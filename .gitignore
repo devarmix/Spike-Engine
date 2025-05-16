@@ -1,0 +1,13 @@
+#  visual studio auto-generated files
+*.sln
+*.vcxproj
+*.filters
+*.user
+.vs
+
+# binaries
+Binaries
+Intermediate
+
+#  test resources
+Test
