@@ -1,9 +1,9 @@
-project "Engine-Core"
-    location "%{wks.location}/Source/Engine-Core"
-    kind "StaticLib"
+project "SpikeEditor"
+    location "%{wks.location}/Source/SpikeEditor"
+    kind "ConsoleApp"
     language "C++"
     cppdialect "C++20"
-	staticruntime "on"
+    staticruntime "on"
 
     targetdir ("%{wks.location}/Binaries/" .. outputDir .. "/%{prj.name}")
 	objdir ("%{wks.location}/Intermediate/" .. outputDir .. "/%{prj.name}")
@@ -25,6 +25,7 @@ project "Engine-Core"
         "%{IncludeDir.VKBootstrap}",
 		"%{IncludeDir.VULKAN_SDK}",
 		"%{IncludeDir.FAST_GLTF}",
+		"%{IncludeDir.ENGINE_CORE}",
 		"%{IncludeDir.ENTT}",
 
 		""
@@ -32,16 +33,7 @@ project "Engine-Core"
 
 	links
 	{
-        "ImGUI",
-		"VK-Bootstrap",
-		"FastGLTF",
-
-		-- SDL libs
-		"%{LibsDir.SDL}/x64/SDL2.lib",
-		"%{LibsDir.SDL}/x64/SDL2main.lib",
-
-		-- Vulkan libs
-		"%{LibsDir.VULKAN_SDK}/vulkan-1.lib"
+       "EngineCore"
 	}
 
 	filter("system:windows")
@@ -52,6 +44,11 @@ project "Engine-Core"
 		{
 			"ENGINE_PLATFORM_WINDOWS",
 			"GLM_FORCE_DEPTH_ZERO_TO_ONE"
+		}
+
+		postbuildcommands 
+		{
+			("{COPY} %{LibsDir.SDL}/x64/SDL2.dll %{wks.location}/Binaries/" .. outputDir .. "/%{prj.name}")
 		}
 
 	filter "configurations:Debug"

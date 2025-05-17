@@ -1,8 +1,8 @@
 include "Dependencies.lua"
 
-workspace "Spike-Engine" 
+workspace "SpikeEngine" 
 	architecture "x64"
-	startproject "Spike-Editor"
+	startproject "SpikeEditor"
 
 	configurations
 	{
@@ -14,10 +14,10 @@ workspace "Spike-Engine"
 outputDir = "%{cfg.build}-%{cfg.system}-%{cfg.architecture}"
 
 -- Dependencies
-include "Source/Third-Party/imgui/Build.lua"
-include "Source/Third-Party/vk-bootstrap/Build.lua"
-include "Source/Third-Party/fastgltf/Build.lua"
+include "Source/ThirdParty/imgui/Build.lua"
+include "Source/ThirdParty/vk-bootstrap/Build.lua"
+include "Source/ThirdParty/fastgltf/Build.lua"
 
 -- Core
-include "Source/Engine-Core/Build.lua"
-include "Source/Spike-Editor/Build.lua"
+include "Source/EngineCore/Build.lua"
+include "Source/SpikeEditor/Build.lua"
