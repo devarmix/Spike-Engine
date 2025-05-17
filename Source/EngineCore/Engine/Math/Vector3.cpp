@@ -35,42 +35,42 @@ namespace SpikeEngine {
         return x * x + y * y + z * z;
     }
 
-    Vector3 Vector3::Zero() {
+    const Vector3 Vector3::Zero() {
 
         return zeroVector;
     }
 
-    Vector3 Vector3::One() {
+    const Vector3 Vector3::One() {
 
         return oneVector;
     }
 
-    Vector3 Vector3::Forward() {
+    const Vector3 Vector3::Forward() {
 
         return forwardVector;
     }
 
-    Vector3 Vector3::Back() {
+    const Vector3 Vector3::Back() {
 
         return backVector;
     }
 
-    Vector3 Vector3::Up() {
+    const Vector3 Vector3::Up() {
 
         return upVector;
     }
 
-    Vector3 Vector3::Down() {
+    const Vector3 Vector3::Down() {
 
         return downVector;
     }
 
-    Vector3 Vector3::Left() {
+    const Vector3 Vector3::Left() {
 
         return leftVector;
     }
 
-    Vector3 Vector3::Right() {
+    const Vector3 Vector3::Right() {
 
         return rightVector;
     }

@@ -11,7 +11,7 @@ namespace SpikeEngine {
 	Scene::~Scene() {}
 
 
-	Ref<GameObject> Scene::CreateGameObject() {
+	const Ref<GameObject> Scene::CreateGameObject() {
 		
 		Ref<GameObject> object = CreateRef<GameObject>(m_Registry.create(), this);
 

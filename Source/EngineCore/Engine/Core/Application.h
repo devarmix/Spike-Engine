@@ -15,12 +15,13 @@ namespace Spike {
 
 	struct ApplicationCreateInfo {
 
-		std::string name;
-		WindowCreateInfo winInfo;
+		std::string Name;
+		WindowCreateInfo WinInfo;
 	};
 
 	class Application {
 	public:
+
 		Application(const ApplicationCreateInfo& info);
 		virtual ~Application() = default;
 
@@ -45,17 +46,19 @@ namespace Spike {
 		// events
 		void OnEvent(Event& event);
 
-		Ref<Window> GetMainWindow() const { return m_Window; }
+		const Ref<Window> GetMainWindow() const { return m_Window; }
 
 		void CleanAll();
 
 	private:
+
 		bool OnWindowResize(const WindowResizeEvent& event);
 		bool OnWindowClose(const WindowCloseEvent& event);
 		bool OnWindowMinimize(const WindowMinimizeEvent& event);
 		bool OnWindowRestore(const WindowRestoreEvent& event);
 
 	private:
+
 		Ref<Window> m_Window;
 		LayerStack m_LayerStack;
 

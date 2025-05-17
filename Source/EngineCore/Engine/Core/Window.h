@@ -7,10 +7,10 @@ namespace Spike {
 
 	struct WindowCreateInfo {
 
-		std::string name;
+		std::string Name;
 
-		uint32_t width;
-		uint32_t height;
+		uint32_t Width;
+		uint32_t Height;
 	};
 
 	class Window {
@@ -21,7 +21,7 @@ namespace Spike {
 		virtual uint32_t GetWidth() const = 0;
 		virtual uint32_t GetHeight() const = 0;
 
-		virtual std::string GetName() const = 0;
+		virtual const std::string& GetName() const = 0;
 		virtual void* GetNativeWindow() const = 0;
 
 		virtual void OnUpdate() = 0;

@@ -127,7 +127,7 @@ namespace Spike {
 		ColorBlendAttachment.blendEnable = VK_FALSE;
 	}
 
-	void PipelineBuilder::SetColorAttachments(VkFormat* formats, uint32_t count) {
+	void PipelineBuilder::SetColorAttachments(const VkFormat* formats, uint32_t count) {
 
 		RenderInfo.colorAttachmentCount = count;
 		RenderInfo.pColorAttachmentFormats = formats;

@@ -12,15 +12,15 @@ Spike::Application* Spike::CreateApplication() {
 
 	WindowCreateInfo winInfo{
 
-		.name = "Spike Editor",
-		.width = 1920,
-		.height = 1080
+		.Name = "Spike Editor",
+		.Width = 1920,
+		.Height = 1080
 	};
 
 	ApplicationCreateInfo appInfo{
 
-		.name = "Spike Editor",
-		.winInfo = winInfo
+		.Name = "Spike Editor",
+		.WinInfo = winInfo
 	};
 
 	return new SpikeEditor::SpikeEditor(appInfo);

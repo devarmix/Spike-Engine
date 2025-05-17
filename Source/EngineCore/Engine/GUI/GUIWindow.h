@@ -15,9 +15,9 @@ namespace SpikeEngine {
 		virtual void OnGUI(float deltaTime) = 0;
 		virtual void OnEvent(Spike::Event& event) {}
 
-		std::string GetName() const { return m_Name; }
+		const std::string& GetName() const { return m_Name; }
 
-		ImGuiWindowFlags GetWindowFlags() const { return m_WindowFlags; }
+		const ImGuiWindowFlags GetWindowFlags() const { return m_WindowFlags; }
 		void SetWindowFlags(ImGuiWindowFlags flags) { m_WindowFlags = flags; }
 		void AddWindowFlags(ImGuiWindowFlags flags) { m_WindowFlags |= flags; }
 

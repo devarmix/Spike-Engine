@@ -4,9 +4,9 @@ namespace Spike {
 
 	WindowsWindow::WindowsWindow(const WindowCreateInfo& info) {
 
-		m_Data.width = info.width;
-		m_Data.height = info.height;
-		m_Data.name = info.name;
+		m_Data.Width = info.Width;
+		m_Data.Height = info.Height;
+		m_Data.Name = info.Name;
 
 		// create a SDL window!
 		SDL_Init(SDL_INIT_VIDEO);
@@ -14,11 +14,11 @@ namespace Spike {
 		SDL_WindowFlags window_Flags = (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
 		m_Window = SDL_CreateWindow(
-			info.name.c_str(),
+			info.Name.c_str(),
 			SDL_WINDOWPOS_UNDEFINED,
 			SDL_WINDOWPOS_UNDEFINED,
-			info.width,
-			info.height,
+			info.Width,
+			info.Height,
 			window_Flags
 		);
 	}
@@ -35,12 +35,12 @@ namespace Spike {
 		while (SDL_PollEvent(&e) != 0) {
 
 			SDLEvent s_event(e);
-			m_Data.eventCallback(s_event);
+			m_Data.EventCallback(s_event);
 
 			if (e.type == SDL_QUIT) {
 
 				WindowCloseEvent event;
-				m_Data.eventCallback(event);
+				m_Data.EventCallback(event);
 			}
 
 			if (e.type == SDL_WINDOWEVENT) {
@@ -48,13 +48,13 @@ namespace Spike {
 				if (e.window.event == SDL_WINDOWEVENT_MINIMIZED) {
 					
 					WindowMinimizeEvent event;
-					m_Data.eventCallback(event);
+					m_Data.EventCallback(event);
 				}
 
 				if (e.window.event == SDL_WINDOWEVENT_RESTORED) {
 					
 					WindowRestoreEvent event;
-					m_Data.eventCallback(event);
+					m_Data.EventCallback(event);
 				}
 
 				if (e.window.event == SDL_WINDOWEVENT_RESIZED) {
@@ -62,11 +62,11 @@ namespace Spike {
 					int w, h;
 					SDL_GetWindowSize(m_Window, &w, &h);
 
-					m_Data.width = w;
-					m_Data.height = h;
+					m_Data.Width = w;
+					m_Data.Height = h;
 
 					WindowResizeEvent event(w, h);
-					m_Data.eventCallback(event);
+					m_Data.EventCallback(event);
 				}
 			}
 
@@ -76,30 +76,30 @@ namespace Spike {
 				if (e.key.repeat) {
 
 					KeyRepeatEvent event(e.key.keysym.sym);
-					m_Data.eventCallback(event);
+					m_Data.EventCallback(event);
 				} else {
 
 					KeyPressEvent event(e.key.keysym.sym);
-					m_Data.eventCallback(event);
+					m_Data.EventCallback(event);
 				}
 			}
 
 			if (e.type == SDL_KEYUP) {
 
 				KeyReleaseEvent event(e.key.keysym.sym);
-				m_Data.eventCallback(event);
+				m_Data.EventCallback(event);
 			}
 
 			if (e.type == SDL_MOUSEBUTTONDOWN) {
 
 				MouseButtonPressEvent event(e.button.button);
-				m_Data.eventCallback(event);
+				m_Data.EventCallback(event);
 			}
 
 			if (e.type == SDL_MOUSEBUTTONUP) {
 
 				MouseButtonReleaseEvent event(e.button.button);
-				m_Data.eventCallback(event);
+				m_Data.EventCallback(event);
 			}
 
 			if (e.type == SDL_MOUSEMOTION) {
@@ -108,7 +108,7 @@ namespace Spike {
 				float deltaY = (float)e.motion.yrel;
 
 				MouseMotionEvent event(deltaX, deltaY);
-				m_Data.eventCallback(event);
+				m_Data.EventCallback(event);
 			}
 
 			if (e.type == SDL_MOUSEWHEEL) {
@@ -117,7 +117,7 @@ namespace Spike {
 				float scrollY = (float)e.wheel.y;
 
 				MouseScrollEvent event(scrollX, scrollY);
-				m_Data.eventCallback(event);
+				m_Data.EventCallback(event);
 			}
 		}
 	}

@@ -23,12 +23,12 @@ namespace SpikeEngine {
 		return Dot(*this, *this);
 	}
 
-	Vector4 Vector4::Zero() {
+	const Vector4 Vector4::Zero() {
 
 		return zeroVector;
 	}
 
-	Vector4 Vector4::One() {
+	const Vector4 Vector4::One() {
 
 		return oneVector;
 	}

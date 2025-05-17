@@ -5,10 +5,10 @@ namespace SpikeEngine {
 	class Mathf {
 	public:
 
-		const float PI = 3.14159274f;
-		const float E = 2.71828175f;
-		const float Deg2Rad = PI / 180;
-		const float Rad2Deg = 57.29578f;
+		static const float PI;
+		static const float E;
+		static const float Deg2Rad;
+		static const float Rad2Deg;
 
 		static float Sin(float f);
 		static float Cos(float f);

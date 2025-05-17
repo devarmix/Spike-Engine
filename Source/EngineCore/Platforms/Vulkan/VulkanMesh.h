@@ -18,12 +18,13 @@ namespace Spike {
 	class VulkanMesh : public Mesh {
 	public:
 
-		VulkanMesh() = default;
+		VulkanMesh(const VulkanMeshData& data) : m_Data(data) {}
 		virtual ~VulkanMesh() override { Destroy();  ASSET_CORE_DESTROY(); }
 
 		void Destroy();
 
-		virtual void* GetData() override { return &Data; }
+		virtual const void* GetData() const override { return (void*)&m_Data; }
+		const VulkanMeshData* GetRawData() const { return &m_Data; }
 
 		static std::vector<Ref<VulkanMesh>> Create(std::filesystem::path& filePath);
 
@@ -32,8 +33,8 @@ namespace Spike {
 		void GenerateTangents(std::vector<uint32_t>& indices, std::vector<Vertex>& vertices);
 		void UploadGPUData(std::span<uint32_t> indices, std::span<Vertex> vertices);
 
-	public:
+	private:
 
-		VulkanMeshData Data;
+		VulkanMeshData m_Data;
 	};
 }

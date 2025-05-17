@@ -18,12 +18,12 @@ namespace SpikeEngine {
 	}
 
 
-	glm::mat4 PerspectiveCamera::GetProjectionMatrix(float aspect) {
+	const glm::mat4 PerspectiveCamera::GetProjectionMatrix(float aspect) {
 
 		return glm::perspective(glm::radians(m_FOV), aspect, m_Near, m_Far);
 	}
 
-	glm::mat4 PerspectiveCamera::GetRotationMatrix() {
+	const glm::mat4 PerspectiveCamera::GetRotationMatrix() {
 
 		glm::quat pitchRotation = glm::angleAxis(m_Rotation.x, glm::vec3{ 1.f, 0.f, 0.f });
 		glm::quat yawRotation = glm::angleAxis(m_Rotation.y, glm::vec3{ 0.f, -1.f, 0.f });
@@ -32,7 +32,7 @@ namespace SpikeEngine {
 		return glm::toMat4(yawRotation) * glm::toMat4(pitchRotation) * glm::toMat4(rollRotation);
 	}
 
-	glm::mat4 PerspectiveCamera::GetViewMatrix() {
+	const glm::mat4 PerspectiveCamera::GetViewMatrix() {
 
 		glm::mat4 cameraTranslation = glm::translate(glm::mat4(1.f), m_Position);
 		glm::mat4 cameraRotation = GetRotationMatrix();

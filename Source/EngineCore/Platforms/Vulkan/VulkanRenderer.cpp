@@ -214,8 +214,8 @@ namespace Spike {
 			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
 			pipelineBulder.SetMultisamplingNone();
 
-			pipelineBulder.SetColorAttachments(&BRDFLutPipeline.BRDFLutTexture->Data.Format, 1);
-			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->Data.Format);
+			pipelineBulder.SetColorAttachments(&BRDFLutPipeline.BRDFLutTexture->GetRawData()->Format, 1);
+			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
 
 			pipelineBulder.PipelineLayout = newLayout;
 			pipelineBulder.DisableBlending();
@@ -284,8 +284,8 @@ namespace Spike {
 			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
 			pipelineBulder.SetMultisamplingNone();
 
-			pipelineBulder.SetColorAttachments(&DrawTexture->Data.Format, 1);
-			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->Data.Format);
+			pipelineBulder.SetColorAttachments(&DrawTexture->GetRawData()->Format, 1);
+			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
 
 			pipelineBulder.PipelineLayout = newLayout;
 			pipelineBulder.DisableBlending();
@@ -301,7 +301,7 @@ namespace Spike {
 
 		// load skybox texture
 		{
-			const char* filePath[6] = {
+			std::array<const char*, 6> filePath = {
 
 				"C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/HDR/FluffballDay/output_skybox_posx.hdr",
 				"C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/HDR/FluffballDay/output_skybox_negx.hdr",
@@ -317,7 +317,7 @@ namespace Spike {
 		// write set
 		{
 			DescriptorWriter writer;
-			writer.WriteImage(0, SkyboxPipeline.SkyboxTexture->Data.View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(0, SkyboxPipeline.SkyboxTexture->GetRawData()->View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
 			writer.UpdateSet(Device.Device, SkyboxPipeline.Set);
 		}
@@ -371,8 +371,8 @@ namespace Spike {
 			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
 			pipelineBulder.SetMultisamplingNone();
 
-			pipelineBulder.SetColorAttachments(&DrawTexture->Data.Format, 1);
-			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->Data.Format);
+			pipelineBulder.SetColorAttachments(&DrawTexture->GetRawData()->Format, 1);
+			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
 
 			pipelineBulder.PipelineLayout = newLayout;
 			pipelineBulder.DisableBlending();
@@ -389,11 +389,11 @@ namespace Spike {
 		// update set
 		{
 			DescriptorWriter writer;
-			writer.WriteImage(1, GBuffer.AlbedoMap->Data.View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			writer.WriteImage(2, GBuffer.NormalMap->Data.View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			writer.WriteImage(3, GBuffer.MaterialMap->Data.View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			writer.WriteImage(4, GBuffer.DepthMap->Data.View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			writer.WriteImage(5, SkyboxPipeline.SkyboxTexture->Data.View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(1, GBuffer.AlbedoMap->GetRawData()->View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(2, GBuffer.NormalMap->GetRawData()->View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(3, GBuffer.MaterialMap->GetRawData()->View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(4, GBuffer.DepthMap->GetRawData()->View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(5, SkyboxPipeline.SkyboxTexture->GetRawData()->View, DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
 			writer.UpdateSet(Device.Device, LightingPipeline.Set);
 		}
@@ -524,11 +524,11 @@ namespace Spike {
 		// update lighting set, after invalidating textures
 		{
 			DescriptorWriter writer;
-			writer.WriteImage(1, VulkanRenderer::GBuffer.AlbedoMap->Data.View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			writer.WriteImage(2, VulkanRenderer::GBuffer.NormalMap->Data.View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			//writer.WriteImage(3, VulkanRenderer::GBuffer.PositionMap->Data.View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			writer.WriteImage(3, VulkanRenderer::GBuffer.MaterialMap->Data.View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			writer.WriteImage(4, VulkanRenderer::GBuffer.DepthMap->Data.View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(1, VulkanRenderer::GBuffer.AlbedoMap->GetRawData()->View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(2, VulkanRenderer::GBuffer.NormalMap->GetRawData()->View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			//writer.WriteImage(3, VulkanRenderer::GBuffer.PositionMap->GetRawData()->View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(3, VulkanRenderer::GBuffer.MaterialMap->GetRawData()->View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(4, VulkanRenderer::GBuffer.DepthMap->GetRawData()->View, VulkanRenderer::DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
 			writer.UpdateSet(VulkanRenderer::Device.Device, VulkanRenderer::LightingPipeline.Set);
 		}
@@ -681,7 +681,7 @@ namespace Spike {
 		DefErrorTexture = VulkanTexture::Create((void*)&pink, VkExtent3D{ 1, 1, 1 }, VK_FORMAT_R8G8B8A8_UNORM,
 			VK_IMAGE_USAGE_SAMPLED_BIT);
 		{
-			void* cubeData[6]{
+			std::array<void*, 6> cubeData = {
 
 				(void*)&pink,
 				(void*)&pink,
@@ -812,7 +812,7 @@ namespace Spike {
 		VkImageSubresourceRange clearRange = VulkanTools::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
 
 		// clear image
-		vkCmdClearColorImage(cmd, DrawTexture->Data.Image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+		vkCmdClearColorImage(cmd, DrawTexture->GetRawData()->Image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 	}
 
 	void VulkanRenderer::DrawImGui(VkCommandBuffer cmd, VkImageView targetImageView) {
@@ -983,63 +983,63 @@ namespace Spike {
 
 		// DRAW TO THE MAIN WINDOW
 
-		DrawExtent.height = uint32_t(std::min(Swapchain.Extent.height, DrawTexture->Data.Extent.height) * RenderScale);
-		DrawExtent.width = uint32_t(std::min(Swapchain.Extent.width, DrawTexture->Data.Extent.width) * RenderScale);
+		DrawExtent.height = uint32_t(std::min(Swapchain.Extent.height, DrawTexture->GetRawData()->Extent.height) * RenderScale);
+		DrawExtent.width = uint32_t(std::min(Swapchain.Extent.width, DrawTexture->GetRawData()->Extent.width) * RenderScale);
 
-		VulkanTexture::TransitionImage(cmd, DrawTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+		VulkanTexture::TransitionImage(cmd, DrawTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
 		DrawBackground(cmd);
 
 		// prevent from drawing, if there is no camera
 		if (MainCamera) {
 
-			VulkanTexture::TransitionImage(cmd, DrawTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			VulkanTexture::TransitionImage(cmd, DrawTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 			//VulkanTexture::TransitionImage(cmd, depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
 			DrawGeometry(cmd);
 
-			VulkanTexture::TransitionImage(cmd, DrawTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+			VulkanTexture::TransitionImage(cmd, DrawTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 		}
 		else {
 
-			VulkanTexture::TransitionImage(cmd, DrawTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+			VulkanTexture::TransitionImage(cmd, DrawTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 		}
 
 		VulkanTexture::TransitionImage(cmd, Swapchain.Images[swapchainImageIndex], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-		VulkanTexture::CopyImageToImage(cmd, DrawTexture->Data.Image, Swapchain.Images[swapchainImageIndex], DrawExtent, Swapchain.Extent);
+		VulkanTexture::CopyImageToImage(cmd, DrawTexture->GetRawData()->Image, Swapchain.Images[swapchainImageIndex], DrawExtent, Swapchain.Extent);
 	}
 
 	void VulkanRenderer::DrawViewport(VkCommandBuffer cmd, uint32_t swapchainImageIndex) {
 
 		// DRAW TO THE VIEWPORT
 
-		DrawExtent.height = uint32_t(std::min(ViewportExtent.height, DrawTexture->Data.Extent.height) * RenderScale);
-		DrawExtent.width = uint32_t(std::min(ViewportExtent.width, DrawTexture->Data.Extent.width) * RenderScale);
+		DrawExtent.height = uint32_t(std::min(ViewportExtent.height, DrawTexture->GetRawData()->Extent.height) * RenderScale);
+		DrawExtent.width = uint32_t(std::min(ViewportExtent.width, DrawTexture->GetRawData()->Extent.width) * RenderScale);
 
-		VulkanTexture::TransitionImage(cmd, DrawTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+		VulkanTexture::TransitionImage(cmd, DrawTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
 		DrawBackground(cmd);
 
-		VulkanTexture::TransitionImage(cmd, DrawTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+		VulkanTexture::TransitionImage(cmd, DrawTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 		VulkanTexture::TransitionImage(cmd, Swapchain.Images[swapchainImageIndex], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-		VulkanTexture::CopyImageToImage(cmd, DrawTexture->Data.Image, Swapchain.Images[swapchainImageIndex], DrawExtent, Swapchain.Extent);
+		VulkanTexture::CopyImageToImage(cmd, DrawTexture->GetRawData()->Image, Swapchain.Images[swapchainImageIndex], DrawExtent, Swapchain.Extent);
 
 		// prevent from drawing, if there is no camera or viewport is minimized
 		if (MainCamera && !ViewportMinimized) {
 
-			VulkanTexture::TransitionImage(cmd, DrawTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			VulkanTexture::TransitionImage(cmd, DrawTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 			//VkUtil::Transition_Image(cmd, depthImage.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
 			DrawGeometry(cmd);
 
-			VulkanTexture::TransitionImage(cmd, DrawTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
-			VulkanTexture::TransitionImage(cmd, ViewportTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+			VulkanTexture::TransitionImage(cmd, DrawTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+			VulkanTexture::TransitionImage(cmd, ViewportTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-			VulkanTexture::CopyImageToImage(cmd, DrawTexture->Data.Image, ViewportTexture->Data.Image, DrawExtent, ViewportExtent);
+			VulkanTexture::CopyImageToImage(cmd, DrawTexture->GetRawData()->Image, ViewportTexture->GetRawData()->Image, DrawExtent, ViewportExtent);
 
-			VulkanTexture::TransitionImage(cmd, ViewportTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			VulkanTexture::TransitionImage(cmd, ViewportTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 		else {
 
@@ -1051,7 +1051,7 @@ namespace Spike {
 			//mainDrawContext.OpaqueSurfaces.clear();
 			//mainDrawContext.TransparentSurfaces.clear();
 
-			VulkanTexture::TransitionImage(cmd, ViewportTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			VulkanTexture::TransitionImage(cmd, ViewportTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 	}
 
@@ -1060,10 +1060,10 @@ namespace Spike {
 		SkyboxPass(cmd);
 
 		// prepare GBuffer for rendering
-		VulkanTexture::TransitionImage(cmd, GBuffer.AlbedoMap->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-		VulkanTexture::TransitionImage(cmd, GBuffer.NormalMap->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-		VulkanTexture::TransitionImage(cmd, GBuffer.MaterialMap->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
-		//VulkanTexture::TransitionImage(cmd, GBuffer.PositionMap->Data.Image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.AlbedoMap->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.NormalMap->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.MaterialMap->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+		//VulkanTexture::TransitionImage(cmd, GBuffer.PositionMap->GetRawData()->Image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
 		{
 			VkClearColorValue clearValue;
@@ -1072,7 +1072,7 @@ namespace Spike {
 			VkImageSubresourceRange clearRange = VulkanTools::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
 
 			// clear image
-			vkCmdClearColorImage(cmd, GBuffer.AlbedoMap->Data.Image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+			vkCmdClearColorImage(cmd, GBuffer.AlbedoMap->GetRawData()->Image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 		}
 
 		{
@@ -1082,7 +1082,7 @@ namespace Spike {
 			VkImageSubresourceRange clearRange = VulkanTools::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
 
 			// clear image
-			vkCmdClearColorImage(cmd, GBuffer.NormalMap->Data.Image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+			vkCmdClearColorImage(cmd, GBuffer.NormalMap->GetRawData()->Image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 		}
 
 		{
@@ -1092,14 +1092,14 @@ namespace Spike {
 			VkImageSubresourceRange clearRange = VulkanTools::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
 
 			// clear image
-			vkCmdClearColorImage(cmd, GBuffer.MaterialMap->Data.Image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
+			vkCmdClearColorImage(cmd, GBuffer.MaterialMap->GetRawData()->Image, VK_IMAGE_LAYOUT_GENERAL, &clearValue, 1, &clearRange);
 		}
 
-		VulkanTexture::TransitionImage(cmd, GBuffer.AlbedoMap->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		VulkanTexture::TransitionImage(cmd, GBuffer.NormalMap->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		VulkanTexture::TransitionImage(cmd, GBuffer.MaterialMap->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		//VulkanTexture::TransitionImage(cmd, GBuffer.PositionMap->Data.Image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		VulkanTexture::TransitionImage(cmd, GBuffer.DepthMap->Data.Image, VK_IMAGE_ASPECT_DEPTH_BIT,VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.AlbedoMap->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.NormalMap->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.MaterialMap->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		//VulkanTexture::TransitionImage(cmd, GBuffer.PositionMap->GetRawData()->Image, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.DepthMap->GetRawData()->Image, VK_IMAGE_ASPECT_DEPTH_BIT,VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
 		//SE_CORE_WARN("GBUFFER PASS");
 		GBufferPass(cmd);
@@ -1107,10 +1107,10 @@ namespace Spike {
 		
 		// prepare GBuffer for lighting
 		//SE_CORE_WARN("LIGHTING PASS");
-		VulkanTexture::TransitionImage(cmd, GBuffer.AlbedoMap->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		VulkanTexture::TransitionImage(cmd, GBuffer.NormalMap->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		VulkanTexture::TransitionImage(cmd, GBuffer.MaterialMap->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		VulkanTexture::TransitionImage(cmd, GBuffer.DepthMap->Data.Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.AlbedoMap->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.NormalMap->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.MaterialMap->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VulkanTexture::TransitionImage(cmd, GBuffer.DepthMap->GetRawData()->Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		//SE_CORE_WARN("LIGHTING PASS");
 		LightingPass(cmd);
@@ -1127,11 +1127,11 @@ namespace Spike {
 			VK_CHECK(vkBeginCommandBuffer(BRDFLutPipeline.Commandbuffer, &cmdBeginInfo));
 		}
 
-		VulkanTexture::TransitionImage(BRDFLutPipeline.Commandbuffer, BRDFLutPipeline.BRDFLutTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		VulkanTexture::TransitionImage(BRDFLutPipeline.Commandbuffer, BRDFLutPipeline.BRDFLutTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		BRDFLutPass(BRDFLutPipeline.Commandbuffer);
 
-		VulkanTexture::TransitionImage(BRDFLutPipeline.Commandbuffer, BRDFLutPipeline.BRDFLutTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VulkanTexture::TransitionImage(BRDFLutPipeline.Commandbuffer, BRDFLutPipeline.BRDFLutTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 		// end and submit command buffer
 		{
@@ -1150,7 +1150,7 @@ namespace Spike {
 
 	void VulkanRenderer::BRDFLutPass(VkCommandBuffer cmd) {
 
-		VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(BRDFLutPipeline.BRDFLutTexture->Data.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(BRDFLutPipeline.BRDFLutTexture->GetRawData()->View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		VkExtent2D rExtent{};
 		rExtent.width = BRDFLutPipelineData::TextureSize;
@@ -1218,13 +1218,13 @@ namespace Spike {
 			});
 
 		// render
-		VkRenderingAttachmentInfo depthAttachment = VulkanTools::DepthAttachmentInfo(GBuffer.DepthMap->Data.View, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+		VkRenderingAttachmentInfo depthAttachment = VulkanTools::DepthAttachmentInfo(GBuffer.DepthMap->GetRawData()->View, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
 		std::array<VkRenderingAttachmentInfo, 3> colorAttachments;
-		colorAttachments[0] = VulkanTools::AttachmentInfo(GBuffer.AlbedoMap->Data.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		colorAttachments[1] = VulkanTools::AttachmentInfo(GBuffer.NormalMap->Data.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		//colorAttachments[2] = VulkanTools::AttachmentInfo(GBuffer.PositionMap->Data.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-		colorAttachments[2] = VulkanTools::AttachmentInfo(GBuffer.MaterialMap->Data.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		colorAttachments[0] = VulkanTools::AttachmentInfo(GBuffer.AlbedoMap->GetRawData()->View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		colorAttachments[1] = VulkanTools::AttachmentInfo(GBuffer.NormalMap->GetRawData()->View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		//colorAttachments[2] = VulkanTools::AttachmentInfo(GBuffer.PositionMap->GetRawData()->View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		colorAttachments[2] = VulkanTools::AttachmentInfo(GBuffer.MaterialMap->GetRawData()->View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		VkRenderingInfo renderInfo = VulkanTools::RenderingInfo(DrawExtent, colorAttachments.data(), 3, &depthAttachment);
 		vkCmdBeginRendering(cmd, &renderInfo);
@@ -1308,7 +1308,7 @@ namespace Spike {
 
 	void VulkanRenderer::SkyboxPass(VkCommandBuffer cmd) {
 
-		VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(DrawTexture->Data.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(DrawTexture->GetRawData()->View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		VkRenderingInfo renderInfo = VulkanTools::RenderingInfo(DrawExtent, &colorAttachment, 1, VK_NULL_HANDLE);
 		vkCmdBeginRendering(cmd, &renderInfo);
@@ -1345,7 +1345,7 @@ namespace Spike {
 
 	void VulkanRenderer::LightingPass(VkCommandBuffer cmd) {
 
-		VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(DrawTexture->Data.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(DrawTexture->GetRawData()->View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		VkRenderingInfo renderInfo = VulkanTools::RenderingInfo(DrawExtent, &colorAttachment, 1, VK_NULL_HANDLE);
 		vkCmdBeginRendering(cmd, &renderInfo);

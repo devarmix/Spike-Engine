@@ -15,12 +15,12 @@ namespace SpikeEngine {
 		Vector2 Normalized() const;
 		float Magnitude() const;
 
-		static Vector2 Zero();
-		static Vector2 One();
-		static Vector2 Up();
-		static Vector2 Down();
-		static Vector2 Left();
-		static Vector2 Right();
+		static const Vector2 Zero();
+		static const Vector2 One();
+		static const Vector2 Up();
+		static const Vector2 Down();
+		static const Vector2 Left();
+		static const Vector2 Right();
 
 		static Vector2 Lerp(Vector2 a, Vector2 b, float t);
 		static Vector2 LerpUnclamped(Vector2 a, Vector2 b, float t);

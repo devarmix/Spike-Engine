@@ -17,14 +17,14 @@ namespace SpikeEngine {
 		float Magnitude() const;
 		int SqrMagnitude() const;
 
-		static Vector3Int Zero();
-		static Vector3Int One();
-		static Vector3Int Up();
-		static Vector3Int Down();
-		static Vector3Int Left();
-		static Vector3Int Right();
-		static Vector3Int Forward();
-		static Vector3Int Back();
+		static const Vector3Int Zero();
+		static const Vector3Int One();
+		static const Vector3Int Up();
+		static const Vector3Int Down();
+		static const Vector3Int Left();
+		static const Vector3Int Right();
+		static const Vector3Int Forward();
+		static const Vector3Int Back();
 
 		void Set(int newX, int newY, int newZ);
 		static float Distance(Vector3Int a, Vector3Int b);

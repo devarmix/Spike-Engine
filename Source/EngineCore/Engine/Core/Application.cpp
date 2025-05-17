@@ -9,10 +9,10 @@ namespace Spike {
 
 	Application::Application(const ApplicationCreateInfo& info) {
 
-		m_Window = Window::Create(info.winInfo);
+		m_Window = Window::Create(info.WinInfo);
 		m_Window->SetEventCallback(BIND_EVENT_FN(Application::OnEvent));
 
-		ENGINE_WARN("Created an application: " + info.name);
+		ENGINE_WARN("Created an application: " + info.Name);
 
 		// Initialize renderer
 		VulkanRenderer::Init(*m_Window, RendererModeViewport);

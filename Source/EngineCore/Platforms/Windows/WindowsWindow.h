@@ -11,24 +11,25 @@ namespace Spike {
 		WindowsWindow(const WindowCreateInfo& info);
 		virtual ~WindowsWindow() override;
 
-		virtual uint32_t GetWidth() const override { return m_Data.width; }
-		virtual uint32_t GetHeight() const override { return m_Data.height; }
+		virtual uint32_t GetWidth() const override { return m_Data.Width; }
+		virtual uint32_t GetHeight() const override { return m_Data.Height; }
 
-		virtual std::string GetName() const override { return m_Data.name; }
+		virtual const std::string& GetName() const override { return m_Data.Name; }
 		virtual void* GetNativeWindow() const override { return m_Window; }
 
 		virtual void OnUpdate() override;
 
-		virtual void SetEventCallback(const EventCallbackFn& callback) override { m_Data.eventCallback = callback; }
+		virtual void SetEventCallback(const EventCallbackFn& callback) override { m_Data.EventCallback = callback; }
 
 	private:
+
 		struct WindowData {
 
-			uint32_t width;
-			uint32_t height;
+			uint32_t Width;
+			uint32_t Height;
 
-			std::string name;
-			EventCallbackFn eventCallback;
+			std::string Name;
+			EventCallbackFn EventCallback;
 		};
 
 		WindowData m_Data;

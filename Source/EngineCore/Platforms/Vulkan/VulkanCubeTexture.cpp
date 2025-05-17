@@ -9,9 +9,10 @@ namespace Spike {
 
 	Ref<VulkanCubeTexture> VulkanCubeTexture::Create(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped) {
 
-		Ref<VulkanCubeTexture> newTexture = CreateRef<VulkanCubeTexture>();
-		newTexture->Data.Format = format;
-		newTexture->Data.Extent = size;
+		VulkanCubeTextureData texData{};
+
+		texData.Format = format;
+		texData.Extent = size;
 
 		VkImageCreateInfo img_info = VulkanTools::CubeImageCreateInfo(format, usage, size);
 		if (mipmapped) {
@@ -23,7 +24,7 @@ namespace Spike {
 		allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		// allocate and create the image
-		VK_CHECK(vmaCreateImage(VulkanRenderer::Device.Allocator, &img_info, &allocinfo, &newTexture->Data.Image, &newTexture->Data.Allocation, nullptr));
+		VK_CHECK(vmaCreateImage(VulkanRenderer::Device.Allocator, &img_info, &allocinfo, &texData.Image, &texData.Allocation, nullptr));
 
 		VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
 		if (format == VK_FORMAT_D32_SFLOAT) {
@@ -31,15 +32,17 @@ namespace Spike {
 		}
 
 		// build a image-view for the image
-		VkImageViewCreateInfo view_info = VulkanTools::CubeImageviewCreateInfo(format, newTexture->Data.Image, aspectFlag);
+		VkImageViewCreateInfo view_info = VulkanTools::CubeImageviewCreateInfo(format, texData.Image, aspectFlag);
 		view_info.subresourceRange.levelCount = img_info.mipLevels;
 
-		VK_CHECK(vkCreateImageView(VulkanRenderer::Device.Device, &view_info, nullptr, &newTexture->Data.View));
+		VK_CHECK(vkCreateImageView(VulkanRenderer::Device.Device, &view_info, nullptr, &texData.View));
+
+		Ref<VulkanCubeTexture> newTexture = CreateRef<VulkanCubeTexture>(texData);
 
 		return newTexture;
 	}
 
-	Ref<VulkanCubeTexture> VulkanCubeTexture::Create(void** data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped) {
+	Ref<VulkanCubeTexture> VulkanCubeTexture::Create(const std::array<void*, 6>& data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped) {
 
 		size_t sdata_size = size.depth * size.width * size.height * 4;
 		size_t data_size = sdata_size * 6;
@@ -57,7 +60,7 @@ namespace Spike {
 
 		VulkanRenderer::ImmediateSubmit([&](VkCommandBuffer cmd) {
 
-			TransitionImage(cmd, newTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+			TransitionImage(cmd, newTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 			std::vector<VkBufferImageCopy> copyRegion(6);
 			for (int i = 0; i < 6; i++) {
@@ -76,13 +79,13 @@ namespace Spike {
 			}
 
 			// copy the buffer into the image
-			vkCmdCopyBufferToImage(cmd, uploadbuffer.Buffer, newTexture->Data.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copyRegion.data());
+			vkCmdCopyBufferToImage(cmd, uploadbuffer.Buffer, newTexture->GetRawData()->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copyRegion.data());
 
 			if (mipmapped) {
-				GenerateMipmaps(cmd, newTexture->Data.Image, VkExtent2D{ newTexture->Data.Extent.width, newTexture->Data.Extent.height });
+				GenerateMipmaps(cmd, newTexture->GetRawData()->Image, VkExtent2D{ newTexture->GetRawData()->Extent.width, newTexture->GetRawData()->Extent.height });
 			}
 			else {
-				TransitionImage(cmd, newTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				TransitionImage(cmd, newTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			}
 			});
@@ -92,13 +95,13 @@ namespace Spike {
 		return newTexture;
 	}
 
-	Ref<VulkanCubeTexture> VulkanCubeTexture::Create(const char** filePath) {
+	Ref<VulkanCubeTexture> VulkanCubeTexture::Create(const std::array<const char*, 6>& filePath) {
 
 		int width, height, nrChannels;
 
 		Ref<VulkanCubeTexture> texture;
 
-		void* cubeData[6];
+		std::array<void*, 6> cubeData{};
 
 		for (int i = 0; i < 6; i++) {
 
@@ -139,16 +142,16 @@ namespace Spike {
 
 	void VulkanCubeTexture::Destroy() {
 
-		if (Data.View != VK_NULL_HANDLE) {
+		if (m_Data.View != VK_NULL_HANDLE) {
 
-			vkDestroyImageView(VulkanRenderer::Device.Device, Data.View, nullptr);
-			Data.View = VK_NULL_HANDLE;
+			vkDestroyImageView(VulkanRenderer::Device.Device, m_Data.View, nullptr);
+			m_Data.View = VK_NULL_HANDLE;
 		}
 
-		if (Data.Image != VK_NULL_HANDLE) {
+		if (m_Data.Image != VK_NULL_HANDLE) {
 
-			vmaDestroyImage(VulkanRenderer::Device.Allocator, Data.Image, Data.Allocation);
-			Data.Image = VK_NULL_HANDLE;
+			vmaDestroyImage(VulkanRenderer::Device.Allocator, m_Data.Image, m_Data.Allocation);
+			m_Data.Image = VK_NULL_HANDLE;
 		}
 	}
 

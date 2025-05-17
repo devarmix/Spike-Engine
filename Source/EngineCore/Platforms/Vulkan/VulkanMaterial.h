@@ -73,22 +73,23 @@ namespace Spike {
 	class VulkanMaterial : public Material {
 	public:
 
-		VulkanMaterial() = default;
+		VulkanMaterial(const VulkanMaterialData& data) : m_Data(data) {}
 		virtual ~VulkanMaterial() override { Destroy(); ASSET_CORE_DESTROY(); }
 
 		void Destroy();
 
 		static Ref<VulkanMaterial> Create();
 
-		virtual void* GetData() override { return &Data; }
+		virtual const void* GetData() const override { return (void*) & m_Data; }
+		const VulkanMaterialData* GetRawData() const { return &m_Data; }
 
 		virtual void SetScalarParameter(const std::string& name, float value) override;
 		virtual void SetColorParameter(const std::string& name, Vector4 value) override;
 		virtual void SetTextureParameter(const std::string& name, Ref<Texture> value) override;
 
-		virtual float GetScalarParameter(const std::string& name) const override;
-		virtual Vector4 GetColorParameter(const std::string& name) const override;
-		virtual Ref<Texture> GetTextureParameter(const std::string& name) const override;
+		virtual const float GetScalarParameter(const std::string& name) override;
+		virtual const Vector4 GetColorParameter(const std::string& name) override;
+		virtual const Ref<Texture> GetTextureParameter(const std::string& name) override;
 
 	public:
 
@@ -104,8 +105,8 @@ namespace Spike {
 
 		void BuildPipeline(VulkanShader shader, MaterialSurfaceType surfaceType);
 
-	public:
+	private:
 
-		VulkanMaterialData Data;
+		VulkanMaterialData m_Data;
 	};
 }

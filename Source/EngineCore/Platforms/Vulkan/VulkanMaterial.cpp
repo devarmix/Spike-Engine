@@ -12,7 +12,7 @@ namespace Spike {
 		auto it = m_ScalarParameters.find(name);
 		if (it != m_ScalarParameters.end()) {
 
-			uint32_t bufIndex = Data.BufIndex;
+			uint32_t bufIndex = m_Data.BufIndex;
 			uint8_t valIndex = m_ScalarParameters[name].DataBindIndex;
 
 			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
@@ -31,7 +31,7 @@ namespace Spike {
 		auto it = m_ColorParameters.find(name);
 		if (it != m_ColorParameters.end()) {
 
-			uint32_t bufIndex = Data.BufIndex;
+			uint32_t bufIndex = m_Data.BufIndex;
 			uint8_t valIndex = m_ColorParameters[name].DataBindIndex;
 			glm::vec4 val = glm::vec4{ value.x, value.y, value.z, value.w };
 
@@ -52,7 +52,7 @@ namespace Spike {
 		if (it != m_TextureParameters.end()) {
 
 			uint8_t valIndex = m_TextureParameters[name].DataBindIndex;
-			uint32_t bufIndex = Data.BufIndex;
+			uint32_t bufIndex = m_Data.BufIndex;
 
 			m_TextureParameters[name].Value = value;
 
@@ -68,12 +68,12 @@ namespace Spike {
 		}
 	}
 
-	float VulkanMaterial::GetScalarParameter(const std::string& name) const {
+	const float VulkanMaterial::GetScalarParameter(const std::string& name) {
 
 		auto it = m_ScalarParameters.find(name);
 		if (it != m_ScalarParameters.end()) {
 
-			uint32_t bufIndex = Data.BufIndex;
+			uint32_t bufIndex = m_Data.BufIndex;
 			uint8_t valIndex = m_ScalarParameters[name].DataBindIndex;
 
 			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
@@ -86,12 +86,12 @@ namespace Spike {
 		}
 	}
 
-	Vector4 VulkanMaterial::GetColorParameter(const std::string& name) const {
+	const Vector4 VulkanMaterial::GetColorParameter(const std::string& name) {
 
 		auto it = m_ColorParameters.find(name);
 		if (it != m_ColorParameters.end()) {
 
-			uint32_t bufIndex = Data.BufIndex;
+			uint32_t bufIndex = m_Data.BufIndex;
 			uint8_t valIndex = m_ColorParameters[name].DataBindIndex;
 
 			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
@@ -106,7 +106,7 @@ namespace Spike {
 		}
 	}
 
-	Ref<Texture> VulkanMaterial::GetTextureParameter(const std::string& name) const {
+	const Ref<Texture> VulkanMaterial::GetTextureParameter(const std::string& name) {
 
 		auto it = m_TextureParameters.find(name);
 		if (it != m_TextureParameters.end()) {
@@ -158,7 +158,7 @@ namespace Spike {
 		if (it == m_TextureParameters.end()) {
 
 			uint32_t newTexIndex = VulkanRenderer::GlobalMaterialManager.GetFreeTextureIndex();
-			uint32_t bufIndex = Data.BufIndex;
+			uint32_t bufIndex = m_Data.BufIndex;
 
 			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
 			constants[bufIndex].TexIndex[valIndex] = newTexIndex;
@@ -208,7 +208,7 @@ namespace Spike {
 		if (it != m_TextureParameters.end()) {
 
 			uint8_t valIndex = m_TextureParameters[name].DataBindIndex;
-			uint32_t bufIndex = Data.BufIndex;
+			uint32_t bufIndex = m_Data.BufIndex;
 
 			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
 			VulkanRenderer::GlobalMaterialManager.ReleaseTextureIndex(constants[bufIndex].TexIndex[valIndex]);
@@ -241,7 +241,7 @@ namespace Spike {
 		VkPipelineLayout newLayout;
 		VK_CHECK(vkCreatePipelineLayout(VulkanRenderer::Device.Device, &mesh_Layout_Info, nullptr, &newLayout));
 
-		Data.Pipeline.Layout = newLayout;
+		m_Data.Pipeline.Layout = newLayout;
 
 		PipelineBuilder pipelineBulder;
 		pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
@@ -251,13 +251,13 @@ namespace Spike {
 		pipelineBulder.SetMultisamplingNone();
 
 		VkFormat colorAttachmentFormats[3];
-		colorAttachmentFormats[0] = VulkanRenderer::GBuffer.AlbedoMap->Data.Format;
-		colorAttachmentFormats[1] = VulkanRenderer::GBuffer.NormalMap->Data.Format;
+		colorAttachmentFormats[0] = VulkanRenderer::GBuffer.AlbedoMap->GetRawData()->Format;
+		colorAttachmentFormats[1] = VulkanRenderer::GBuffer.NormalMap->GetRawData()->Format;
 		//colorAttachmentFormats[2] = VulkanRenderer::GBuffer.PositionMap->Data.Format;
-		colorAttachmentFormats[2] = VulkanRenderer::GBuffer.MaterialMap->Data.Format;
+		colorAttachmentFormats[2] = VulkanRenderer::GBuffer.MaterialMap->GetRawData()->Format;
 
 		pipelineBulder.SetColorAttachments(colorAttachmentFormats, 3);
-		pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->Data.Format);
+		pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
 
 		pipelineBulder.PipelineLayout = newLayout;
 
@@ -266,7 +266,7 @@ namespace Spike {
 			pipelineBulder.DisableBlending();
 			pipelineBulder.EnableDepthTest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
-			Data.Pipeline.Pipeline = pipelineBulder.BuildPipeline(VulkanRenderer::Device.Device);
+			m_Data.Pipeline.Pipeline = pipelineBulder.BuildPipeline(VulkanRenderer::Device.Device);
 		} 
 		else if (surfaceType == Transparent) {
 
@@ -274,13 +274,13 @@ namespace Spike {
 
 			pipelineBulder.EnableDepthTest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
 
-			Data.Pipeline.Pipeline = pipelineBulder.BuildPipeline(VulkanRenderer::Device.Device);
+			m_Data.Pipeline.Pipeline = pipelineBulder.BuildPipeline(VulkanRenderer::Device.Device);
 		}
 	}
 
 	Ref<VulkanMaterial> VulkanMaterial::Create() {
 
-		Ref<VulkanMaterial> mat = CreateRef<VulkanMaterial>();
+		VulkanMaterialData matData{};
 
 		uint32_t bufIndex = VulkanRenderer::GlobalMaterialManager.GetFreeBufferIndex();
 
@@ -299,9 +299,11 @@ namespace Spike {
 			VulkanRenderer::GlobalMaterialManager.WriteBuffer(bufIndex);
 		}
 
-		mat->Data.BufIndex = bufIndex;
+		matData.BufIndex = bufIndex;
 
 		VulkanShader shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRTest.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRTest.frag.spv");
+
+		Ref<VulkanMaterial> mat = CreateRef<VulkanMaterial>(matData);
 
 		mat->BuildPipeline(shader, Opaque);
 
@@ -315,7 +317,7 @@ namespace Spike {
 		for (auto& [k, v] : m_TextureParameters) {
 
 			uint8_t valIndex = v.DataBindIndex;
-			uint32_t bufIndex = Data.BufIndex;
+			uint32_t bufIndex = m_Data.BufIndex;
 
 			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
 			VulkanRenderer::GlobalMaterialManager.ReleaseTextureIndex(constants[bufIndex].TexIndex[valIndex]);
@@ -323,18 +325,18 @@ namespace Spike {
 
 		m_TextureParameters.clear();
 
-		VulkanRenderer::GlobalMaterialManager.ReleaseBufferIndex(Data.BufIndex);
+		VulkanRenderer::GlobalMaterialManager.ReleaseBufferIndex(m_Data.BufIndex);
 
-		if (Data.Pipeline.Layout != VK_NULL_HANDLE) {
+		if (m_Data.Pipeline.Layout != VK_NULL_HANDLE) {
 
-			vkDestroyPipelineLayout(VulkanRenderer::Device.Device, Data.Pipeline.Layout, nullptr);
-			Data.Pipeline.Layout = VK_NULL_HANDLE;
+			vkDestroyPipelineLayout(VulkanRenderer::Device.Device, m_Data.Pipeline.Layout, nullptr);
+			m_Data.Pipeline.Layout = VK_NULL_HANDLE;
 		}
 
-		if (Data.Pipeline.Pipeline != VK_NULL_HANDLE) {
+		if (m_Data.Pipeline.Pipeline != VK_NULL_HANDLE) {
 
-			vkDestroyPipeline(VulkanRenderer::Device.Device, Data.Pipeline.Pipeline, nullptr);
-			Data.Pipeline.Pipeline = VK_NULL_HANDLE;
+			vkDestroyPipeline(VulkanRenderer::Device.Device, m_Data.Pipeline.Pipeline, nullptr);
+			m_Data.Pipeline.Pipeline = VK_NULL_HANDLE;
 		}
 	}
 

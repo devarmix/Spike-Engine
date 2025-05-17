@@ -15,12 +15,12 @@ namespace SpikeEngine {
 		float Magnitude() const;
 		int SqrMagnitude() const;
 
-		static Vector2Int Zero();
-		static Vector2Int One();
-		static Vector2Int Up();
-		static Vector2Int Down();
-		static Vector2Int Right();
-		static Vector2Int Left();
+		static const Vector2Int Zero();
+		static const Vector2Int One();
+		static const Vector2Int Up();
+		static const Vector2Int Down();
+		static const Vector2Int Right();
+		static const Vector2Int Left();
 
 		void Set(int newX, int newY);
 		static float Distance(Vector2Int a, Vector2Int b);

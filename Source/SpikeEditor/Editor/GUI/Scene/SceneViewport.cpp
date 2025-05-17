@@ -13,7 +13,7 @@ namespace SpikeEditor {
 
 	void SceneViewport::OnCreate() {
 
-		m_DSet = ImGui_ImplVulkan_AddTexture(VulkanRenderer::DefSamplerLinear, VulkanRenderer::ViewportTexture->Data.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		m_DSet = ImGui_ImplVulkan_AddTexture(VulkanRenderer::DefSamplerLinear, VulkanRenderer::ViewportTexture->GetRawData()->View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		VulkanRenderer::MainCamera = &m_Camera;
 
 		SetWindowFlags(ImGuiWindowFlags_NoMove);
@@ -68,7 +68,7 @@ namespace SpikeEditor {
 			SpikeEditor::Get().OnEvent(event);
 
 			if (!m_Minimized)
-			    m_DSet = ImGui_ImplVulkan_AddTexture(VulkanRenderer::DefSamplerLinear, VulkanRenderer::ViewportTexture->Data.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			    m_DSet = ImGui_ImplVulkan_AddTexture(VulkanRenderer::DefSamplerLinear, VulkanRenderer::ViewportTexture->GetRawData()->View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 
 		// draw viewport image

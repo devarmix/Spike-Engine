@@ -8,11 +8,11 @@ namespace SpikeEngine {
 	class PerspectiveCamera {
 	public:
 
-		glm::mat4 GetViewMatrix();
-		glm::mat4 GetRotationMatrix();
-		glm::mat4 GetProjectionMatrix(float aspect);
+		const glm::mat4 GetViewMatrix();
+		const glm::mat4 GetRotationMatrix();
+		const glm::mat4 GetProjectionMatrix(float aspect);
 
-		glm::vec3 GetPosition() const { return m_Position; }
+		const glm::vec3 GetPosition() const { return m_Position; }
 
 		void SetCameraPosition(const glm::vec3& position);
 		void SetCameraRotation(const glm::vec3& rotation);

@@ -16,7 +16,7 @@ namespace Spike {
 
 	void RendererLayer::OnAttach() {
 
-		Meshes = Mesh::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/models/sphereSmoothUV.glb");
+		Meshes = Mesh::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/models/monkey.glb");
 
 		//Ref<Texture> albedoMap = Texture::Create("res/textures/sloppy-mortar-stone-wall_albedo.png");
 		//Ref<Texture> normalMap = Texture::Create("res/textures/sloppy-mortar-stone-wall_normal-ogl.png");

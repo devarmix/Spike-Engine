@@ -3,6 +3,11 @@
 
 namespace SpikeEngine {
 
+	const float Mathf::PI = 3.14159274f;
+	const float Mathf::E = 2.71828175f;
+	const float Mathf::Deg2Rad = PI / 180;
+	const float Mathf::Rad2Deg = 57.29578f;
+
 	float Mathf::Sin(float f) {
 		return sin(f);
 	}

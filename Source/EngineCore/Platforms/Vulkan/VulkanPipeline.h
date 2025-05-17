@@ -28,7 +28,7 @@ namespace Spike {
 		void SetCullMode(VkCullModeFlags cullMode, VkFrontFace frontFace);
 		void SetMultisamplingNone();
 		void DisableBlending();
-		void SetColorAttachments(VkFormat* formats, uint32_t count);
+		void SetColorAttachments(const VkFormat* formats, uint32_t count);
 		void SetDepthFormat(VkFormat format);
 		void DisableDepthTest();
 		void EnableDepthTest(bool depthWriteEnable, VkCompareOp op);

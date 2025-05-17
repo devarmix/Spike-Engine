@@ -31,7 +31,7 @@ namespace SpikeEngine {
 
 		static std::vector<Ref<Mesh>> Create(std::filesystem::path filePath);
 
-		virtual void* GetData() = 0;
+		virtual const void* GetData() const = 0;
 
 		ASSET_CLASS_TYPE(MeshAsset);
 

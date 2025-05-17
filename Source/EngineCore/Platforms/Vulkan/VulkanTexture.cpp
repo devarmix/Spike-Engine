@@ -9,9 +9,9 @@ namespace Spike {
 
 	Ref<VulkanTexture> VulkanTexture::Create(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped) {
 
-		Ref<VulkanTexture> newTexture = CreateRef<VulkanTexture>();
-		newTexture->Data.Format = format;
-		newTexture->Data.Extent = size;
+		VulkanTextureData texData{};
+		texData.Format = format;
+		texData.Extent = size;
 
 		VkImageCreateInfo img_info = VulkanTools::ImageCreateInfo(format, usage, size);
 		if (mipmapped) {
@@ -23,7 +23,7 @@ namespace Spike {
 		allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		// allocate and create the image
-		VK_CHECK(vmaCreateImage(VulkanRenderer::Device.Allocator, &img_info, &allocinfo, &newTexture->Data.Image, &newTexture->Data.Allocation, nullptr));
+		VK_CHECK(vmaCreateImage(VulkanRenderer::Device.Allocator, &img_info, &allocinfo, &texData.Image, &texData.Allocation, nullptr));
 
 		VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
 		if (format == VK_FORMAT_D32_SFLOAT) {
@@ -31,10 +31,12 @@ namespace Spike {
 		}
 
 		// build a image-view for the image
-		VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(format, newTexture->Data.Image, aspectFlag);
+		VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(format, texData.Image, aspectFlag);
 		view_info.subresourceRange.levelCount = img_info.mipLevels;
 
-		VK_CHECK(vkCreateImageView(VulkanRenderer::Device.Device, &view_info, nullptr, &newTexture->Data.View));
+		VK_CHECK(vkCreateImageView(VulkanRenderer::Device.Device, &view_info, nullptr, &texData.View));
+
+		Ref<VulkanTexture> newTexture = CreateRef<VulkanTexture>(texData);
 
 		return newTexture;
 	}
@@ -50,7 +52,7 @@ namespace Spike {
 
 		VulkanRenderer::ImmediateSubmit([&](VkCommandBuffer cmd) {
 
-			TransitionImage(cmd, newTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+			TransitionImage(cmd, newTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
 			VkBufferImageCopy copyRegion = {};
 			copyRegion.bufferOffset = 0;
@@ -64,14 +66,14 @@ namespace Spike {
 			copyRegion.imageExtent = size;
 
 			// copy the buffer into the image
-			vkCmdCopyBufferToImage(cmd, uploadbuffer.Buffer, newTexture->Data.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+			vkCmdCopyBufferToImage(cmd, uploadbuffer.Buffer, newTexture->GetRawData()->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
 				&copyRegion);
 
 			if (mipmapped) {
-				GenerateMipmaps(cmd, newTexture->Data.Image, VkExtent2D{ newTexture->Data.Extent.width, newTexture->Data.Extent.height });
+				GenerateMipmaps(cmd, newTexture->GetRawData()->Image, VkExtent2D{ newTexture->GetRawData()->Extent.width, newTexture->GetRawData()->Extent.height });
 			}
 			else {
-				TransitionImage(cmd, newTexture->Data.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				TransitionImage(cmd, newTexture->GetRawData()->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 					VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			}
 			});
@@ -112,16 +114,16 @@ namespace Spike {
 
 	void VulkanTexture::Destroy() {
 
-		if (Data.View != VK_NULL_HANDLE) {
+		if (m_Data.View != VK_NULL_HANDLE) {
 
-			vkDestroyImageView(VulkanRenderer::Device.Device, Data.View, nullptr);
-			Data.View = VK_NULL_HANDLE;
+			vkDestroyImageView(VulkanRenderer::Device.Device, m_Data.View, nullptr);
+			m_Data.View = VK_NULL_HANDLE;
 		}
 
-		if (Data.Image != VK_NULL_HANDLE) {
+		if (m_Data.Image != VK_NULL_HANDLE) {
 
-			vmaDestroyImage(VulkanRenderer::Device.Allocator, Data.Image, Data.Allocation);
-			Data.Image = VK_NULL_HANDLE;
+			vmaDestroyImage(VulkanRenderer::Device.Allocator, m_Data.Image, m_Data.Allocation);
+			m_Data.Image = VK_NULL_HANDLE;
 		}
 	}
 

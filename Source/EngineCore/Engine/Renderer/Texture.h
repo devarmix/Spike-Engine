@@ -11,8 +11,8 @@ namespace SpikeEngine {
 
 		static Ref<Texture> Create(const char* filePath);
 
-		virtual Vector3 GetSize() const = 0;
-		virtual void* GetData() = 0;
+		virtual const Vector3 GetSize() const = 0;
+		virtual const void* GetData() const = 0;
 
 		ASSET_CLASS_TYPE(TextureAsset);
 	};

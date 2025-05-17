@@ -27,32 +27,32 @@ namespace SpikeEngine {
 	}
 
 
-	Vector2Int Vector2Int::Zero() {
+	const Vector2Int Vector2Int::Zero() {
 
 		return zeroVector;
 	}
 
-	Vector2Int Vector2Int::One() {
+	const Vector2Int Vector2Int::One() {
 
 		return oneVector;
 	}
 
-	Vector2Int Vector2Int::Up() {
+	const Vector2Int Vector2Int::Up() {
 
 		return upVector;
 	}
 
-	Vector2Int Vector2Int::Down() {
+	const Vector2Int Vector2Int::Down() {
 
 		return downVector;
 	}
 
-	Vector2Int Vector2Int::Left() {
+	const Vector2Int Vector2Int::Left() {
 
 		return leftVector;
 	}
 
-	Vector2Int Vector2Int::Right() {
+	const Vector2Int Vector2Int::Right() {
 
 		return rightVector;
 	}

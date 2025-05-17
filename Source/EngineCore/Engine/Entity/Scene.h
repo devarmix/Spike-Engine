@@ -17,7 +17,7 @@ namespace SpikeEngine {
 		Scene();
 		~Scene();
 
-		Ref<GameObject> CreateGameObject();
+		const Ref<GameObject> CreateGameObject();
 		void DestroyGameObject(Ref<GameObject> object);
 
 		void OnUpdate();

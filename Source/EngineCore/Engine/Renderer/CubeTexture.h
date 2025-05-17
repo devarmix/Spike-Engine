@@ -9,10 +9,10 @@ namespace SpikeEngine {
 	class CubeTexture : public Spike::Asset {
 	public:
 
-		static Ref<CubeTexture> Create(const char** filePath);
+		static Ref<CubeTexture> Create(const std::array<const char*, 6>& filePath);
 
-		virtual Vector3 GetSize() const = 0;
-		virtual void* GetData() = 0;
+		virtual const Vector3 GetSize() const = 0;
+		virtual const void* GetData() const = 0;
 
 		ASSET_CLASS_TYPE(CubeTextureAsset);
 	};

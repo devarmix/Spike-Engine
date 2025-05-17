@@ -38,24 +38,26 @@ namespace Spike {
 	class VulkanCubeTexture : public CubeTexture {
 	public:
 
-		VulkanCubeTexture() = default;
+		VulkanCubeTexture(const VulkanCubeTextureData& data) : m_Data(data) {}
 		virtual ~VulkanCubeTexture() override { Destroy(); ASSET_CORE_DESTROY(); }
 
 		void Destroy();
 
-		virtual void* GetData() override { return &Data; }
-		virtual Vector3 GetSize() const override { return Vector3((float)Data.Extent.width, (float)Data.Extent.height, (float)Data.Extent.depth); }
+		virtual const void* GetData() const override { return (void*)&m_Data; }
+		const VulkanCubeTextureData* GetRawData() const { return &m_Data; }
+
+		virtual const Vector3 GetSize() const override { return Vector3((float)m_Data.Extent.width, (float)m_Data.Extent.height, (float)m_Data.Extent.depth); }
 
 		static Ref<VulkanCubeTexture> Create(VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
-		static Ref<VulkanCubeTexture> Create(void** data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
-		static Ref<VulkanCubeTexture> Create(const char** filePath);
+		static Ref<VulkanCubeTexture> Create(const std::array<void*, 6>& data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped = false);
+		static Ref<VulkanCubeTexture> Create(const std::array<const char*, 6>& filePath);
 
 		static void TransitionImage(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags imageAspectFlags, VkImageLayout currentLayout, VkImageLayout newLayout);
 		static void CopyImageToImage(VkCommandBuffer cmd, VkImage source, VkImage destination, VkExtent2D srcSize, VkExtent2D dstSize);
 		static void GenerateMipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize);
 
-	public:
+	private:
 
-		VulkanCubeTextureData Data;
+		VulkanCubeTextureData m_Data;
 	};
 }

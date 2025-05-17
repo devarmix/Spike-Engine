@@ -20,8 +20,8 @@ namespace SpikeEngine {
 
 		static float SqrMagnitude(Vector4 a);
 
-		static Vector4 Zero();
-		static Vector4 One();
+		static const Vector4 Zero();
+		static const Vector4 One();
 
 		void Set(float newX, float newY, float newZ, float newW);
 		static Vector4 Lerp(Vector4 a, Vector4 b, float t);
