@@ -12,7 +12,7 @@
 #include <Engine/Core/Stats.h>
 #include <Platforms/Vulkan/VulkanPipeline.h>
 
-#include <Engine/Core/Profiler.h>
+#include <Engine/Core/Timestep.h>
 
 namespace Spike {
 
@@ -1384,7 +1384,7 @@ namespace Spike {
 		if (MainCamera)
 			UpdateScene();
 
-		EXECUTION_TIME_PROFILER_START
+		Timer timer = Timer();
 
 		VkCommandBuffer cmd = GetCurrentFrame().MainCommandBuffer;
 		uint32_t swapchainImageIndex;
@@ -1410,8 +1410,6 @@ namespace Spike {
 
 		EndFrame(cmd, swapchainImageIndex);
 
-		EXECUTION_TIME_PROFILER_END
-
-		Stats::Data.RenderTime = GET_EXECUTION_TIME_MS;
+		Stats::Data.RenderTime = timer.GetElapsedMs();
 	}
 }

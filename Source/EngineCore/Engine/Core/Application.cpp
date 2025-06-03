@@ -4,7 +4,6 @@
 #include <Engine/Core/Stats.h>
 
 #include <Platforms/Vulkan/VulkanRenderer.h>
-#include <Engine/Core/Profiler.h>
 
 namespace Spike {
 
@@ -43,7 +42,7 @@ namespace Spike {
 
 		while (m_Running) {
 
-			EXECUTION_TIME_PROFILER_START
+			Timer timer = Timer();
 
 			if (!m_Minimized) {
 
@@ -55,12 +54,11 @@ namespace Spike {
 
 			m_Window->OnUpdate();
 
-			EXECUTION_TIME_PROFILER_END
+			float elapsed = timer.GetElapsedMs();
 
-			// convert from microseconds to seconds
-			m_Time.DeltaTime = GET_EXECUTION_TIME_MS;
+			m_Time.DeltaTime = elapsed / 1000.f;
 
-			Stats::Data.Frametime = elapsed.count() / 1000.f;
+			Stats::Data.Frametime = elapsed;
 			Stats::Data.Fps = 1000.f / Stats::Data.Frametime;
 		}
 	}

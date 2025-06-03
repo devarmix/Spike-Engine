@@ -2,7 +2,7 @@
 
 #include <Engine/Core/Stats.h>
 
-#include <Engine/Core/Profiler.h>
+#include <Engine/Core/Timestep.h>
 
 namespace Spike {
 
@@ -13,13 +13,11 @@ namespace Spike {
 
 	void SceneLayer::OnUpdate(float deltaTime) {
 
-		EXECUTION_TIME_PROFILER_START
+		Timer timer = Timer();
 
 		m_ActiveScene->OnUpdate();
 
-		EXECUTION_TIME_PROFILER_END
-
-		Stats::Data.SceneUpdateTime = GET_EXECUTION_TIME_MS;
+		Stats::Data.SceneUpdateTime = timer.GetElapsedMs();
 	}
 
     void SceneLayer::OnAttach() {
