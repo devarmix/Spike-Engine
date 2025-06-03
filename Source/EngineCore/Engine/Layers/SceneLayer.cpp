@@ -2,7 +2,7 @@
 
 #include <Engine/Core/Stats.h>
 
-#include <chrono>
+#include <Engine/Core/Profiler.h>
 
 namespace Spike {
 
@@ -13,15 +13,13 @@ namespace Spike {
 
 	void SceneLayer::OnUpdate(float deltaTime) {
 
-		// reset counters
-		auto start = std::chrono::system_clock::now();
+		EXECUTION_TIME_PROFILER_START
 
 		m_ActiveScene->OnUpdate();
 
-		auto end = std::chrono::system_clock::now();
+		EXECUTION_TIME_PROFILER_END
 
-		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		Stats::Data.SceneUpdateTime = elapsed.count() / 1000.f;
+		Stats::Data.SceneUpdateTime = GET_EXECUTION_TIME_MS;
 	}
 
     void SceneLayer::OnAttach() {

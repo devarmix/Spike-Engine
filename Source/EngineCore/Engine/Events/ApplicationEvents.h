@@ -14,7 +14,7 @@ namespace Spike {
 
 		std::string GetName() const override { return "Window Resize Event"; }
 
-		EVENT_CLASS_TYPE(WindowResize);
+		EVENT_CLASS_TYPE(WindowResize)
 
 	private:
 		unsigned int m_Width;
@@ -26,7 +26,7 @@ namespace Spike {
 		WindowCloseEvent() {}
 		std::string GetName() const override { return "Window Close Event"; }
 
-		EVENT_CLASS_TYPE(WindowClose);
+		EVENT_CLASS_TYPE(WindowClose)
 	};
 
 	class WindowMinimizeEvent : public GenericEvent {
@@ -34,7 +34,7 @@ namespace Spike {
 		WindowMinimizeEvent() {}
 		std::string GetName() const override { return "Window Minimize Event"; }
 
-		EVENT_CLASS_TYPE(WindowMinimize);
+		EVENT_CLASS_TYPE(WindowMinimize)
 	};
 
 	class WindowRestoreEvent : public GenericEvent {
@@ -42,7 +42,7 @@ namespace Spike {
 		WindowRestoreEvent() {}
 		std::string GetName() const override { return "Window Restore Event"; }
 
-		EVENT_CLASS_TYPE(WindowRestore);
+		EVENT_CLASS_TYPE(WindowRestore)
 	};
 
 	class SDLEvent : public GenericEvent {
@@ -52,7 +52,7 @@ namespace Spike {
 
 		const SDL_Event& GetEvent() const { return event; }
 
-		EVENT_CLASS_TYPE(SDL);
+		EVENT_CLASS_TYPE(SDL)
 
 	private:
 		SDL_Event event;
@@ -67,7 +67,7 @@ namespace Spike {
 
 		std::string GetName() const override { return "Scene Viewport Resize Event"; }
 
-		EVENT_CLASS_TYPE(SceneViewportResize);
+		EVENT_CLASS_TYPE(SceneViewportResize)
 
 	private:
 		uint32_t m_Width;
@@ -79,7 +79,7 @@ namespace Spike {
 		SceneViewportMinimizeEvent() {}
 		std::string GetName() const override { return "Scene Viewport Minimize Event"; }
 
-		EVENT_CLASS_TYPE(SceneViewportMinimize);
+		EVENT_CLASS_TYPE(SceneViewportMinimize)
 	};
 
 	class SceneViewportRestoreEvent : public GenericEvent {
@@ -87,7 +87,7 @@ namespace Spike {
 		SceneViewportRestoreEvent() {}
 		std::string GetName() const override { return "Scene Viewport Restore Event"; }
 
-		EVENT_CLASS_TYPE(SceneViewportRestore);
+		EVENT_CLASS_TYPE(SceneViewportRestore)
 	};
 
 	class KeyPressEvent : public GenericEvent {
@@ -97,7 +97,7 @@ namespace Spike {
 
 		SDL_Keycode GetKey() const { return m_Key; }
 
-		EVENT_CLASS_TYPE(KeyPress);
+		EVENT_CLASS_TYPE(KeyPress)
 
 	private:
 		SDL_Keycode m_Key;
@@ -110,7 +110,7 @@ namespace Spike {
 
 		SDL_Keycode GetKey() const { return m_Key; }
 
-		EVENT_CLASS_TYPE(KeyRelease);
+		EVENT_CLASS_TYPE(KeyRelease)
 
 	private:
 		SDL_Keycode m_Key;
@@ -123,7 +123,7 @@ namespace Spike {
 
 		SDL_Keycode GetKey() const { return m_Key; }
 
-		EVENT_CLASS_TYPE(KeyRepeat);
+		EVENT_CLASS_TYPE(KeyRepeat)
 
 	private:
 		SDL_Keycode m_Key;
@@ -136,7 +136,7 @@ namespace Spike {
 
 		Uint8 GetButton() const { return m_Button; }
 
-		EVENT_CLASS_TYPE(MouseButtonPress);
+		EVENT_CLASS_TYPE(MouseButtonPress)
 
 	private:
 		Uint8 m_Button;
@@ -149,7 +149,7 @@ namespace Spike {
 
 		Uint8 GetButton() const { return m_Button; }
 
-		EVENT_CLASS_TYPE(MouseButtonRelease);
+		EVENT_CLASS_TYPE(MouseButtonRelease)
 
 	private:
 		Uint8 m_Button;
@@ -163,13 +163,13 @@ namespace Spike {
 		float GetDeltaX() const { return m_MouseDeltaX; }
 		float GetDeltaY() const { return m_MouseDeltaY; }
 
-		EVENT_CLASS_TYPE(MouseMotion);
+		EVENT_CLASS_TYPE(MouseMotion)
 
 	private:
 		float m_MouseDeltaX;
 		float m_MouseDeltaY;
 	};
-
+	
 	class MouseScrollEvent : public GenericEvent {
 	public:
 		MouseScrollEvent(float x, float y) : m_ScrollX(x), m_ScrollY(y) {}
@@ -178,7 +178,7 @@ namespace Spike {
 		float GetScrollX() const { return m_ScrollX; }
 		float GetScrollY() const { return m_ScrollY; }
 
-		EVENT_CLASS_TYPE(MouseScroll);
+		EVENT_CLASS_TYPE(MouseScroll)
 
 	private:
 		float m_ScrollX;

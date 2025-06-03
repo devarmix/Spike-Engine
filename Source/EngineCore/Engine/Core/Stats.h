@@ -13,7 +13,7 @@ namespace Spike {
 		int TriangleCount;
 		int DrawcallCount;
 		float SceneUpdateTime;
-		float MeshDrawTime;
+		float RenderTime;
 	};
 
 	class StatsGUI : public GUI_Window {

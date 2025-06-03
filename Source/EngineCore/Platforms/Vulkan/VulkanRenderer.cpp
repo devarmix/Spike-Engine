@@ -12,6 +12,8 @@
 #include <Engine/Core/Stats.h>
 #include <Platforms/Vulkan/VulkanPipeline.h>
 
+#include <Engine/Core/Profiler.h>
+
 namespace Spike {
 
 	constexpr bool bUseValidationLayers = true;
@@ -1046,7 +1048,7 @@ namespace Spike {
 			// reset counters
 			Stats::Data.DrawcallCount = 0;
 			Stats::Data.TriangleCount = 0;
-			Stats::Data.MeshDrawTime = 0;
+			Stats::Data.RenderTime = 0;
 
 			//mainDrawContext.OpaqueSurfaces.clear();
 			//mainDrawContext.TransparentSurfaces.clear();
@@ -1191,8 +1193,6 @@ namespace Spike {
 		Stats::Data.DrawcallCount = 0;
 		Stats::Data.TriangleCount = 0;
 
-		auto start = std::chrono::system_clock::now();
-
 		std::vector<uint32_t> opaque_Draws;
 		opaque_Draws.reserve(MainDrawContext.OpaqueSurfaces.size());
 
@@ -1299,11 +1299,6 @@ namespace Spike {
 		MainDrawContext.TransparentSurfaces.clear();
 
 		vkCmdEndRendering(cmd);
-
-		auto end = std::chrono::system_clock::now();
-
-		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		Stats::Data.MeshDrawTime = elapsed.count() / 1000.f;
 	}
 
 	void VulkanRenderer::SkyboxPass(VkCommandBuffer cmd) {
@@ -1389,6 +1384,8 @@ namespace Spike {
 		if (MainCamera)
 			UpdateScene();
 
+		EXECUTION_TIME_PROFILER_START
+
 		VkCommandBuffer cmd = GetCurrentFrame().MainCommandBuffer;
 		uint32_t swapchainImageIndex;
 
@@ -1412,5 +1409,9 @@ namespace Spike {
 		}
 
 		EndFrame(cmd, swapchainImageIndex);
+
+		EXECUTION_TIME_PROFILER_END
+
+		Stats::Data.RenderTime = GET_EXECUTION_TIME_MS;
 	}
 }

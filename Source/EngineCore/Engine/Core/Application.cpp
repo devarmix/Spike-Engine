@@ -4,6 +4,7 @@
 #include <Engine/Core/Stats.h>
 
 #include <Platforms/Vulkan/VulkanRenderer.h>
+#include <Engine/Core/Profiler.h>
 
 namespace Spike {
 
@@ -42,8 +43,7 @@ namespace Spike {
 
 		while (m_Running) {
 
-			// reset counters
-			auto start = std::chrono::system_clock::now();
+			EXECUTION_TIME_PROFILER_START
 
 			if (!m_Minimized) {
 
@@ -55,13 +55,10 @@ namespace Spike {
 
 			m_Window->OnUpdate();
 
-
-			auto end = std::chrono::system_clock::now();
-
-			auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+			EXECUTION_TIME_PROFILER_END
 
 			// convert from microseconds to seconds
-			m_Time.DeltaTime = elapsed.count() / 1000000.f;
+			m_Time.DeltaTime = GET_EXECUTION_TIME_MS;
 
 			Stats::Data.Frametime = elapsed.count() / 1000.f;
 			Stats::Data.Fps = 1000.f / Stats::Data.Frametime;
