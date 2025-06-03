@@ -7,13 +7,13 @@ namespace Spike {
 
 	struct StatsData {
 
-		float fps;
-		float frametime;
+		float Fps;
+		float Frametime;
 
-		int triangle_count;
-		int drawcall_count;
-		float scene_update_time;
-		float mesh_draw_time;
+		int TriangleCount;
+		int DrawcallCount;
+		float SceneUpdateTime;
+		float MeshDrawTime;
 	};
 
 	class StatsGUI : public GUI_Window {
@@ -27,6 +27,6 @@ namespace Spike {
 
 	class Stats {
 	public:
-		static StatsData stats;
+		static StatsData Data;
 	};
 }

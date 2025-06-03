@@ -22,30 +22,30 @@ namespace SpikeEditor {
 		SetCameraPosition(m_Position);
 	}
 
-	void EditorCamera::PollEvents(Spike::Event& event) {
+	void EditorCamera::PollEvents(const Spike::GenericEvent& event) {
 
-		Spike::EventDispatcher dispatcher(event);
-		dispatcher.Dispatch<Spike::MouseButtonPressEvent>(BIND_EVENT_FN(EditorCamera::OnMouseButtonPress));
-		dispatcher.Dispatch<Spike::MouseButtonReleaseEvent>(BIND_EVENT_FN(EditorCamera::OnMouseButtonRelease));
-		dispatcher.Dispatch<Spike::MouseScrollEvent>(BIND_EVENT_FN(EditorCamera::OnMouseScroll));
+		Spike::EventHandler handler(event);
+		handler.Handle<Spike::MouseButtonPressEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonPress));
+		handler.Handle<Spike::MouseButtonReleaseEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonRelease));
+		handler.Handle<Spike::MouseScrollEvent>(BIND_FUNCTION(EditorCamera::OnMouseScroll));
 
 		// poll movement events, only when right mouse button is pressed
 		if (m_MouseRightButton) {
 
-			dispatcher.Dispatch<Spike::KeyPressEvent>(BIND_EVENT_FN(EditorCamera::OnKeyPress));
-			dispatcher.Dispatch<Spike::KeyReleaseEvent>(BIND_EVENT_FN(EditorCamera::OnKeyRelease));
-			dispatcher.Dispatch<Spike::MouseMotionEvent>(BIND_EVENT_FN(EditorCamera::OnMouseMotion));
+			handler.Handle<Spike::KeyPressEvent>(BIND_FUNCTION(EditorCamera::OnKeyPress));
+			handler.Handle<Spike::KeyReleaseEvent>(BIND_FUNCTION(EditorCamera::OnKeyRelease));
+			handler.Handle<Spike::MouseMotionEvent>(BIND_FUNCTION(EditorCamera::OnMouseMotion));
 		}
 	}
 
 	bool EditorCamera::OnKeyPress(const Spike::KeyPressEvent& event) {
 
 		if (event.GetKey() == SDLK_w) { m_TargetVelocity.z = -1; }
-		if (event.GetKey() == SDLK_s) { m_TargetVelocity.z = 1; }
-		if (event.GetKey() == SDLK_a) { m_TargetVelocity.x = -1; }
-		if (event.GetKey() == SDLK_d) { m_TargetVelocity.x = 1; }
-		if (event.GetKey() == SDLK_q) { m_TargetVelocity.y = -1; }
-		if (event.GetKey() == SDLK_e) { m_TargetVelocity.y = 1; }
+		else if (event.GetKey() == SDLK_s) { m_TargetVelocity.z = 1; }
+		else if (event.GetKey() == SDLK_a) { m_TargetVelocity.x = -1; }
+		else if (event.GetKey() == SDLK_d) { m_TargetVelocity.x = 1; }
+		else if (event.GetKey() == SDLK_q) { m_TargetVelocity.y = -1; }
+		else if (event.GetKey() == SDLK_e) { m_TargetVelocity.y = 1; }
 
 		return false;
 	}
@@ -53,11 +53,11 @@ namespace SpikeEditor {
 	bool EditorCamera::OnKeyRelease(const Spike::KeyReleaseEvent& event) {
 
 		if (event.GetKey() == SDLK_w && m_TargetVelocity.z < 0) { m_TargetVelocity.z = 0; }
-		if (event.GetKey() == SDLK_s && m_TargetVelocity.z > 0) { m_TargetVelocity.z = 0; }
-		if (event.GetKey() == SDLK_a && m_TargetVelocity.x < 0) { m_TargetVelocity.x = 0; }
-		if (event.GetKey() == SDLK_d && m_TargetVelocity.x > 0) { m_TargetVelocity.x = 0; }
-		if (event.GetKey() == SDLK_q && m_TargetVelocity.y < 0) { m_TargetVelocity.y = 0; }
-		if (event.GetKey() == SDLK_e && m_TargetVelocity.y > 0) { m_TargetVelocity.y = 0; }
+		else if (event.GetKey() == SDLK_s && m_TargetVelocity.z > 0) { m_TargetVelocity.z = 0; }
+		else if (event.GetKey() == SDLK_a && m_TargetVelocity.x < 0) { m_TargetVelocity.x = 0; }
+		else if (event.GetKey() == SDLK_d && m_TargetVelocity.x > 0) { m_TargetVelocity.x = 0; }
+		else if (event.GetKey() == SDLK_q && m_TargetVelocity.y < 0) { m_TargetVelocity.y = 0; }
+		else if (event.GetKey() == SDLK_e && m_TargetVelocity.y > 0) { m_TargetVelocity.y = 0; }
 
 		return false;
 	}

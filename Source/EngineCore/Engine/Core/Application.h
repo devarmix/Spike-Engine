@@ -44,9 +44,9 @@ namespace Spike {
 		void Run();
 
 		// events
-		void OnEvent(Event& event);
+		void OnEvent(const GenericEvent& event);
 
-		const Ref<Window> GetMainWindow() const { return m_Window; }
+		Ref<Window> GetMainWindow() const { return m_Window; }
 
 		void CleanAll();
 

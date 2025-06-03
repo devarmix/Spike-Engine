@@ -17,7 +17,7 @@ namespace Spike {
 		virtual void OnAttach() override;
 		virtual void OnDetach() override;
 
-		virtual void OnEvent(Event& event) override;
+		virtual void OnEvent(const GenericEvent& event) override;
 
 		Ref<Scene> GetActiveScene() const { return m_ActiveScene; }
 

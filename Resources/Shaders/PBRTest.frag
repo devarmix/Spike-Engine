@@ -20,14 +20,17 @@ layout(location = 2) out vec4 outMaterial;
 #define MetallicMap   3
 #define RoughnessMap  4
 
+#define Roughness     0
+#define Metallic      1
+
 void main() {
 
     vec4 albedo = vec4(1.0);
    // vec3 normalSample = GetTextureValue(NormalMap, fragTexCoord).rgb;
 
     float ao = 1.0;
-    float metallic = 0.4;
-    float roughness = 0.8;
+    float metallic = GetScalarValue(Metallic);
+    float roughness = GetScalarValue(Roughness);
 
     if (albedo.a < 0.5) {
 

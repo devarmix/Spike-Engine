@@ -1,5 +1,5 @@
 project "FastGLTF"
-    location "%{wks.location}/Source/Third-Party/fastgltf"
+    location "%{wks.location}/Source/ThirdParty/fastgltf"
     kind "StaticLib"
     language "C++"
     cppdialect "C++17"

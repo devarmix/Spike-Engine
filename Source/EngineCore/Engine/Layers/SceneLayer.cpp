@@ -21,7 +21,7 @@ namespace Spike {
 		auto end = std::chrono::system_clock::now();
 
 		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		Stats::stats.scene_update_time = elapsed.count() / 1000.f;
+		Stats::Data.SceneUpdateTime = elapsed.count() / 1000.f;
 	}
 
     void SceneLayer::OnAttach() {
@@ -39,5 +39,5 @@ namespace Spike {
 
 	void SceneLayer::OnDetach() {}
 
-	void SceneLayer::OnEvent(Event& event) {}
+	void SceneLayer::OnEvent(const GenericEvent& event) {}
 }

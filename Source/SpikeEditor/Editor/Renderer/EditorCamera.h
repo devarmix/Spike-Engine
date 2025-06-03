@@ -15,7 +15,7 @@ namespace SpikeEditor {
 		~EditorCamera();
 
 		void OnUpdate(float deltaTime);
-		void PollEvents(Spike::Event& event);
+		void PollEvents(const Spike::GenericEvent& event);
 
 		void SetViewportHovered(bool value = true) { m_ViewportHovered = value; }
 

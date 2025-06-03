@@ -16,7 +16,7 @@ namespace SpikeEditor {
 		virtual void OnCreate() override;
 		virtual void OnGUI(float deltaTime) override;
 
-		virtual void OnEvent(Spike::Event& event) override;
+		virtual void OnEvent(const Spike::GenericEvent& event) override;
 
 	private:
 

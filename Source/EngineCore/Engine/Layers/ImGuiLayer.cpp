@@ -117,7 +117,7 @@ namespace Spike {
         colors[ImGuiCol_TitleBgCollapsed] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
     }
 	 
-	void ImGuiLayer::OnEvent(Event& event) {
+	void ImGuiLayer::OnEvent(const GenericEvent& event) {
 
         for (auto& window : m_WindowList) {
 

@@ -10,7 +10,7 @@ namespace Spike {
 	Application::Application(const ApplicationCreateInfo& info) {
 
 		m_Window = Window::Create(info.WinInfo);
-		m_Window->SetEventCallback(BIND_EVENT_FN(Application::OnEvent));
+		m_Window->SetEventCallback(BIND_FUNCTION(Application::OnEvent));
 
 		ENGINE_WARN("Created an application: " + info.Name);
 
@@ -49,7 +49,7 @@ namespace Spike {
 
 				// update all layers
 				for (Layer* layer : m_LayerStack) {
-					layer->OnUpdate(m_Time.deltaTime);
+					layer->OnUpdate(m_Time.DeltaTime);
 				}
 			}
 
@@ -61,27 +61,27 @@ namespace Spike {
 			auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
 			// convert from microseconds to seconds
-			m_Time.deltaTime = elapsed.count() / 1000000.f;
+			m_Time.DeltaTime = elapsed.count() / 1000000.f;
 
-			Stats::stats.frametime = elapsed.count() / 1000.f;
-			Stats::stats.fps = 1000.f / Stats::stats.frametime;
+			Stats::Data.Frametime = elapsed.count() / 1000.f;
+			Stats::Data.Fps = 1000.f / Stats::Data.Frametime;
 		}
 	}
 
-	void Application::OnEvent(Event& event) {
+	void Application::OnEvent(const GenericEvent& event) {
 
-		EventDispatcher dispatcher(event);
-		dispatcher.Dispatch<WindowResizeEvent>(BIND_EVENT_FN(Application::OnWindowResize));
-		dispatcher.Dispatch<WindowCloseEvent>(BIND_EVENT_FN(Application::OnWindowClose));
-		dispatcher.Dispatch<WindowMinimizeEvent>(BIND_EVENT_FN(Application::OnWindowMinimize));
-		dispatcher.Dispatch<WindowRestoreEvent>(BIND_EVENT_FN(Application::OnWindowRestore));
+		EventHandler handler(event);
+		handler.Handle<WindowResizeEvent>(BIND_FUNCTION(Application::OnWindowResize));
+		handler.Handle<WindowCloseEvent>(BIND_FUNCTION(Application::OnWindowClose));
+		handler.Handle<WindowMinimizeEvent>(BIND_FUNCTION(Application::OnWindowMinimize));
+		handler.Handle<WindowRestoreEvent>(BIND_FUNCTION(Application::OnWindowRestore));
 
-		if (!event.IsHandled) {
+		if (!event.IsHandled()) {
 
 			for (Layer* layer : m_LayerStack) {
 
 				layer->OnEvent(event);
-				if (event.IsHandled) break;
+				if (event.IsHandled()) break;
 			}
 		}
 	}

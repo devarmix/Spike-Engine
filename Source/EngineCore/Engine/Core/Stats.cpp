@@ -2,17 +2,17 @@
 
 namespace Spike {
 
-	StatsData Stats::stats{};
+	StatsData Stats::Data{};
 
 	StatsGUI::~StatsGUI() {}
 
 	void StatsGUI::OnGUI(float deltaTime) {
 
-		ImGui::Text("fps %f", Stats::stats.fps);
-		ImGui::Text("frametime %f ms", Stats::stats.frametime);
-		ImGui::Text("draw time %f ms", Stats::stats.mesh_draw_time);
-		ImGui::Text("update time %f ms", Stats::stats.scene_update_time);
-		ImGui::Text("triangles %i", Stats::stats.triangle_count);
-		ImGui::Text("draws %i", Stats::stats.drawcall_count);
+		ImGui::Text("Fps %f", Stats::Data.Fps);
+		ImGui::Text("Frametime %f ms", Stats::Data.Frametime);
+		ImGui::Text("Draw Time %f ms", Stats::Data.MeshDrawTime);
+		ImGui::Text("Update Time %f ms", Stats::Data.SceneUpdateTime);
+		ImGui::Text("Triangles %i", Stats::Data.TriangleCount);
+		ImGui::Text("Draws %i", Stats::Data.DrawcallCount);
 	}
 }

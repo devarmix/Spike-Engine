@@ -15,5 +15,5 @@ namespace SpikeEditor {
 
 	void EditorGUILayer::OnUpdate(float deltaTime) {}
 
-	void EditorGUILayer::OnEvent(Spike::Event& event) {}
+	void EditorGUILayer::OnEvent(const Spike::GenericEvent& event) {}
 }

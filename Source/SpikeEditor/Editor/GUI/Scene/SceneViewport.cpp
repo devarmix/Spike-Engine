@@ -76,12 +76,12 @@ namespace SpikeEditor {
 		    ImGui::Image((ImTextureID)m_DSet, size);
 	}
 
-	void SceneViewport::OnEvent(Spike::Event& event) {
+	void SceneViewport::OnEvent(const Spike::GenericEvent& event) {
 
 		m_Camera.PollEvents(event);
 
-		Spike::EventDispatcher dispatcher(event);
-		dispatcher.Dispatch<Spike::MouseButtonPressEvent>(BIND_EVENT_FN(SceneViewport::OnMouseButtonPress));
+		Spike::EventHandler handler(event);
+		handler.Handle<Spike::MouseButtonPressEvent>(BIND_FUNCTION(SceneViewport::OnMouseButtonPress));
 	}
 
 	bool SceneViewport::OnMouseButtonPress(const Spike::MouseButtonPressEvent& event) {

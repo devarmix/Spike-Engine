@@ -1,5 +1,5 @@
 project "ImGui"
-    location "%{wks.location}/Source/Third-Party/imgui"
+    location "%{wks.location}/Source/ThirdParty/imgui"
 	kind "StaticLib"
 	language "C++"
 	cppdialect "C++17"

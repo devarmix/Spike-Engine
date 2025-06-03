@@ -16,7 +16,7 @@ namespace Spike {
 
 	void RendererLayer::OnAttach() {
 
-		Meshes = Mesh::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/models/monkey.glb");
+		Meshes = Mesh::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/models/sphereSmoothUV.glb");
 
 		//Ref<Texture> albedoMap = Texture::Create("res/textures/sloppy-mortar-stone-wall_albedo.png");
 		//Ref<Texture> normalMap = Texture::Create("res/textures/sloppy-mortar-stone-wall_normal-ogl.png");
@@ -24,7 +24,13 @@ namespace Spike {
 		//Ref<Texture> metMap = Texture::Create("res/textures/sloppy-mortar-stone-wall_metallic.png");
 		//Ref<Texture> rougMap = Texture::Create("res/textures/sloppy-mortar-stone-wall_roughness.png");
 
+		float roughness = 0.0f;
+		float metallic = 1.0f;
+
 		Ref<Material> PBRMat = Material::Create();
+
+		PBRMat->AddScalarParameter("Roughness", 0, roughness);
+		PBRMat->AddScalarParameter("Metallic", 1, metallic);
 
 		//PBRMat->AddTextureParameter("AlbedoMap", 0, albedoMap);
 		//PBRMat->AddTextureParameter("NormalMap", 1, normalMap);
@@ -47,15 +53,15 @@ namespace Spike {
 		VulkanRenderer::Draw();
 	}
 
-	void RendererLayer::OnEvent(Event& event) {
+	void RendererLayer::OnEvent(const GenericEvent& event) {
 
-		EventDispatcher dispatcher(event);
-		dispatcher.Dispatch<WindowResizeEvent>(BIND_EVENT_FN(RendererLayer::OnWindowResize));
-		dispatcher.Dispatch<SDLEvent>(BIND_EVENT_FN(RendererLayer::OnSDLEvent));
+		EventHandler handler(event);
+		handler.Handle<WindowResizeEvent>(BIND_FUNCTION(RendererLayer::OnWindowResize));
+		handler.Handle<SDLEvent>(BIND_FUNCTION(RendererLayer::OnSDLEvent));
 
-		dispatcher.Dispatch<SceneViewportResizeEvent>(BIND_EVENT_FN(RendererLayer::OnSceneViewportResize));
-		dispatcher.Dispatch<SceneViewportMinimizeEvent>(BIND_EVENT_FN(RendererLayer::OnSceneViewportMinimize));
-		dispatcher.Dispatch<SceneViewportRestoreEvent>(BIND_EVENT_FN(RendererLayer::OnSceneViewportRestore));
+		handler.Handle<SceneViewportResizeEvent>(BIND_FUNCTION(RendererLayer::OnSceneViewportResize));
+		handler.Handle<SceneViewportMinimizeEvent>(BIND_FUNCTION(RendererLayer::OnSceneViewportMinimize));
+		handler.Handle<SceneViewportRestoreEvent>(BIND_FUNCTION(RendererLayer::OnSceneViewportRestore));
 	}
 
 	bool RendererLayer::OnWindowResize(const WindowResizeEvent& event) {
@@ -64,7 +70,7 @@ namespace Spike {
 		return false;
 	}
 
-	bool RendererLayer::OnSDLEvent(SDLEvent& event) {
+	bool RendererLayer::OnSDLEvent(const SDLEvent& event) {
 
 		VulkanRenderer::PoolImGuiEvents(event.GetEvent());
 

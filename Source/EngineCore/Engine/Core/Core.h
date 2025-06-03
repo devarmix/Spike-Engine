@@ -14,6 +14,7 @@
     #error Spike Engine supports only Windows!
 #endif 
 
+#define BIND_FUNCTION(x) std::bind(&x, this, std::placeholders::_1)
 
 template<typename T>
 using Ref = std::shared_ptr<T>;

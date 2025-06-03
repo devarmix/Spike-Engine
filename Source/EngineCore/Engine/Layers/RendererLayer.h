@@ -20,11 +20,11 @@ namespace Spike {
 		virtual void OnAttach() override;
 		virtual void OnDetach() override;
 
-		virtual void OnEvent(Event& event) override;
+		virtual void OnEvent(const GenericEvent& event) override;
 
 	private:
 		bool OnWindowResize(const WindowResizeEvent& event);
-		bool OnSDLEvent(SDLEvent& event);
+		bool OnSDLEvent(const SDLEvent& event);
 		
 		bool OnSceneViewportResize(const SceneViewportResizeEvent& event);
 		bool OnSceneViewportMinimize(const SceneViewportMinimizeEvent& event);

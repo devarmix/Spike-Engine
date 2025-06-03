@@ -80,7 +80,7 @@ namespace Spike {
 
 		static Ref<VulkanMaterial> Create();
 
-		virtual const void* GetData() const override { return (void*) & m_Data; }
+		virtual const void* GetData() const override { return (void*)&m_Data; }
 		const VulkanMaterialData* GetRawData() const { return &m_Data; }
 
 		virtual void SetScalarParameter(const std::string& name, float value) override;

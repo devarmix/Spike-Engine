@@ -26,7 +26,7 @@ namespace Spike {
 
 		virtual void OnUpdate() = 0;
 
-		using EventCallbackFn = std::function<void(Event&)>;
+		using EventCallbackFn = std::function<void(const GenericEvent&)>;
 		virtual void SetEventCallback(const EventCallbackFn& callback) = 0;
 	};
 }

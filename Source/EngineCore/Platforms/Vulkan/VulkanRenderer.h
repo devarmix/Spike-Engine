@@ -228,7 +228,7 @@ namespace Spike {
 		static void ResizeSwapchain(uint32_t width, uint32_t height);
 		static void ResizeViewport(uint32_t width, uint32_t height);
 
-		static void PoolImGuiEvents(SDL_Event& event);
+		static void PoolImGuiEvents(const SDL_Event& event);
 
 	private:
 

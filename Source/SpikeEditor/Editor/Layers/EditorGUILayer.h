@@ -14,6 +14,6 @@ namespace SpikeEditor {
 		virtual void OnDetach() override;
 		virtual void OnUpdate(float deltaTime) override;
 
-		virtual void OnEvent(Spike::Event& event) override;
+		virtual void OnEvent(const Spike::GenericEvent& event) override;
 	};
 }

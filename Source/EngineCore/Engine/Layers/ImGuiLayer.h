@@ -15,7 +15,7 @@ namespace Spike {
 		virtual void OnAttach() override;
 		virtual void OnDetach() override;
 
-		virtual void OnEvent(Event& event) override;
+		virtual void OnEvent(const GenericEvent& event) override;
 
 		template<typename T, typename... Args>
 		Ref<T> CreateGUI(Args&&... args) {

@@ -14,7 +14,7 @@ namespace Spike {
 		virtual void OnAttach() {}
 		virtual void OnDetach() {}
 
-		virtual void OnEvent(Event& event) {}
+		virtual void OnEvent(const GenericEvent& event) {}
 
 		const std::string& GetName() const { return m_Name; }
 

@@ -6,33 +6,41 @@ namespace Spike {
 
 	enum EventType {
 
-		NONE = 0, WindowResize, WindowClose, WindowMinimize, WindowRestore, 
+		NONE = 0, 
+		WindowResize, WindowClose, WindowMinimize, WindowRestore, 
 		SDL, SceneViewportResize, SceneViewportMinimize, SceneViewportRestore,
 		KeyPress, KeyRelease, KeyRepeat,
 		MouseButtonPress, MouseButtonRelease, MouseMotion, MouseScroll
 	};
 
-	class Event {
+	class GenericEvent {
 	public:
-		virtual ~Event() = default;
+		virtual ~GenericEvent() = default;
 
 		virtual std::string GetName() const = 0;
 
 		virtual EventType GetEventType() const = 0;
 
-		bool IsHandled = false;
+		void SetHandled() const { m_IsHandled = true; }
+		bool IsHandled() const { return m_IsHandled; }
+
+	private:
+		 mutable bool m_IsHandled = false;
 	};
 
-	class EventDispatcher {
+	class EventHandler {
 	public:
-		EventDispatcher(Event& event) : m_Event(event) {}
+		EventHandler(const GenericEvent& event) : m_Event(event) {}
 
-		template<typename T, typename F>
-		bool Dispatch(const F& func) {
+		template<typename T>
+		using EventFN = std::function<bool(const T&)>;
+
+		template<typename T>
+		bool Handle(const EventFN<T>& func) {
 
 			if (m_Event.GetEventType() == T::GetStaticType()) {
 
-				m_Event.IsHandled = func(static_cast<T&>(m_Event));
+				if (func((const T&)m_Event)) m_Event.SetHandled();
 				return true;
 			}
 
@@ -40,12 +48,10 @@ namespace Spike {
 		}
 
 	private:
-		Event& m_Event;
+		const GenericEvent& m_Event;
 	};
 }
 
 #define EVENT_CLASS_TYPE(type) \
         static Spike::EventType GetStaticType() { return Spike::EventType::type; } \
-        Spike::EventType GetEventType() const { return GetStaticType(); }
-
-#define BIND_EVENT_FN(x) std::bind(&x, this, std::placeholders::_1)
+        Spike::EventType GetEventType() const override { return GetStaticType(); }

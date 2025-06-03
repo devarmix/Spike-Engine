@@ -1,5 +1,5 @@
 project "VK-Bootstrap"
-    location "%{wks.location}/Source/Third-Party/vk-bootstrap"
+    location "%{wks.location}/Source/ThirdParty/vk-bootstrap"
     kind "StaticLib"
     language "C++"
     cppdialect "C++17"

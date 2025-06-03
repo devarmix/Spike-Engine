@@ -827,7 +827,7 @@ namespace Spike {
 		vkCmdEndRendering(cmd);
 	}
 
-	void VulkanRenderer::PoolImGuiEvents(SDL_Event& event) {
+	void VulkanRenderer::PoolImGuiEvents(const SDL_Event& event) {
 
 		ImGui_ImplSDL2_ProcessEvent(&event);
 	}
@@ -1044,9 +1044,9 @@ namespace Spike {
 		else {
 
 			// reset counters
-			Stats::stats.drawcall_count = 0;
-			Stats::stats.triangle_count = 0;
-			Stats::stats.mesh_draw_time = 0;
+			Stats::Data.DrawcallCount = 0;
+			Stats::Data.TriangleCount = 0;
+			Stats::Data.MeshDrawTime = 0;
 
 			//mainDrawContext.OpaqueSurfaces.clear();
 			//mainDrawContext.TransparentSurfaces.clear();
@@ -1188,8 +1188,8 @@ namespace Spike {
 	void VulkanRenderer::GBufferPass(VkCommandBuffer cmd) {
 
 		// reset counters
-		Stats::stats.drawcall_count = 0;
-		Stats::stats.triangle_count = 0;
+		Stats::Data.DrawcallCount = 0;
+		Stats::Data.TriangleCount = 0;
 
 		auto start = std::chrono::system_clock::now();
 
@@ -1281,8 +1281,8 @@ namespace Spike {
 
 			// stats
 			//E_CORE_INFO("DRAW");
-			Stats::stats.drawcall_count++;
-			Stats::stats.triangle_count += draw.IndexCount / 3;
+			Stats::Data.DrawcallCount++;
+			Stats::Data.TriangleCount += draw.IndexCount / 3;
 		};
 
 		//SE_CORE_INFO("{}", opaque_Draws.size());
@@ -1303,7 +1303,7 @@ namespace Spike {
 		auto end = std::chrono::system_clock::now();
 
 		auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		Stats::stats.mesh_draw_time = elapsed.count() / 1000.f;
+		Stats::Data.MeshDrawTime = elapsed.count() / 1000.f;
 	}
 
 	void VulkanRenderer::SkyboxPass(VkCommandBuffer cmd) {
