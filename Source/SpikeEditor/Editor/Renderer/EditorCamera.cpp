@@ -16,14 +16,14 @@ namespace SpikeEditor {
 
 		glm::mat4 cameraRotation = GetRotationMatrix();
 
-		Vector3 v = m_CurrentVelocity * 0.05f * m_Speed * m_SpeedMultiplier * m_SpeedScrollMultiplier;
+		Vector3 v = m_CurrentVelocity * deltaTime * 7.f * m_Speed * m_SpeedMultiplier * m_SpeedScrollMultiplier;
 		m_Position += glm::vec3(cameraRotation * glm::vec4(v.x, v.y, v.z, 0.f));
 
 		SetCameraPosition(m_Position);
 	}
 
 	void EditorCamera::PollEvents(const Spike::GenericEvent& event) {
-
+		 
 		Spike::EventHandler handler(event);
 		handler.Handle<Spike::MouseButtonPressEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonPress));
 		handler.Handle<Spike::MouseButtonReleaseEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonRelease));

@@ -8,6 +8,7 @@ namespace SpikeEngine {
 
 	class Texture : public Spike::Asset {
 	public:
+		virtual ~Texture() = default;
 
 		static Ref<Texture> Create(const char* filePath);
 

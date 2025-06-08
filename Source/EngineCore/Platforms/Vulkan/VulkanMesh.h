@@ -10,8 +10,8 @@ namespace Spike {
 
 	struct VulkanMeshData {
 
-		VulkanBuffer IndexBuffer;
-		VulkanBuffer VertexBuffer;
+		VulkanBuffer* IndexBuffer;
+		VulkanBuffer* VertexBuffer;
 		VkDeviceAddress VertexBufferAddress;
 	};
 

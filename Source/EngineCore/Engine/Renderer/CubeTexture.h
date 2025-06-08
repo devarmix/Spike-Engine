@@ -8,6 +8,7 @@ namespace SpikeEngine {
 
 	class CubeTexture : public Spike::Asset {
 	public:
+		virtual ~CubeTexture() = default;
 
 		static Ref<CubeTexture> Create(const std::array<const char*, 6>& filePath);
 

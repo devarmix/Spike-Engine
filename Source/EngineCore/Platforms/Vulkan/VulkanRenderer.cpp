@@ -207,10 +207,10 @@ namespace Spike {
 
 			BRDFLutPipeline.PipelineLayout = newLayout;
 
-			VulkanShader shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/BRDFLut.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/BRDFLut.frag.spv");
+			VulkanShader* shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/BRDFLut.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/BRDFLut.frag.spv");
 
 			PipelineBuilder pipelineBulder;
-			pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
+			pipelineBulder.SetShaders(shader->VertexModule, shader->FragmentModule);
 			pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 			pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
 			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
@@ -225,7 +225,7 @@ namespace Spike {
 
 			BRDFLutPipeline.Pipeline = pipelineBulder.BuildPipeline(Device.Device);
 
-			shader.Destroy();
+			delete shader;
 		}
 
 		// init command / sync structures
@@ -277,10 +277,10 @@ namespace Spike {
 
 			SkyboxPipeline.PipelineLayout = newLayout;
 
-			VulkanShader shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/Skybox.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/Skybox.frag.spv");
+			VulkanShader* shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/Skybox.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/Skybox.frag.spv");
 
 			PipelineBuilder pipelineBulder;
-			pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
+			pipelineBulder.SetShaders(shader->VertexModule, shader->FragmentModule);
 			pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 			pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
 			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
@@ -295,7 +295,7 @@ namespace Spike {
 
 			SkyboxPipeline.Pipeline = pipelineBulder.BuildPipeline(Device.Device);
 
-			shader.Destroy();
+			delete shader;
 		}
 
 		// init descriptor set
@@ -364,10 +364,10 @@ namespace Spike {
 
 			LightingPipeline.PipelineLayout = newLayout;
 
-			VulkanShader shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRLightingTest.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRLightingTest.frag.spv");
+			VulkanShader* shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRLightingTest.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRLightingTest.frag.spv");
 
 			PipelineBuilder pipelineBulder;
-			pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
+			pipelineBulder.SetShaders(shader->VertexModule, shader->FragmentModule);
 			pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 			pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
 			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
@@ -382,7 +382,7 @@ namespace Spike {
 
 			LightingPipeline.Pipeline = pipelineBulder.BuildPipeline(Device.Device);
 
-			shader.Destroy();
+			delete shader;
 		}
 
 		// init descriptor set
@@ -412,7 +412,7 @@ namespace Spike {
 			light.Position = { 3.f, 3.f, 3.f };
 			light.Type = 0;
 
-			LightObject* lights = (LightObject*)LightingPipeline.LightBuffer.AllocationInfo.pMappedData;
+			LightObject* lights = (LightObject*)LightingPipeline.LightBuffer->AllocationInfo.pMappedData;
 			lights[0] = light;
 		}
 
@@ -425,14 +425,14 @@ namespace Spike {
 			light.Position = { 5.f, 4.f, 4.f };
 			light.Type = 0;
 
-			LightObject* lights = (LightObject*)LightingPipeline.LightBuffer.AllocationInfo.pMappedData;
+			LightObject* lights = (LightObject*)LightingPipeline.LightBuffer->AllocationInfo.pMappedData;
 			lights[1] = light;
 		}
 
 		// update descriptor set with a buffer of all frame lights
 		{
 			DescriptorWriter writer;
-			writer.WriteBuffer(0, LightingPipeline.LightBuffer.Buffer, sizeof(LightObject) * 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+			writer.WriteBuffer(0, LightingPipeline.LightBuffer->Buffer, sizeof(LightObject) * 2, 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 
 			writer.UpdateSet(Device.Device, LightingPipeline.Set);
 		}
@@ -443,7 +443,7 @@ namespace Spike {
 			vkDestroyPipelineLayout(Device.Device, LightingPipeline.PipelineLayout, nullptr);
 			vkDestroyPipeline(Device.Device, LightingPipeline.Pipeline, nullptr);
 
-			LightingPipeline.LightBuffer.Destroy();
+			delete LightingPipeline.LightBuffer;
 		});
 	}
 
@@ -869,7 +869,7 @@ namespace Spike {
 			RenderObject def;
 			def.IndexCount = s.VertexCount;
 			def.FirstIndex = s.StartVertexIndex;
-			def.IndexBuffer = meshData->IndexBuffer.Buffer;
+			def.IndexBuffer = meshData->IndexBuffer->Buffer;
 			def.Material = s.Material;
 			def.Bounds = s.Bounds;
 
@@ -893,7 +893,7 @@ namespace Spike {
 		light.Color = color;
 		light.Position = position;
 
-		LightObject* lights = (LightObject*)LightingPipeline.LightBuffer.AllocationInfo.pMappedData;
+		LightObject* lights = (LightObject*)LightingPipeline.LightBuffer->AllocationInfo.pMappedData;
 		lights[MainDrawContext.LightCount] = light;
 
 		MainDrawContext.LightCount++;
@@ -922,30 +922,30 @@ namespace Spike {
 		VK_CHECK(vkBeginCommandBuffer(cmd, &cmdBeginInfo));
 
 		// create scene data buffer
-	    VulkanBuffer sceneDatabuffer = VulkanBuffer::Create(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+	    VulkanBuffer* sceneDatabuffer = VulkanBuffer::Create(sizeof(GPUSceneData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
 		// write current scene data
 		{
 			void* uData;
-			vmaMapMemory(Device.Allocator, sceneDatabuffer.Allocation, &uData);
+			vmaMapMemory(Device.Allocator, sceneDatabuffer->Allocation, &uData);
 
 			GPUSceneData* sceneUniformData = (GPUSceneData*)uData;
 			*sceneUniformData = SceneData;
 
-			vmaUnmapMemory(Device.Allocator, sceneDatabuffer.Allocation);
+			vmaUnmapMemory(Device.Allocator, sceneDatabuffer->Allocation);
 		}
 
 		MainDrawContext.FrameSceneDataSet = GetCurrentFrame().FrameDescriptors.Allocate(Device.Device, SceneDataDescriptorLayout);
 		{
 			DescriptorWriter writer;
-			writer.WriteBuffer(0, sceneDatabuffer.Buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+			writer.WriteBuffer(0, sceneDatabuffer->Buffer, sizeof(GPUSceneData), 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
 			writer.UpdateSet(Device.Device, MainDrawContext.FrameSceneDataSet);
 		}
 
 		GetCurrentFrame().DeletionQueue.PushFunction([=]() mutable {
 
-			sceneDatabuffer.Destroy();
+			delete sceneDatabuffer;
 		});
 
 		return true;

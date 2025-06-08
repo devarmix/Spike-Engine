@@ -28,6 +28,7 @@ namespace SpikeEngine {
 
 	class Mesh : public Spike::Asset {
 	public:
+		virtual ~Mesh() = default;
 
 		static std::vector<Ref<Mesh>> Create(std::filesystem::path filePath);
 

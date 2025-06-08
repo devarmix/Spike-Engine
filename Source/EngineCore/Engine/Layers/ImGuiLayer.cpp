@@ -9,11 +9,19 @@
 
 #include <Engine/Core/Stats.h>
 
+#include <Platforms/Vulkan/VulkanGui.h>
+
 namespace Spike {
+
+    ImGuiTextureMapper* ImGuiTextureMapper::Create() {
+
+        return VulkanImGuiTextureMapper::Create();
+    }
 
 	ImGuiLayer::~ImGuiLayer() {
 
 		m_WindowList.clear();
+        delete m_GlobalGuiTextureMapper;
 	}
 
 	void ImGuiLayer::OnAttach() {

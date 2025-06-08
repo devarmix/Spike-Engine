@@ -36,6 +36,7 @@ namespace SpikeEngine {
 
 	class Material : public Spike::Asset {
 	public:
+		virtual ~Material() = default;
 
 		static Ref<Material> Create();
 

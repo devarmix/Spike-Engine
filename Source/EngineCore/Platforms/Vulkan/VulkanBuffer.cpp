@@ -3,7 +3,7 @@
 
 namespace Spike {
 
-	VulkanBuffer VulkanBuffer::Create(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memUsage) {
+	VulkanBuffer* VulkanBuffer::Create(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memUsage) {
 
 		VkBufferCreateInfo bufferInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
 		bufferInfo.pNext = nullptr;
@@ -15,10 +15,10 @@ namespace Spike {
 		vmaAllocInfo.usage = memUsage;
 		vmaAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-		VulkanBuffer newBuffer;
+		VulkanBuffer* newBuffer = new VulkanBuffer();
 
-		VK_CHECK(vmaCreateBuffer(VulkanRenderer::Device.Allocator, &bufferInfo, &vmaAllocInfo, &newBuffer.Buffer,
-			&newBuffer.Allocation, &newBuffer.AllocationInfo));
+		VK_CHECK(vmaCreateBuffer(VulkanRenderer::Device.Allocator, &bufferInfo, &vmaAllocInfo, &newBuffer->Buffer,
+			&newBuffer->Allocation, &newBuffer->AllocationInfo));
 
 		return newBuffer;
 	}

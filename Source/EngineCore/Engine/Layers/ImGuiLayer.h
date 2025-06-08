@@ -2,13 +2,28 @@
 
 #include <Engine/Core/Layer.h>
 #include <Engine/GUI/GUIWindow.h>
+#include <Engine/Renderer/Texture.h>
+
 using namespace SpikeEngine;
 
 namespace Spike {
 
+	class ImGuiTextureMapper {
+	public:
+		virtual ~ImGuiTextureMapper() = default;
+
+		static ImGuiTextureMapper* Create();
+
+		virtual ImTextureID RegisterTexture(Ref<Texture> texture) = 0;
+		virtual void UnregisterTexture(ImTextureID id) = 0;
+
+		virtual void UpdateTexture(ImTextureID id, Ref<Texture> newTexture) = 0;
+	};
+
 	class ImGuiLayer : public Layer {
 	public:
-		ImGuiLayer() : Layer("ImGui Layer") {}
+		ImGuiLayer() : Layer("ImGui Layer") { m_WindowList.clear(); 
+		    m_GlobalGuiTextureMapper = ImGuiTextureMapper::Create(); }
 		~ImGuiLayer() override;
 
 		virtual void OnUpdate(float deltaTime) override;
@@ -27,6 +42,8 @@ namespace Spike {
 			return window;
 		}
 
+		ImGuiTextureMapper* GetGlobalGuiTextureMapper() { return m_GlobalGuiTextureMapper; }
+
 		//static void DestroyWindow(Ref<GUI_Window>& window);
 
 	private:
@@ -34,5 +51,6 @@ namespace Spike {
 
 	private:
 		std::vector<Ref<GUI_Window>> m_WindowList;
+		ImGuiTextureMapper* m_GlobalGuiTextureMapper;
 	};
 }

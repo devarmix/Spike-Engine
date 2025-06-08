@@ -9,11 +9,14 @@ using namespace Spike;
 
 namespace SpikeEditor {
 
-	SceneViewport::~SceneViewport() {}
+	SceneViewport::~SceneViewport() {
+
+		UnMapGUITexture(m_ViewportTexID);
+	}
 
 	void SceneViewport::OnCreate() {
 
-		m_DSet = ImGui_ImplVulkan_AddTexture(VulkanRenderer::DefSamplerLinear, VulkanRenderer::ViewportTexture->GetRawData()->View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		m_ViewportTexID = MapGUITexture(VulkanRenderer::ViewportTexture);
 		VulkanRenderer::MainCamera = &m_Camera;
 
 		SetWindowFlags(ImGuiWindowFlags_NoMove);
@@ -32,12 +35,6 @@ namespace SpikeEditor {
 		ImVec2 size = ImGui::GetContentRegionAvail();
 
 		if (m_Width != size.x || m_Height != size.y) {
-
-			// wait till gpu done its things, so we avoid any validation errors.
-			vkDeviceWaitIdle(VulkanRenderer::Device.Device);
-
-			if (!m_Minimized)
-			    ImGui_ImplVulkan_RemoveTexture(m_DSet);
 
 			if ((size.x <= 0 || size.y <= 0) && !m_Minimized) {
 
@@ -68,12 +65,12 @@ namespace SpikeEditor {
 			SpikeEditor::Get().OnEvent(event);
 
 			if (!m_Minimized)
-			    m_DSet = ImGui_ImplVulkan_AddTexture(VulkanRenderer::DefSamplerLinear, VulkanRenderer::ViewportTexture->GetRawData()->View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+				UpdateGUITexture(m_ViewportTexID, VulkanRenderer::ViewportTexture);
 		}
 
 		// draw viewport image
 		if (!m_Minimized)
-		    ImGui::Image((ImTextureID)m_DSet, size);
+		    ImGui::Image(m_ViewportTexID, size);
 	}
 
 	void SceneViewport::OnEvent(const Spike::GenericEvent& event) {

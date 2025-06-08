@@ -9,10 +9,11 @@ namespace Spike {
 	public:
 
 		VulkanShader() = default;
+		~VulkanShader() { Destroy(); }
 
 		void Destroy();
 
-		static VulkanShader Create(const char* vertexPath, const char* fragmentPath);
+		static VulkanShader* Create(const char* vertexPath, const char* fragmentPath);
 
 	public:
 

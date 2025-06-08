@@ -7,7 +7,12 @@
 
 namespace Spike {
 
+	Application* Application::m_Instance = nullptr;
+
 	Application::Application(const ApplicationCreateInfo& info) {
+
+		assert(m_Instance == nullptr);
+		m_Instance = this;
 
 		m_Window = Window::Create(info.WinInfo);
 		m_Window->SetEventCallback(BIND_FUNCTION(Application::OnEvent));

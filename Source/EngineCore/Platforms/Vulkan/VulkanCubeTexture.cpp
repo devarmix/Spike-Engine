@@ -47,9 +47,9 @@ namespace Spike {
 		size_t sdata_size = size.depth * size.width * size.height * 4;
 		size_t data_size = sdata_size * 6;
 
-		VulkanBuffer uploadbuffer = VulkanBuffer::Create(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+		VulkanBuffer* uploadbuffer = VulkanBuffer::Create(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-		unsigned char* mappedData = (unsigned char*)uploadbuffer.AllocationInfo.pMappedData;
+		unsigned char* mappedData = (unsigned char*)uploadbuffer->AllocationInfo.pMappedData;
 
 		for (int i = 0; i < 6; i++) {
 
@@ -79,7 +79,7 @@ namespace Spike {
 			}
 
 			// copy the buffer into the image
-			vkCmdCopyBufferToImage(cmd, uploadbuffer.Buffer, newTexture->GetRawData()->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copyRegion.data());
+			vkCmdCopyBufferToImage(cmd, uploadbuffer->Buffer, newTexture->GetRawData()->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 6, copyRegion.data());
 
 			if (mipmapped) {
 				GenerateMipmaps(cmd, newTexture->GetRawData()->Image, VkExtent2D{ newTexture->GetRawData()->Extent.width, newTexture->GetRawData()->Extent.height });
@@ -90,7 +90,7 @@ namespace Spike {
 			}
 			});
 
-		uploadbuffer.Destroy();
+		delete uploadbuffer;
 
 		return newTexture;
 	}

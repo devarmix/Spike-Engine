@@ -8,10 +8,11 @@ namespace Spike {
 	struct VulkanBuffer {
 
 		VulkanBuffer() = default;
+		~VulkanBuffer() { Destroy(); }
 
 		void Destroy();
 
-		static VulkanBuffer Create(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memUsage);
+		static VulkanBuffer* Create(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memUsage);
 
 		VkBuffer Buffer;
 		VmaAllocation Allocation;

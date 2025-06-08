@@ -197,7 +197,7 @@ namespace Spike {
 			VkDescriptorSetLayout SetLayout;
 
 			// stores all the lights for this frame
-			VulkanBuffer LightBuffer;
+			VulkanBuffer* LightBuffer;
 
 		} LightingPipeline;
 

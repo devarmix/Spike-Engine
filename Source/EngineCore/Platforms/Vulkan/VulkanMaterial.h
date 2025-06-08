@@ -17,7 +17,7 @@ namespace Spike {
 		VkDescriptorSet DataSet;
 		VkDescriptorSetLayout DataSetLayout;
 
-		VulkanBuffer DataBuffer;
+		VulkanBuffer* DataBuffer;
 
 		static constexpr uint32_t IndexInvalid = 10000000;
 
@@ -103,7 +103,7 @@ namespace Spike {
 
 	private:
 
-		void BuildPipeline(VulkanShader shader, MaterialSurfaceType surfaceType);
+		void BuildPipeline(VulkanShader* shader, MaterialSurfaceType surfaceType);
 
 	private:
 

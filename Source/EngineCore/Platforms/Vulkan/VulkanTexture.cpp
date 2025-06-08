@@ -44,9 +44,9 @@ namespace Spike {
 	Ref<VulkanTexture> VulkanTexture::Create(void* data, VkExtent3D size, VkFormat format, VkImageUsageFlags usage, bool mipmapped) {
 
 		size_t data_size = size.depth * size.width * size.height * 4;
-		VulkanBuffer uploadbuffer = VulkanBuffer::Create(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+		VulkanBuffer* uploadbuffer = VulkanBuffer::Create(data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
-		memcpy(uploadbuffer.AllocationInfo.pMappedData, data, data_size);
+		memcpy(uploadbuffer->AllocationInfo.pMappedData, data, data_size);
 
 		Ref<VulkanTexture> newTexture = Create(size, format, usage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, mipmapped);
 
@@ -66,7 +66,7 @@ namespace Spike {
 			copyRegion.imageExtent = size;
 
 			// copy the buffer into the image
-			vkCmdCopyBufferToImage(cmd, uploadbuffer.Buffer, newTexture->GetRawData()->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+			vkCmdCopyBufferToImage(cmd, uploadbuffer->Buffer, newTexture->GetRawData()->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
 				&copyRegion);
 
 			if (mipmapped) {
@@ -78,7 +78,7 @@ namespace Spike {
 			}
 			});
 
-		uploadbuffer.Destroy();
+		delete uploadbuffer;
 
 		return newTexture;
 	}

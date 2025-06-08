@@ -15,7 +15,7 @@ namespace Spike {
 			uint32_t bufIndex = m_Data.BufIndex;
 			uint8_t valIndex = m_ScalarParameters[name].DataBindIndex;
 
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
+			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
 			constants[bufIndex].ScalarData[valIndex] = value;
 
 			VulkanRenderer::GlobalMaterialManager.WriteBuffer(bufIndex);
@@ -35,7 +35,7 @@ namespace Spike {
 			uint8_t valIndex = m_ColorParameters[name].DataBindIndex;
 			glm::vec4 val = glm::vec4{ value.x, value.y, value.z, value.w };
 
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
+			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
 			constants[bufIndex].ColorData[valIndex] = val;
 
 			VulkanRenderer::GlobalMaterialManager.WriteBuffer(bufIndex);
@@ -56,7 +56,7 @@ namespace Spike {
 
 			m_TextureParameters[name].Value = value;
 
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
+			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
 			uint32_t texIndex = constants[bufIndex].TexIndex[valIndex];
 
 			VulkanTextureData* texData = (VulkanTextureData*)value->GetData();
@@ -76,7 +76,7 @@ namespace Spike {
 			uint32_t bufIndex = m_Data.BufIndex;
 			uint8_t valIndex = m_ScalarParameters[name].DataBindIndex;
 
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
+			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
 			return constants[bufIndex].ScalarData[valIndex];
 		}
 		else {
@@ -94,7 +94,7 @@ namespace Spike {
 			uint32_t bufIndex = m_Data.BufIndex;
 			uint8_t valIndex = m_ColorParameters[name].DataBindIndex;
 
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
+			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
 			glm::vec4 val = constants[bufIndex].ColorData[valIndex];
 
 			return Vector4(val.x, val.y, val.z, val.w);
@@ -160,7 +160,7 @@ namespace Spike {
 			uint32_t newTexIndex = VulkanRenderer::GlobalMaterialManager.GetFreeTextureIndex();
 			uint32_t bufIndex = m_Data.BufIndex;
 
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
+			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
 			constants[bufIndex].TexIndex[valIndex] = newTexIndex;
 
 			VulkanRenderer::GlobalMaterialManager.WriteBuffer(bufIndex);
@@ -210,7 +210,7 @@ namespace Spike {
 			uint8_t valIndex = m_TextureParameters[name].DataBindIndex;
 			uint32_t bufIndex = m_Data.BufIndex;
 
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
+			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
 			VulkanRenderer::GlobalMaterialManager.ReleaseTextureIndex(constants[bufIndex].TexIndex[valIndex]);
 
 			constants[bufIndex].TexIndex[valIndex] = VulkanMaterialManager::IndexInvalid;
@@ -223,7 +223,7 @@ namespace Spike {
 		}
 	}
 
-	void VulkanMaterial::BuildPipeline(VulkanShader shader, MaterialSurfaceType surfaceType) {
+	void VulkanMaterial::BuildPipeline(VulkanShader* shader, MaterialSurfaceType surfaceType) {
 
 		VkPushConstantRange matrixRange{};
 		matrixRange.offset = 0;
@@ -244,7 +244,7 @@ namespace Spike {
 		m_Data.Pipeline.Layout = newLayout;
 
 		PipelineBuilder pipelineBulder;
-		pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
+		pipelineBulder.SetShaders(shader->VertexModule, shader->FragmentModule);
 		pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 		pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
 		pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
@@ -293,7 +293,7 @@ namespace Spike {
 				newBuf.TexIndex[i] = VulkanMaterialManager::IndexInvalid;
 			}
 
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
+			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
 			constants[bufIndex] = newBuf;
 
 			VulkanRenderer::GlobalMaterialManager.WriteBuffer(bufIndex);
@@ -301,13 +301,13 @@ namespace Spike {
 
 		matData.BufIndex = bufIndex;
 
-		VulkanShader shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRTest.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRTest.frag.spv");
+		VulkanShader* shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRTest.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRTest.frag.spv");
 
 		Ref<VulkanMaterial> mat = CreateRef<VulkanMaterial>(matData);
 
 		mat->BuildPipeline(shader, Opaque);
 
-		shader.Destroy();
+		delete shader;
 
 		return mat;
 	}
@@ -319,7 +319,7 @@ namespace Spike {
 			uint8_t valIndex = v.DataBindIndex;
 			uint32_t bufIndex = m_Data.BufIndex;
 
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer.AllocationInfo.pMappedData;
+			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
 			VulkanRenderer::GlobalMaterialManager.ReleaseTextureIndex(constants[bufIndex].TexIndex[valIndex]);
 		}
 
@@ -425,7 +425,7 @@ namespace Spike {
 
 		vkDestroyDescriptorSetLayout(VulkanRenderer::Device.Device, DataSetLayout, nullptr);
 
-		DataBuffer.Destroy();
+		delete DataBuffer;
 	}
 
 	uint32_t VulkanMaterialManager::GetFreeTextureIndex() {
@@ -477,7 +477,7 @@ namespace Spike {
 	void VulkanMaterialManager::WriteBuffer(uint32_t index) {
 
 		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.buffer = DataBuffer.Buffer;
+		bufferInfo.buffer = DataBuffer->Buffer;
 		bufferInfo.offset = index * sizeof(MaterialDataConstants);
 		bufferInfo.range = sizeof(MaterialDataConstants);
 

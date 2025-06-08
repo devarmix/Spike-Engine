@@ -2,6 +2,7 @@
 
 #include <Engine/Core/Core.h>
 #include <Engine/Events/Event.h>
+#include <Engine/Renderer/Texture.h>
 #include <imgui.h>
 
 namespace SpikeEngine {
@@ -20,6 +21,10 @@ namespace SpikeEngine {
 		ImGuiWindowFlags GetWindowFlags() const { return m_WindowFlags; }
 		void SetWindowFlags(ImGuiWindowFlags flags) { m_WindowFlags = flags; }
 		void AddWindowFlags(ImGuiWindowFlags flags) { m_WindowFlags |= flags; }
+
+		ImTextureID MapGUITexture(Ref<Texture> texture);
+		void UpdateGUITexture(ImTextureID id, Ref<Texture> newTexture);
+		void UnMapGUITexture(ImTextureID id);
 
 	private:
 		std::string m_Name;

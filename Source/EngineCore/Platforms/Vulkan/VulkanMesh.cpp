@@ -148,23 +148,23 @@ namespace Spike {
 		m_Data.VertexBuffer = VulkanBuffer::Create(vertexBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
-		VkBufferDeviceAddressInfo deviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = m_Data.VertexBuffer.Buffer };
+		VkBufferDeviceAddressInfo deviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = m_Data.VertexBuffer->Buffer };
 		m_Data.VertexBufferAddress = vkGetBufferDeviceAddress(VulkanRenderer::Device.Device, &deviceAddressInfo);
 
 		m_Data.IndexBuffer = VulkanBuffer::Create(indexBufferSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_ONLY);
 
-		VulkanBuffer staging = VulkanBuffer::Create(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VulkanBuffer* staging = VulkanBuffer::Create(vertexBufferSize + indexBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VMA_MEMORY_USAGE_CPU_ONLY);
 
 		void* data;
-		vmaMapMemory(VulkanRenderer::Device.Allocator, staging.Allocation, &data);
+		vmaMapMemory(VulkanRenderer::Device.Allocator, staging->Allocation, &data);
 		
 		// copy vertex and index buffers
 		memcpy(data, vertices.data(), vertexBufferSize);
 		memcpy((char*)data + vertexBufferSize, indices.data(), indexBufferSize);
 
-		vmaUnmapMemory(VulkanRenderer::Device.Allocator, staging.Allocation);
+		vmaUnmapMemory(VulkanRenderer::Device.Allocator, staging->Allocation);
 
 		VulkanRenderer::ImmediateSubmit([&](VkCommandBuffer cmd) {
 
@@ -173,22 +173,22 @@ namespace Spike {
 			vertexCopy.srcOffset = 0;
 			vertexCopy.size = vertexBufferSize;
 
-			vkCmdCopyBuffer(cmd, staging.Buffer, m_Data.VertexBuffer.Buffer, 1, &vertexCopy);
+			vkCmdCopyBuffer(cmd, staging->Buffer, m_Data.VertexBuffer->Buffer, 1, &vertexCopy);
 
 			VkBufferCopy indexCopy{ 0 };
 			indexCopy.dstOffset = 0;
 			indexCopy.srcOffset = vertexBufferSize;
 			indexCopy.size = indexBufferSize;
 
-			vkCmdCopyBuffer(cmd, staging.Buffer, m_Data.IndexBuffer.Buffer, 1, &indexCopy);
+			vkCmdCopyBuffer(cmd, staging->Buffer, m_Data.IndexBuffer->Buffer, 1, &indexCopy);
 		});
 
-		staging.Destroy();
+		delete staging;
 	}
 
 	void VulkanMesh::Destroy() {
 
-		m_Data.IndexBuffer.Destroy();
-		m_Data.VertexBuffer.Destroy();
+		delete m_Data.IndexBuffer;
+		delete m_Data.VertexBuffer;
 	}
 }

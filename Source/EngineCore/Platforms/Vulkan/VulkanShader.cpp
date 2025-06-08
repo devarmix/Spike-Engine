@@ -37,15 +37,17 @@ namespace Spike {
 		return true;
 	}
 
-	VulkanShader VulkanShader::Create(const char* vertexPath, const char* fragmentPath) {
+	VulkanShader* VulkanShader::Create(const char* vertexPath, const char* fragmentPath) {
 
-		VulkanShader shader{};
+		VulkanShader* shader = new VulkanShader();
 
-		if (!LoadShaderModule(vertexPath, &shader.VertexModule))
-			ENGINE_ERROR("Failed to load vertex shader module from path: {}", vertexPath);
+		if (!(LoadShaderModule(fragmentPath, &shader->FragmentModule) && LoadShaderModule(vertexPath, &shader->VertexModule))) {
 
-		if (!LoadShaderModule(fragmentPath, &shader.FragmentModule))
-			ENGINE_ERROR("Failed to load fragment shader module from path: {}", fragmentPath);
+			ENGINE_ERROR("Failed to load shader modules from paths: {0}, {1}", vertexPath, fragmentPath);
+			delete shader;
+
+			return nullptr;
+		}
 
 		return shader;
 	}

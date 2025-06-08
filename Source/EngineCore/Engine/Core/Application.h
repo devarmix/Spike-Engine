@@ -48,6 +48,9 @@ namespace Spike {
 
 		Ref<Window> GetMainWindow() const { return m_Window; }
 
+		static Application* Get() { return m_Instance; }
+		ImGuiLayer* GetImGUILayer() { return m_ImGuiLayer; }
+
 		void CleanAll();
 
 	private:
@@ -70,6 +73,8 @@ namespace Spike {
 		SceneLayer* m_SceneLayer;
 
 		Time m_Time;
+
+		static Application* m_Instance;
 	};
 
 	// to be defined in client

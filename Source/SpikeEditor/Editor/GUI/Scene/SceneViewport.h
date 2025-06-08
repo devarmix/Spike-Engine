@@ -26,7 +26,7 @@ namespace SpikeEditor {
 		uint32_t m_Width = 100;
 		uint32_t m_Height = 100;
 
-		VkDescriptorSet m_DSet;
+		ImTextureID m_ViewportTexID = 0;
 
 		bool m_Minimized = false;
 
