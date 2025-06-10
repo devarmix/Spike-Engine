@@ -16,10 +16,10 @@ namespace Spike {
 		float RenderTime;
 	};
 
-	class StatsGUI : public GUI_Window {
+	class StatsGUI : public GUIWindow {
 	public:
-		StatsGUI() : GUI_Window("Stats") {}
-		~StatsGUI() override;
+		StatsGUI() : GUIWindow("Stats") {}
+		virtual ~StatsGUI() override;
 
 		virtual void OnCreate() override {}
 		virtual void OnGUI(float deltaTime) override;

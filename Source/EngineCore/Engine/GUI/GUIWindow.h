@@ -7,10 +7,10 @@
 
 namespace SpikeEngine {
 
-	class GUI_Window {
+	class GUIWindow {
 	public:
-		GUI_Window(const std::string& name);
-		virtual ~GUI_Window() = default;
+		GUIWindow(const std::string& name);
+		virtual ~GUIWindow() = default;
 
 		virtual void OnCreate() = 0;
 		virtual void OnGUI(float deltaTime) = 0;
@@ -22,13 +22,27 @@ namespace SpikeEngine {
 		void SetWindowFlags(ImGuiWindowFlags flags) { m_WindowFlags = flags; }
 		void AddWindowFlags(ImGuiWindowFlags flags) { m_WindowFlags |= flags; }
 
-		ImTextureID MapGUITexture(Ref<Texture> texture);
-		void UpdateGUITexture(ImTextureID id, Ref<Texture> newTexture);
-		void UnMapGUITexture(ImTextureID id);
-
 	private:
 		std::string m_Name;
 
 		ImGuiWindowFlags m_WindowFlags;
+	};
+
+	class GUITextureHandle {
+	public:
+		GUITextureHandle();
+		GUITextureHandle(Ref<Texture> texture);
+
+		~GUITextureHandle();
+		void DestroyHandle();
+
+		void UpdateHandle(Ref<Texture> newTexture);
+		Ref<Texture> GetRawTexture() const { return m_Texture; }
+
+		operator ImTextureID() const { return m_Id; }
+
+	private:
+		Ref<Texture> m_Texture;
+		ImTextureID m_Id;
 	};
 }

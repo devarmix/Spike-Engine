@@ -1,24 +1,32 @@
 #include <Engine/GUI/GUIWindow.h>
 #include <Engine/Core/Application.h>
+#include <Engine/Core/Log.h>
 
 using namespace Spike;
 
 namespace SpikeEngine {
 
-	GUI_Window::GUI_Window(const std::string& name) : m_Name(name), m_WindowFlags(0) {}
+	GUIWindow::GUIWindow(const std::string& name) : m_Name(name), m_WindowFlags(0) {}
 
-	ImTextureID GUI_Window::MapGUITexture(Ref<Texture> texture) {
 
-		return Application::Get()->GetImGUILayer()->GetGlobalGuiTextureMapper()->RegisterTexture(texture);
+	GUITextureHandle::GUITextureHandle() : m_Id(0), m_Texture(nullptr) {}
+
+	GUITextureHandle::~GUITextureHandle() {}
+
+	GUITextureHandle::GUITextureHandle(Ref<Texture> texture) {
+
+		m_Id = Application::Get().GetImGUILayer()->GetGlobalGuiTextureMapper()->RegisterTexture(texture);
+		m_Texture = texture;
 	}
 
-	void GUI_Window::UpdateGUITexture(ImTextureID id, Ref<Texture> newTexture) {
+	void GUITextureHandle::DestroyHandle() {
 
-		Application::Get()->GetImGUILayer()->GetGlobalGuiTextureMapper()->UpdateTexture(id, newTexture);
+		Application::Get().GetImGUILayer()->GetGlobalGuiTextureMapper()->UnregisterTexture(m_Id);
 	}
 
-	void GUI_Window::UnMapGUITexture(ImTextureID id) {
+	void GUITextureHandle::UpdateHandle(Ref<Texture> newTexture) {
 
-		Application::Get()->GetImGUILayer()->GetGlobalGuiTextureMapper()->UnregisterTexture(id);
+		Application::Get().GetImGUILayer()->GetGlobalGuiTextureMapper()->UpdateTexture(m_Id, newTexture);
+		m_Texture = newTexture;
 	}
 }

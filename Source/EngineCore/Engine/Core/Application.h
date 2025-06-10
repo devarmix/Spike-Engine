@@ -48,7 +48,7 @@ namespace Spike {
 
 		Ref<Window> GetMainWindow() const { return m_Window; }
 
-		static Application* Get() { return m_Instance; }
+		static Application& Get() { return *m_Instance; }
 		ImGuiLayer* GetImGUILayer() { return m_ImGuiLayer; }
 
 		void CleanAll();

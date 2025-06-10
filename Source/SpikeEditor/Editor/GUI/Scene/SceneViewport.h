@@ -8,10 +8,10 @@ using namespace SpikeEngine;
 
 namespace SpikeEditor {
 
-	class SceneViewport : public GUI_Window {
+	class SceneViewport : public GUIWindow {
 	public:
-		SceneViewport() : GUI_Window("Scene") {}
-		~SceneViewport() override;
+		SceneViewport() : GUIWindow("Scene") {}
+		virtual ~SceneViewport() override;
 
 		virtual void OnCreate() override;
 		virtual void OnGUI(float deltaTime) override;
@@ -26,7 +26,7 @@ namespace SpikeEditor {
 		uint32_t m_Width = 100;
 		uint32_t m_Height = 100;
 
-		ImTextureID m_ViewportTexID = 0;
+		GUITextureHandle m_ViewportTex;
 
 		bool m_Minimized = false;
 

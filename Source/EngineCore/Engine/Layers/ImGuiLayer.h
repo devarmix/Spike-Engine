@@ -50,7 +50,7 @@ namespace Spike {
 		void SetDarkColors();
 
 	private:
-		std::vector<Ref<GUI_Window>> m_WindowList;
+		std::vector<Ref<GUIWindow>> m_WindowList;
 		ImGuiTextureMapper* m_GlobalGuiTextureMapper;
 	};
 }

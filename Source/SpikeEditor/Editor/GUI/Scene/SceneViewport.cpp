@@ -11,12 +11,12 @@ namespace SpikeEditor {
 
 	SceneViewport::~SceneViewport() {
 
-		UnMapGUITexture(m_ViewportTexID);
+		m_ViewportTex.DestroyHandle();
 	}
 
 	void SceneViewport::OnCreate() {
 
-		m_ViewportTexID = MapGUITexture(VulkanRenderer::ViewportTexture);
+		m_ViewportTex = GUITextureHandle(VulkanRenderer::ViewportTexture);
 		VulkanRenderer::MainCamera = &m_Camera;
 
 		SetWindowFlags(ImGuiWindowFlags_NoMove);
@@ -65,12 +65,12 @@ namespace SpikeEditor {
 			SpikeEditor::Get().OnEvent(event);
 
 			if (!m_Minimized)
-				UpdateGUITexture(m_ViewportTexID, VulkanRenderer::ViewportTexture);
+				m_ViewportTex.UpdateHandle(VulkanRenderer::ViewportTexture);
 		}
 
 		// draw viewport image
 		if (!m_Minimized)
-		    ImGui::Image(m_ViewportTexID, size);
+		    ImGui::Image(m_ViewportTex, size);
 	}
 
 	void SceneViewport::OnEvent(const Spike::GenericEvent& event) {
