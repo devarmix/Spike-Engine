@@ -30,33 +30,6 @@ namespace Spike {
 		VkDescriptorSet Allocate(VkDevice device, VkDescriptorSetLayout layout);
 	};
 
-	struct DescriptorAllocatorGrowable {
-	public:
-
-		struct PoolSizeRatio {
-
-			VkDescriptorType Type;
-			float Ratio;
-		};
-
-		void Init(VkDevice device, uint32_t maxSets, std::span<PoolSizeRatio> poolRatios);
-		void ClearPools(VkDevice device);
-		void DestroyPools(VkDevice device);
-
-		VkDescriptorSet Allocate(VkDevice device, VkDescriptorSetLayout layout, void* pNext = nullptr);
-
-	private:
-
-		VkDescriptorPool GetPool(VkDevice device);
-		VkDescriptorPool CreatePool(VkDevice device, uint32_t setCount, std::span<PoolSizeRatio> poolRatios);
-
-		std::vector<PoolSizeRatio> Ratios;
-		std::vector<VkDescriptorPool> FullPools;
-		std::vector<VkDescriptorPool> ReadyPools;
-
-		uint32_t SetsPerPool;
-	};
-
 	struct DescriptorWriter {
 
 		std::deque<VkDescriptorImageInfo> ImageInfos;

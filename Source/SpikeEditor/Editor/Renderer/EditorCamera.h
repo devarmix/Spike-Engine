@@ -15,9 +15,9 @@ namespace SpikeEditor {
 		~EditorCamera();
 
 		void OnUpdate(float deltaTime);
-		void PollEvents(const Spike::GenericEvent& event);
+		void OnEvent(const Spike::GenericEvent& event);
 
-		void SetViewportHovered(bool value = true) { m_ViewportHovered = value; }
+		void SetViewportHovered(bool value) { m_ViewportHovered = value; }
 
 		void SetSpeed(float value);
 		void SetSpeedMultiplier(float value);
@@ -36,8 +36,6 @@ namespace SpikeEditor {
 		bool OnMouseScroll(const Spike::MouseScrollEvent& event);
 
 	private:
-		
-		glm::vec3 m_Position{ 0, 0, 0 };
 
 		Vector3 m_TargetVelocity;
 		Vector3 m_CurrentVelocity;
@@ -57,7 +55,7 @@ namespace SpikeEditor {
 		float m_Pitch = 0;
 		float m_Yaw = 0;
 
-		bool m_MouseRightButton = false;
+		bool m_IsControlled = false;
 		bool m_ViewportHovered = false;
 	};
 }

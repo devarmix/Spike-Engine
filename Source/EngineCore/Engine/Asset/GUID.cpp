@@ -10,19 +10,19 @@ namespace Spike {
 	static std::mt19937_64 s_Engine(s_RandomDevice());
 	static std::uniform_int_distribution<uint64_t> s_UniformDistribution;
 
-	GUID::GUID()
-		: m_GUID(0)
+	AssetID::AssetID()
+		: m_ID(0)
 	{
 	}
 
-	GUID::GUID(uint64_t guid)
-		: m_GUID(guid)
+	AssetID::AssetID(uint64_t id)
+		: m_ID(id)
 	{
 	}
 
-	GUID GUID::Generate() {
+	AssetID AssetID::Generate() {
 
-		GUID guid(s_UniformDistribution(s_Engine));
-		return guid;
+		AssetID id(s_UniformDistribution(s_Engine));
+		return id;
 	}
 }

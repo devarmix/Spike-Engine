@@ -8,8 +8,6 @@
 #include <Engine/Entity/Components/MeshRenderer/MeshRenderer.h>
 #include <Engine/Entity/Components/Transform/Transform.h>
 
-#include <Engine/GUI/GUIWindow.h>
-
 #include <Engine/Math/Mathf.h>
 #include <Engine/Math/Vector2.h>
 #include <Engine/Math/Vector2Int.h>

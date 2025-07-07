@@ -2,44 +2,48 @@
 #include <Engine/Core/Log.h>
 
 #include <Engine/Core/Stats.h>
+#include "imgui_impl_sdl2.h"
 
-#include <Platforms/Vulkan/VulkanRenderer.h>
+Spike::Application* Spike::GApplication = nullptr;
 
 namespace Spike {
 
-	Application* Application::m_Instance = nullptr;
-
 	Application::Application(const ApplicationCreateInfo& info) {
-
-		assert(m_Instance == nullptr);
-		m_Instance = this;
 
 		m_Window = Window::Create(info.WinInfo);
 		m_Window->SetEventCallback(BIND_FUNCTION(Application::OnEvent));
 
+		//m_TaskScheduler.Init(5);
+		m_UsingImGui = info.UsingImGui;
+
+		// initialize globals
+		GApplication = this;
+		//GTaskScheduler = &m_TaskScheduler;
+		GfxDevice::Create(m_Window, m_UsingImGui);
+
 		ENGINE_WARN("Created an application: " + info.Name);
 
-		// Initialize renderer
-		VulkanRenderer::Init(*m_Window, RendererModeViewport);
-
 		m_SceneLayer = new SceneLayer();
-		m_ImGuiLayer = new ImGuiLayer();
-		m_RendererLayer = new RendererLayer();
 
 		// push default layers
 		PushLayer(m_SceneLayer);
 
-		PushOverlay(m_ImGuiLayer);
-		PushOverlay(m_RendererLayer);
-
-		m_ImGuiLayer->CreateGUI<StatsGUI>();
-
 		m_Running = true;
 	}
 
-	void Application::CleanAll() {
+	void Application::Destroy() {
 
 		m_LayerStack.CleanAll();
+
+		EXECUTE_ON_RENDER_THREAD([]() {
+
+			delete GGfxDevice;
+			});
+
+		m_RenderThread.Terminate();
+		m_RenderThread.Join();
+
+		delete m_Window;
 	}
 
 
@@ -48,6 +52,19 @@ namespace Spike {
 		while (m_Running) {
 
 			Timer timer = Timer();
+
+			m_RenderThread.WaitTillDone();
+
+			// process queued events when render thread is idle
+			//ProcessEvents();
+
+			// process last frame
+			m_RenderThread.Process();
+
+			EXECUTE_ON_RENDER_THREAD([]() {
+
+				GGfxDevice->BeginFrameCommandRecording();
+				});
 
 			if (!m_Minimized) {
 
@@ -58,6 +75,17 @@ namespace Spike {
 			}
 
 			m_Window->OnUpdate();
+
+			uint32_t width = m_Window->GetWidth();
+			uint32_t height = m_Window->GetHeight();
+
+			EXECUTE_ON_RENDER_THREAD([=]() {
+
+				GGfxDevice->DrawSwapchain(width, height, true);
+				});
+
+			// sync render thread
+			//m_SyncStructures.FrameEndSync();
 
 			float elapsed = timer.GetElapsedMs();
 
@@ -71,10 +99,47 @@ namespace Spike {
 	void Application::OnEvent(const GenericEvent& event) {
 
 		EventHandler handler(event);
-		handler.Handle<WindowResizeEvent>(BIND_FUNCTION(Application::OnWindowResize));
-		handler.Handle<WindowCloseEvent>(BIND_FUNCTION(Application::OnWindowClose));
-		handler.Handle<WindowMinimizeEvent>(BIND_FUNCTION(Application::OnWindowMinimize));
-		handler.Handle<WindowRestoreEvent>(BIND_FUNCTION(Application::OnWindowRestore));
+
+		handler.Handle<WindowCloseEvent>([this](const WindowCloseEvent& e) {
+
+			m_Running = false;
+
+		    ENGINE_WARN("Closed Window");
+		    return false;
+			});
+
+		handler.Handle<WindowMinimizeEvent>([this](const WindowMinimizeEvent& e) {
+
+			m_Minimized = true;
+
+			ENGINE_WARN("Minimized Window");
+			return true;
+			});
+
+		handler.Handle<WindowRestoreEvent>([this](const WindowRestoreEvent& e) {
+
+			m_Minimized = false;
+
+			ENGINE_WARN("Restored Window");
+			return true;
+			});
+
+		handler.Handle<SDLEvent>([this](const SDLEvent& e) {
+
+			SDL_Event nativeEvent = e.GetEvent();
+
+			if (m_UsingImGui) {
+
+				// process imgui events on render thread
+				// TODO: probably move this to a dedicated ImGui layer or smth
+				EXECUTE_ON_RENDER_THREAD([nativeEvent]() {
+
+					ImGui_ImplSDL2_ProcessEvent(&nativeEvent);
+					});
+			}
+
+			return false;
+			});
 
 		if (!event.IsHandled()) {
 
@@ -85,39 +150,6 @@ namespace Spike {
 			}
 		}
 	}
-
-
-	bool Application::OnWindowResize(const WindowResizeEvent& event) {
-
-		ENGINE_WARN("Resized Window: Width {0}, Height {1}", event.GetWidth(), event.GetHeight());
-
-		return false;
-	}
-
-	bool Application::OnWindowClose(const WindowCloseEvent& event) {
-
-		m_Running = false;
-
-		ENGINE_WARN("Closed Window");
-		return false;
-	}
-
-	bool Application::OnWindowMinimize(const WindowMinimizeEvent& event) {
-
-		m_Minimized = true;
-
-		ENGINE_WARN("Minimized Window");
-		return false;
-	}
-
-	bool Application::OnWindowRestore(const WindowRestoreEvent& event) {
-
-		m_Minimized = false;
-
-		ENGINE_WARN("Restored Window");
-		return false;
-	}
-
 
 	void Application::PushLayer(Layer* layer) {
 		m_LayerStack.PushLayer(layer);

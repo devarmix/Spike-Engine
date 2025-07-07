@@ -1,347 +1,12 @@
 #include <Platforms/Vulkan/VulkanMaterial.h>
 #include <Platforms/Vulkan/VulkanDescriptors.h>
-#include <Platforms/Vulkan/VulkanRenderer.h>
 
 #include <Platforms/Vulkan/VulkanPipeline.h>
 #include <Platforms/Vulkan/VulkanTools.h>
 
 namespace Spike {
 
-	void VulkanMaterial::SetScalarParameter(const std::string& name, float value) {
-
-		auto it = m_ScalarParameters.find(name);
-		if (it != m_ScalarParameters.end()) {
-
-			uint32_t bufIndex = m_Data.BufIndex;
-			uint8_t valIndex = m_ScalarParameters[name].DataBindIndex;
-
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
-			constants[bufIndex].ScalarData[valIndex] = value;
-
-			VulkanRenderer::GlobalMaterialManager.WriteBuffer(bufIndex);
-		}
-		else {
-
-			ENGINE_ERROR("Scalar parameter with the name: {0} does not exist!", name);
-		}
-	}
-
-	void VulkanMaterial::SetColorParameter(const std::string& name, Vector4 value) {
-
-		auto it = m_ColorParameters.find(name);
-		if (it != m_ColorParameters.end()) {
-
-			uint32_t bufIndex = m_Data.BufIndex;
-			uint8_t valIndex = m_ColorParameters[name].DataBindIndex;
-			glm::vec4 val = glm::vec4{ value.x, value.y, value.z, value.w };
-
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
-			constants[bufIndex].ColorData[valIndex] = val;
-
-			VulkanRenderer::GlobalMaterialManager.WriteBuffer(bufIndex);
-		}
-		else {
-
-			ENGINE_ERROR("Color parameter with the name: {0} does not exist!", name);
-		}
-	}
-
-	void VulkanMaterial::SetTextureParameter(const std::string& name, Ref<Texture> value) {
-
-		auto it = m_TextureParameters.find(name);
-		if (it != m_TextureParameters.end()) {
-
-			uint8_t valIndex = m_TextureParameters[name].DataBindIndex;
-			uint32_t bufIndex = m_Data.BufIndex;
-
-			m_TextureParameters[name].Value = value;
-
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
-			uint32_t texIndex = constants[bufIndex].TexIndex[valIndex];
-
-			VulkanTextureData* texData = (VulkanTextureData*)value->GetData();
-			VulkanRenderer::GlobalMaterialManager.WriteTexture(texIndex, texData);
-		}
-		else {
-
-			ENGINE_ERROR("Texture parameter with the name: {0} does not exist!", name);
-		}
-	}
-
-	const float VulkanMaterial::GetScalarParameter(const std::string& name) {
-
-		auto it = m_ScalarParameters.find(name);
-		if (it != m_ScalarParameters.end()) {
-
-			uint32_t bufIndex = m_Data.BufIndex;
-			uint8_t valIndex = m_ScalarParameters[name].DataBindIndex;
-
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
-			return constants[bufIndex].ScalarData[valIndex];
-		}
-		else {
-
-			ENGINE_ERROR("Scalar parameter with the name : {0} does not exist!", name);
-			return 0;
-		}
-	}
-
-	const Vector4 VulkanMaterial::GetColorParameter(const std::string& name) {
-
-		auto it = m_ColorParameters.find(name);
-		if (it != m_ColorParameters.end()) {
-
-			uint32_t bufIndex = m_Data.BufIndex;
-			uint8_t valIndex = m_ColorParameters[name].DataBindIndex;
-
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
-			glm::vec4 val = constants[bufIndex].ColorData[valIndex];
-
-			return Vector4(val.x, val.y, val.z, val.w);
-		}
-		else {
-
-			ENGINE_ERROR("Color parameter with the name : {0} does not exist!", name);
-			return Vector4::Zero();
-		}
-	}
-
-	const Ref<Texture> VulkanMaterial::GetTextureParameter(const std::string& name) {
-
-		auto it = m_TextureParameters.find(name);
-		if (it != m_TextureParameters.end()) {
-
-			return m_TextureParameters[name].Value;
-		}
-		else {
-
-			ENGINE_ERROR("Texture parameter with the name : {0} does not exist!", name);
-			return nullptr;
-		}
-	}
-
-	void VulkanMaterial::AddScalarParameter(const std::string& name, uint8_t valIndex, float value) {
-
-		auto it = m_ScalarParameters.find(name);
-		if (it == m_ScalarParameters.end()) {
-
-			ScalarParameter newParam{ valIndex };
-			m_ScalarParameters[name] = newParam;
-
-			SetScalarParameter(name, value);
-		}
-		else {
-
-			ENGINE_ERROR("Scalar parameter with the name: {0} already exists!", name);
-		}
-	}
-
-	void VulkanMaterial::AddColorParameter(const std::string& name, uint8_t valIndex, glm::vec4 value) {
-
-		auto it = m_ColorParameters.find(name);
-		if (it == m_ColorParameters.end()) {
-
-			ColorParameter newParam{ valIndex };
-			m_ColorParameters[name] = newParam;
-
-			SetColorParameter(name, Vector4(value.x, value.y, value.z, value.w));
-		}
-		else {
-
-			ENGINE_ERROR("Color parameter with the name: {0} already exists!", name);
-		}
- 	}
-
-	void VulkanMaterial::AddTextureParameter(const std::string& name, uint8_t valIndex, Ref<Texture> value) {
-
-		auto it = m_TextureParameters.find(name);
-		if (it == m_TextureParameters.end()) {
-
-			uint32_t newTexIndex = VulkanRenderer::GlobalMaterialManager.GetFreeTextureIndex();
-			uint32_t bufIndex = m_Data.BufIndex;
-
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
-			constants[bufIndex].TexIndex[valIndex] = newTexIndex;
-
-			VulkanRenderer::GlobalMaterialManager.WriteBuffer(bufIndex);
-
-			TextureParameter newParam{ value, valIndex };
-			m_TextureParameters[name] = newParam;
-
-			SetTextureParameter(name, value);
-		}
-		else {
-
-			ENGINE_ERROR("Texture parameter with the name: {0} already exists!", name);
-		}
-	}
-
-	void VulkanMaterial::RemoveScalarParameter(const std::string& name) {
-
-		auto it = m_ScalarParameters.find(name);
-		if (it != m_ScalarParameters.end()) {
-
-			m_ScalarParameters.erase(name);
-		}
-		else {
-
-			ENGINE_ERROR("Scalar parameter with the name : {0} does not exist!", name);
-		}
-	}
-
-	void VulkanMaterial::RemoveColorParameter(const std::string& name) {
-
-		auto it = m_ColorParameters.find(name);
-		if (it != m_ColorParameters.end()) {
-
-			m_ColorParameters.erase(name);
-		}
-		else {
-
-			ENGINE_ERROR("Color parameter with the name : {0} does not exist!", name);
-		}
-	}
-
-	void VulkanMaterial::RemoveTextureParameter(const std::string& name) {
-
-		auto it = m_TextureParameters.find(name);
-		if (it != m_TextureParameters.end()) {
-
-			uint8_t valIndex = m_TextureParameters[name].DataBindIndex;
-			uint32_t bufIndex = m_Data.BufIndex;
-
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
-			VulkanRenderer::GlobalMaterialManager.ReleaseTextureIndex(constants[bufIndex].TexIndex[valIndex]);
-
-			constants[bufIndex].TexIndex[valIndex] = VulkanMaterialManager::IndexInvalid;
-
-			m_TextureParameters.erase(name);
-		}
-		else {
-
-			ENGINE_ERROR("Texture parameter with the name : {0} does not exist!", name);
-		}
-	}
-
-	void VulkanMaterial::BuildPipeline(VulkanShader* shader, MaterialSurfaceType surfaceType) {
-
-		VkPushConstantRange matrixRange{};
-		matrixRange.offset = 0;
-		matrixRange.size = sizeof(VulkanMaterialManager::MaterialPushConstants);
-		matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		VkDescriptorSetLayout layouts[] = { VulkanRenderer::SceneDataDescriptorLayout, VulkanRenderer::GlobalMaterialManager.DataSetLayout };
-
-		VkPipelineLayoutCreateInfo mesh_Layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-		mesh_Layout_Info.setLayoutCount = 2;
-		mesh_Layout_Info.pSetLayouts = layouts;
-		mesh_Layout_Info.pPushConstantRanges = &matrixRange;
-		mesh_Layout_Info.pushConstantRangeCount = 1;
-
-		VkPipelineLayout newLayout;
-		VK_CHECK(vkCreatePipelineLayout(VulkanRenderer::Device.Device, &mesh_Layout_Info, nullptr, &newLayout));
-
-		m_Data.Pipeline.Layout = newLayout;
-
-		PipelineBuilder pipelineBulder;
-		pipelineBulder.SetShaders(shader->VertexModule, shader->FragmentModule);
-		pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-		pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
-		pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-		pipelineBulder.SetMultisamplingNone();
-
-		VkFormat colorAttachmentFormats[3];
-		colorAttachmentFormats[0] = VulkanRenderer::GBuffer.AlbedoMap->GetRawData()->Format;
-		colorAttachmentFormats[1] = VulkanRenderer::GBuffer.NormalMap->GetRawData()->Format;
-		//colorAttachmentFormats[2] = VulkanRenderer::GBuffer.PositionMap->Data.Format;
-		colorAttachmentFormats[2] = VulkanRenderer::GBuffer.MaterialMap->GetRawData()->Format;
-
-		pipelineBulder.SetColorAttachments(colorAttachmentFormats, 3);
-		pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
-
-		pipelineBulder.PipelineLayout = newLayout;
-
-		if (surfaceType == Opaque) {
-
-			pipelineBulder.DisableBlending();
-			pipelineBulder.EnableDepthTest(true, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-			m_Data.Pipeline.Pipeline = pipelineBulder.BuildPipeline(VulkanRenderer::Device.Device);
-		} 
-		else if (surfaceType == Transparent) {
-
-			pipelineBulder.EnableBlendingAdditive();
-
-			pipelineBulder.EnableDepthTest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-			m_Data.Pipeline.Pipeline = pipelineBulder.BuildPipeline(VulkanRenderer::Device.Device);
-		}
-	}
-
-	Ref<VulkanMaterial> VulkanMaterial::Create() {
-
-		VulkanMaterialData matData{};
-
-		uint32_t bufIndex = VulkanRenderer::GlobalMaterialManager.GetFreeBufferIndex();
-
-		// create new material buffer
-		{
-			VulkanMaterialManager::MaterialDataConstants newBuf{};
-
-			for (int i = 0; i < 16; i++) {
-
-				newBuf.TexIndex[i] = VulkanMaterialManager::IndexInvalid;
-			}
-
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
-			constants[bufIndex] = newBuf;
-
-			VulkanRenderer::GlobalMaterialManager.WriteBuffer(bufIndex);
-		}
-
-		matData.BufIndex = bufIndex;
-
-		VulkanShader* shader = VulkanShader::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRTest.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/PBRTest.frag.spv");
-
-		Ref<VulkanMaterial> mat = CreateRef<VulkanMaterial>(matData);
-
-		mat->BuildPipeline(shader, Opaque);
-
-		delete shader;
-
-		return mat;
-	}
-
-	void VulkanMaterial::Destroy() {
-
-		for (auto& [k, v] : m_TextureParameters) {
-
-			uint8_t valIndex = v.DataBindIndex;
-			uint32_t bufIndex = m_Data.BufIndex;
-
-			VulkanMaterialManager::MaterialDataConstants* constants = (VulkanMaterialManager::MaterialDataConstants*)VulkanRenderer::GlobalMaterialManager.DataBuffer->AllocationInfo.pMappedData;
-			VulkanRenderer::GlobalMaterialManager.ReleaseTextureIndex(constants[bufIndex].TexIndex[valIndex]);
-		}
-
-		m_TextureParameters.clear();
-
-		VulkanRenderer::GlobalMaterialManager.ReleaseBufferIndex(m_Data.BufIndex);
-
-		if (m_Data.Pipeline.Layout != VK_NULL_HANDLE) {
-
-			vkDestroyPipelineLayout(VulkanRenderer::Device.Device, m_Data.Pipeline.Layout, nullptr);
-			m_Data.Pipeline.Layout = VK_NULL_HANDLE;
-		}
-
-		if (m_Data.Pipeline.Pipeline != VK_NULL_HANDLE) {
-
-			vkDestroyPipeline(VulkanRenderer::Device.Device, m_Data.Pipeline.Pipeline, nullptr);
-			m_Data.Pipeline.Pipeline = VK_NULL_HANDLE;
-		}
-	}
-
-
-	void VulkanMaterialManager::Init(uint32_t maxMatSets) {
+	void VulkanMaterialManager::Init(VulkanDevice* device, uint32_t maxMatSets) {
 
 		// Create Descriptor Set Layout
 		{
@@ -374,7 +39,7 @@ namespace Spike {
 			LayoutInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT;
 			LayoutInfo.pNext = &LayoutBindingFlagsInfo;
 
-			VK_CHECK(vkCreateDescriptorSetLayout(VulkanRenderer::Device.Device, &LayoutInfo, nullptr, &DataSetLayout));
+			VK_CHECK(vkCreateDescriptorSetLayout(device->Device, &LayoutInfo, nullptr, &DataSetLayout));
 		}
 
 		// Create Descriptor Pool
@@ -393,7 +58,7 @@ namespace Spike {
 			PoolInfo.maxSets = 1;
 			PoolInfo.pNext = nullptr;
 
-			VK_CHECK(vkCreateDescriptorPool(VulkanRenderer::Device.Device, &PoolInfo, nullptr, &DataPool));
+			VK_CHECK(vkCreateDescriptorPool(device->Device, &PoolInfo, nullptr, &DataPool));
 		}
 
 		// Create Descriptor Set
@@ -405,11 +70,11 @@ namespace Spike {
 			SetInfo.pSetLayouts = &DataSetLayout;
 			SetInfo.descriptorSetCount = 1;
 
-			VK_CHECK(vkAllocateDescriptorSets(VulkanRenderer::Device.Device, &SetInfo, &DataSet));
+			VK_CHECK(vkAllocateDescriptorSets(device->Device, &SetInfo, &DataSet));
 		}
 
 		// Allocate Data Buffer
-		DataBuffer = VulkanBuffer::Create(sizeof(MaterialDataConstants) * maxMatSets, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+		DataBuffer = VulkanBuffer(device, sizeof(MaterialDataConstants) * maxMatSets, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 
 		// Initialize Other Parameters
 		NextBufferIndex = 0;
@@ -419,13 +84,61 @@ namespace Spike {
 		FreeTextureIndicies.clear();
 	}
 
-	void VulkanMaterialManager::Cleanup() {
+	void VulkanMaterialManager::Cleanup(VulkanDevice* device) {
 
-		vkDestroyDescriptorPool(VulkanRenderer::Device.Device, DataPool, nullptr);
+		vkDestroyDescriptorPool(device->Device, DataPool, nullptr);
 
-		vkDestroyDescriptorSetLayout(VulkanRenderer::Device.Device, DataSetLayout, nullptr);
+		vkDestroyDescriptorSetLayout(device->Device, DataSetLayout, nullptr);
 
-		delete DataBuffer;
+		DataBuffer.Destroy(device);
+	}
+
+	void VulkanMaterialManager::BuildMaterialPipeline(VkPipeline* outPipeline, VkPipelineLayout* outLayout, VulkanDevice* device, VkDescriptorSetLayout frameSetLayout, VulkanShader shader, EMaterialSurfaceType surfaceType) {
+
+		VkPushConstantRange matrixRange{};
+		matrixRange.offset = 0;
+		matrixRange.size = sizeof(MaterialPushConstants);
+		matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		VkDescriptorSetLayout layouts[] = { frameSetLayout, DataSetLayout };
+
+		VkPipelineLayoutCreateInfo mesh_Layout_Info = VulkanTools::PipelineLayoutCreateInfo();
+		mesh_Layout_Info.setLayoutCount = 2;
+		mesh_Layout_Info.pSetLayouts = layouts;
+		mesh_Layout_Info.pPushConstantRanges = &matrixRange;
+		mesh_Layout_Info.pushConstantRangeCount = 1;
+
+		VK_CHECK(vkCreatePipelineLayout(device->Device, &mesh_Layout_Info, nullptr, outLayout));
+
+		PipelineBuilder pipelineBulder;
+		pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
+		pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+		pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
+		pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+		pipelineBulder.SetMultisamplingNone();
+
+		VkFormat colorAttachmentFormats[3] = { VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8B8A8_UNORM };
+
+		pipelineBulder.SetColorAttachments(colorAttachmentFormats, 3);
+		pipelineBulder.SetDepthFormat(VK_FORMAT_D32_SFLOAT);
+
+		pipelineBulder.PipelineLayout = *outLayout;
+
+		if (surfaceType == ESurfaceTypeOpaque) {
+
+			pipelineBulder.DisableBlending();
+			pipelineBulder.EnableDepthTest(true, VK_COMPARE_OP_GREATER);
+
+			*outPipeline = pipelineBulder.BuildPipeline(device->Device);
+		}
+		else if (surfaceType == ESurfaceTypeTransparent) {
+
+			pipelineBulder.EnableBlendingAdditive();
+
+			pipelineBulder.EnableDepthTest(false, VK_COMPARE_OP_GREATER);
+
+			*outPipeline = pipelineBulder.BuildPipeline(device->Device);
+		}
 	}
 
 	uint32_t VulkanMaterialManager::GetFreeTextureIndex() {
@@ -474,10 +187,10 @@ namespace Spike {
 		FreeBufferIndicies.push_back(index);
 	}
 
-	void VulkanMaterialManager::WriteBuffer(uint32_t index) {
+	void VulkanMaterialManager::WriteBuffer(VulkanDevice* device, uint32_t index) {
 
 		VkDescriptorBufferInfo bufferInfo{};
-		bufferInfo.buffer = DataBuffer->Buffer;
+		bufferInfo.buffer = DataBuffer.Buffer;
 		bufferInfo.offset = index * sizeof(MaterialDataConstants);
 		bufferInfo.range = sizeof(MaterialDataConstants);
 
@@ -490,15 +203,17 @@ namespace Spike {
 		write.descriptorCount = 1;
 		write.pBufferInfo = &bufferInfo;
 
-		vkUpdateDescriptorSets(VulkanRenderer::Device.Device, 1, &write, 0, nullptr);
+		vkUpdateDescriptorSets(device->Device, 1, &write, 0, nullptr);
 	}
 
-	void VulkanMaterialManager::WriteTexture(uint32_t index, VulkanTextureData* texData) {
+	void VulkanMaterialManager::WriteTexture(VulkanDevice* device, uint32_t index, VulkanTextureNativeData* texData, VkSampler sampler) {
+
+		assert(index != IndexInvalid);
 
 		VkDescriptorImageInfo imageInfo{};
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		imageInfo.imageView = texData->View;
-		imageInfo.sampler = VulkanRenderer::DefSamplerLinear;
+		imageInfo.sampler = sampler;
 
 		VkWriteDescriptorSet write{};
 		write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -509,6 +224,6 @@ namespace Spike {
 		write.descriptorCount = 1;
 		write.pImageInfo = &imageInfo;
 
-		vkUpdateDescriptorSets(VulkanRenderer::Device.Device, 1, &write, 0, nullptr);
+		vkUpdateDescriptorSets(device->Device, 1, &write, 0, nullptr);
 	}
 }

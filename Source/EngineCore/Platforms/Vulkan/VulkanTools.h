@@ -1,6 +1,9 @@
 #pragma once
 
 #include <Platforms/Vulkan/VulkanCommon.h>
+#include <Platforms/Vulkan/VulkanShader.h>
+#include <Engine/Renderer/Material.h>
+#include <Engine/Renderer/TextureBase.h>
 
 namespace Spike {
 
@@ -21,7 +24,7 @@ namespace Spike {
 		VkSubmitInfo2 SubmitInfo(VkCommandBufferSubmitInfo* cmd, VkSemaphoreSubmitInfo* signalSemaphoreInfo, VkSemaphoreSubmitInfo* waitSemaphoreInfo);
 
 		VkImageCreateInfo ImageCreateInfo(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent);
-		VkImageCreateInfo CubeImageCreateInfo(VkFormat format, VkImageUsageFlags usageFlags, VkExtent3D extent);
+		VkImageCreateInfo CubeImageCreateInfo(VkFormat format, VkImageUsageFlags usageFlags, uint32_t size);
 		VkImageViewCreateInfo ImageviewCreateInfo(VkFormat format, VkImage image, VkImageAspectFlags aspectFlags);
 		VkImageViewCreateInfo CubeImageviewCreateInfo(VkFormat format, VkImage image, VkImageAspectFlags aspectFlags);
 
@@ -32,6 +35,25 @@ namespace Spike {
 
 		VkPipelineLayoutCreateInfo PipelineLayoutCreateInfo();
 
-		VkRenderingAttachmentInfo DepthAttachmentInfo(VkImageView view, VkImageLayout layout);
+		VkRenderingAttachmentInfo DepthAttachmentInfo(VkImageView view, VkClearValue* clear, VkImageLayout layout);
+
+		void TransitionImage(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags imageAspectFlags, VkImageLayout currentLayout, VkImageLayout newLayout);
+		void TransitionImage(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags imageAspectFlags, VkImageLayout currentLayout, VkImageLayout newLayout, VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask);
+		void CopyImageToImage(VkCommandBuffer cmd, VkImage source, VkImage destination, VkExtent2D srcSize, VkExtent2D dstSize);
+		void GenerateMipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize);
+
+		void TransitionImageCube(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags imageAspectFlags, VkImageLayout currentLayout, VkImageLayout newLayout);
+		void CopyImageToImageCube(VkCommandBuffer cmd, VkImage source, VkImage destination, VkExtent2D srcSize, VkExtent2D dstSize);
+
+		void TransitionBuffer(VkCommandBuffer cmd, VkBuffer buffer, size_t size, size_t offset, VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask, 
+			VkPipelineStageFlags2 srcPipelineStage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VkPipelineStageFlags2 dstPipelineStage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+
+		void FillBuffer(VkCommandBuffer cmd, VkBuffer buffer, size_t size, size_t offset, uint32_t value, VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask,
+			VkPipelineStageFlags2 srcPipelineStage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VkPipelineStageFlags2 dstPipelineStage = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
+
+		VkFormat TextureFormatToVulkan(ETextureFormat format);
+		VkImageUsageFlags TextureUsageFlagsToVulkan(ETextureUsageFlags usageFlags);
+
+		uint32_t GetComputeGroupCount(uint32_t threadCount, uint32_t groupSize);
 	}
 }

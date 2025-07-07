@@ -1,20 +1,68 @@
 #pragma once
 
 #include <Engine/Core/Core.h>
-#include <Engine/Math/Vector3.h>
 #include <Engine/Asset/Asset.h>
+#include <Engine/Renderer/TextureBase.h>
+#include <Engine/Renderer/Texture2D.h>
+using namespace Spike;
+
+namespace Spike {
+
+	enum ECubeTextureFilterMode {
+
+		EFilterNone = 0,
+		EFilterIrradiance,
+		EFilterRadiance
+	};
+
+	class CubeTextureResource : public TextureResource {
+	public:
+
+		CubeTextureResource(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, TextureResource* samplerTexture, ECubeTextureFilterMode filterMode)
+			: TextureResource(format, usageFlags), m_Size(size), m_FilterMode(filterMode), m_SamplerTexture(samplerTexture) {}
+
+		virtual ~CubeTextureResource() override {}
+
+		virtual void InitGPUData() override;
+		virtual void ReleaseGPUData() override;
+
+		uint32_t GetSize() const { return m_Size; }
+		ECubeTextureFilterMode GetFilterMode() const { return m_FilterMode; }
+
+	private:
+
+		uint32_t m_Size;
+		ECubeTextureFilterMode m_FilterMode;
+
+		TextureResource* m_SamplerTexture;
+	};
+}
 
 namespace SpikeEngine {
 
-	class CubeTexture : public Spike::Asset {
+	class CubeTexture : public Asset {
 	public:
-		virtual ~CubeTexture() = default;
 
-		static Ref<CubeTexture> Create(const std::array<const char*, 6>& filePath);
+		CubeTexture(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, TextureResource* samplerTexture, ECubeTextureFilterMode filterMode);
+		virtual ~CubeTexture() override;
 
-		virtual const Vector3 GetSize() const = 0;
-		virtual const void* GetData() const = 0;
+		static Ref<CubeTexture> Create(const char* filePath, uint32_t size, ETextureFormat format = EFormatRGBA32SFloat);
+		static Ref<CubeTexture> Create(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, Ref<Texture2D> samplerTexture);
+		static Ref<CubeTexture> CreateFiltered(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, Ref<CubeTexture> samplerTexture, ECubeTextureFilterMode filterMode);
 
-		ASSET_CLASS_TYPE(CubeTextureAsset);
+		CubeTextureResource* GetResource() { return m_RenderResource; }
+		void ReleaseResource();
+		void CreateResource(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, TextureResource* samplerTexture, ECubeTextureFilterMode filterMode = EFilterNone);
+
+		uint32_t GetSize() const { return m_RenderResource->GetSize(); }
+
+		ETextureFormat GetFormat() const { return m_RenderResource->GetFormat(); }
+		ECubeTextureFilterMode GetFilterMode() const { return m_RenderResource->GetFilterMode(); }
+
+		ASSET_CLASS_TYPE(CubeTextureAsset)
+
+	private:
+
+		CubeTextureResource* m_RenderResource;
 	};
 }

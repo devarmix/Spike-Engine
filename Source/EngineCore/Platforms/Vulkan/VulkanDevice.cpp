@@ -5,12 +5,22 @@
 
 namespace Spike {
 
-	void VulkanDevice::Init(Window& window, bool useValidationLayers) {
+	VulkanDevice::VulkanDevice() : 
+		Instance(nullptr),
+	    DebugMessenger(nullptr),
+		Device(nullptr),
+		PhysicalDevice(nullptr),
+		Surface(nullptr),
+		Allocator(nullptr),
+	    Queues{.GraphicsQueue = nullptr, .GraphicsQueueFamily = 0} {}
+
+
+	void VulkanDevice::Init(Window* window, bool useValidationLayers) {
 
 		vkb::InstanceBuilder builder;
 
 		// make vulkan instance, with basic textures
-		auto inst_ret = builder.set_app_name(window.GetName().c_str())
+		auto inst_ret = builder.set_app_name(window->GetName().c_str())
 			.request_validation_layers(useValidationLayers)
 			.use_default_debug_messenger()
 			.require_api_version(1, 3, 0)
@@ -22,7 +32,7 @@ namespace Spike {
 		Instance = vkb_inst.instance;
 		DebugMessenger = vkb_inst.debug_messenger;
 
-		SDL_Vulkan_CreateSurface((SDL_Window*)window.GetNativeWindow(), Instance, &Surface);
+		SDL_Vulkan_CreateSurface((SDL_Window*)window->GetNativeWindow(), Instance, &Surface);
 
 		// vulkan 1.3 features
 		VkPhysicalDeviceVulkan13Features features{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
@@ -43,6 +53,9 @@ namespace Spike {
 
 		features12.descriptorBindingSampledImageUpdateAfterBind = true;
 		features12.descriptorBindingStorageBufferUpdateAfterBind = true;
+
+		features12.samplerFilterMinmax = true;
+		features12.drawIndirectCount = true;
 
 		// select the gpu, which supports vulkan 1.3 and can write to the SDL surface
 		vkb::PhysicalDeviceSelector selector{ vkb_inst };
@@ -66,9 +79,6 @@ namespace Spike {
 		// get graphics queues
 		Queues.GraphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
 		Queues.GraphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
-
-		Queues.ComputeQueue = vkbDevice.get_queue(vkb::QueueType::compute).value();
-		Queues.ComputeQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::compute).value();
 
 		// initialize the memory allocator
 		VmaAllocatorCreateInfo allocatorInfo = {};

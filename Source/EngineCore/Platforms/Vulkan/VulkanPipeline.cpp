@@ -2,8 +2,6 @@
 #include <Platforms/Vulkan/VulkanTools.h>
 #include <Platforms/Vulkan/VulkanDescriptors.h>
 
-#include <Platforms/Vulkan/VulkanRenderer.h>
-
 namespace Spike {
 
 	void PipelineBuilder::Clear() {

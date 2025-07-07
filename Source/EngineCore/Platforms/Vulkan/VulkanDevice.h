@@ -5,10 +5,10 @@
 
 namespace Spike {
 
-	struct VulkanDevice {
-
-		VulkanDevice() = default;
-		void Init(Window& window, bool useValidationLayers = false);
+	class VulkanDevice {
+	public:
+		VulkanDevice();
+		void Init(Window* window, bool useValidationLayers = false);
 
 		void Destroy();
 
@@ -22,10 +22,6 @@ namespace Spike {
 
 			VkQueue GraphicsQueue;
 			uint32_t GraphicsQueueFamily;
-
-			VkQueue ComputeQueue;
-			uint32_t ComputeQueueFamily;
-
 		} Queues;
 
 		VmaAllocator Allocator;

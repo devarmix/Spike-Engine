@@ -25,16 +25,8 @@ namespace Spike {
     do {                                                                           \
         VkResult err = x;                                                          \
         if(err)  {                                                                 \
-            ENGINE_ERROR("Detected Vulkan Error: {}", string_VkResult(err));      \
+            ENGINE_ERROR("Detected Vulkan Error: {}", string_VkResult(err));       \
             abort();                                                               \
         }                                                                          \
     } while (0)
-
-    struct Vertex {
-
-        glm::vec4 Position;           // w - UV_x
-        glm::vec4 Normal;             // w - UV_y
-        glm::vec4 Color;
-        glm::vec4 Tangent;            // w - handedness
-    };
 }

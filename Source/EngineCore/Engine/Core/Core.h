@@ -16,6 +16,8 @@
 
 #define BIND_FUNCTION(x) std::bind(&x, this, std::placeholders::_1)
 
+#define BIT(x) (1 << x)
+
 template<typename T>
 using Ref = std::shared_ptr<T>;
 

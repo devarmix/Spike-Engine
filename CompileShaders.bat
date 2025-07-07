@@ -15,7 +15,4 @@ for %%f in (*.vert *.frag *.comp *.geom *.tesc *.tese) do (
     echo Compiling %%f...
     glslc %%f -o %%f.spv
 )
-
-REM Print a completion message
-echo All shaders compiled successfully
 pause.

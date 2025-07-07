@@ -4,18 +4,18 @@
 
 namespace Spike {
 
-	class GUID
+	class AssetID
 	{
 	public:
-		GUID();
-		GUID(uint64_t guid);
-		GUID(const GUID&) = default;
+		AssetID();
+		AssetID(uint64_t id);
+		AssetID(const AssetID&) = default;
 
-		static GUID Generate();
+		static AssetID Generate();
 
-		operator uint64_t() const { return m_GUID; }
+		operator uint64_t() const { return m_ID; }
 	private:
-		uint64_t m_GUID;
+		uint64_t m_ID;
 	};
 
 }
@@ -24,11 +24,11 @@ namespace std {
 	template <typename T> struct hash;
 
 	template<>
-	struct hash<Spike::GUID>
+	struct hash<Spike::AssetID>
 	{
-		std::size_t operator()(const Spike::GUID& guid) const
+		std::size_t operator()(const Spike::AssetID& id) const
 		{
-			return (uint64_t)guid;
+			return (uint64_t)id;
 		}
 	};
 

@@ -1,0 +1,185 @@
+#version 450
+
+layout (local_size_x = 256) in;
+
+#extension GL_GOOGLE_include_directive : require
+#include "DrawCommon.glsl"
+
+struct DrawIndirectCommand {
+
+	uint VertexCount;     
+	uint InstanceCount;  
+	uint FirstVertex; 
+	uint FirstInstance; 
+};
+
+layout(std430, set = 0, binding = 1) buffer DeclDrawCommandsBuffer {
+
+	DrawIndirectCommand DrawCommands[];
+} DrawCommandsBuffer;
+
+layout(std430, set = 0, binding = 2) buffer DeclDrawCountBuffer {
+
+	uint DrawCounts[];
+} DrawCountBuffer;
+
+layout(std430, set = 0, binding = 4) readonly buffer DeclBatchOffsetsBuffer {
+
+	uint BatchOffsets[];
+} BatchOffsetsBuffer;
+
+layout(set = 0, binding = 5) uniform sampler2D DepthPyramid;
+
+struct CullData {
+
+	vec4 FrustumPlanes[6];
+
+	float P00;
+    float P11;
+    uint PyramidSize;
+
+	float pad0;
+};
+
+layout(std140, set = 0, binding = 6) uniform DeclCullDataBuffer {
+
+	CullData Data[MAX_SCENE_DRAWS_PER_FRAME];
+} CullDataBuffer;
+
+layout(std430, set = 0, binding = 7) readonly buffer DeclLastVisibilityBuffer {
+
+	uint Visibility[];
+} LastVisibilityBuffer;
+
+layout(std430, set = 0, binding = 8) writeonly buffer DeclCurrentVisibilityBuffer {
+
+	uint Visibility[];
+} CurrentVisibilityBuffer;
+
+layout(push_constant) uniform Constants {
+
+	uint MeshCount;
+	uint SceneDataOffset;
+	uint DrawCountOffset;
+	uint DrawCommandOffset;
+	uint MetaDataOffset;
+	uint BatchOffset;
+	uint CullDataOffset;
+
+	uint IsPrepass;
+
+} CullDataConstant;
+
+// 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere
+// https://jcgt.org/published/0002/02/05/
+bool TryCalculateSphereBounds(vec3 center, float radius, float zNear, float P00, float P11, out vec4 AABB)
+{
+	if (-center.z < radius + zNear)
+	{
+		return false;
+	}
+
+	vec2 centerXZ = -center.xz;
+	vec2 vX = vec2(sqrt(dot(centerXZ, centerXZ) - radius * radius), radius);
+	vec2 minX = mat2(vX.x, vX.y, -vX.y, vX.x) * centerXZ;
+	vec2 maxX = mat2(vX.x, -vX.y, vX.y, vX.x) * centerXZ;
+
+	vec2 centerYZ = -center.yz;
+	vec2 vY = vec2(sqrt(dot(centerYZ, centerYZ) - radius * radius), radius);
+	vec2 minY = mat2(vY.x, vY.y, -vY.y, vY.x) * centerYZ;
+	vec2 maxY = mat2(vY.x, -vY.y, vY.y, vY.x) * centerYZ;
+
+	AABB = 0.5 - 0.5 * vec4(
+		minX.x / minX.y * P00, minY.x / minY.y * P11,
+		maxX.x / maxX.y * P00, maxY.x / maxY.y * P11);
+
+	return true;
+}
+
+bool IsVisible(uint objectID, bool prepass) {
+
+	vec3 boundsCenter = MetadataBuffer.ObjectsMetadata[CullDataConstant.MetaDataOffset + objectID].BoundsOrigin.xyz;
+	boundsCenter = vec3(MetadataBuffer.ObjectsMetadata[CullDataConstant.MetaDataOffset + objectID].GlobalTransform * vec4(boundsCenter, 1.f));
+	
+	float boundsRadius = MetadataBuffer.ObjectsMetadata[CullDataConstant.MetaDataOffset + objectID].BoundsOrigin.w;
+
+	uint lastVisibilityIndex = MetadataBuffer.ObjectsMetadata[CullDataConstant.MetaDataOffset + objectID].LastVisibilityIndex;
+	bool visible = prepass ? LastVisibilityBuffer.Visibility[lastVisibilityIndex] == 1 : true;
+
+	if (visible) {
+
+		for (uint i = 0u; i < 6u; i++) {
+
+		    vec4 plane = CullDataBuffer.Data[CullDataConstant.CullDataOffset].FrustumPlanes[i];
+		    float d = dot(vec3(plane), boundsCenter) + plane.w;
+
+		    if (d < -boundsRadius) {
+
+			    visible = false;
+			    break;
+		    } 
+		}
+	}
+
+	// occlusion culling
+	if (!prepass) {
+
+		if (visible) {
+
+		    vec3 centerViewSpace = (SceneDataBuffer.SceneData[CullDataConstant.SceneDataOffset].View * vec4(boundsCenter, 1.0)).xyz;
+		    float zNear = SceneDataBuffer.SceneData[CullDataConstant.SceneDataOffset].Proj[3][2];
+		    vec4 AABB;
+
+		    if (TryCalculateSphereBounds(centerViewSpace, boundsRadius, zNear, CullDataBuffer.Data[CullDataConstant.CullDataOffset].P00, CullDataBuffer.Data[CullDataConstant.CullDataOffset].P11, AABB))
+		    {
+			    float boundsWidth = (AABB.z - AABB.x) * float(CullDataBuffer.Data[CullDataConstant.CullDataOffset].PyramidSize);
+			    float boundsHeight = (AABB.w - AABB.y) * float(CullDataBuffer.Data[CullDataConstant.CullDataOffset].PyramidSize);
+			    float mipIndex = floor(log2(max(boundsWidth, boundsHeight)));
+
+			    float occluderDepth = textureLod(DepthPyramid, 0.5 * (AABB.xy + AABB.zw), mipIndex).x;
+			    float nearestBoundsDepth = zNear / (-centerViewSpace.z - boundsRadius);
+
+			    bool bOcclusionCulled = occluderDepth >= nearestBoundsDepth;
+			    visible = !bOcclusionCulled;
+		    }
+	    }
+	}
+
+	return visible;
+}
+
+void main()
+{
+	uint gID = gl_GlobalInvocationID.x;
+	if (gID < CullDataConstant.MeshCount) 
+	{
+		bool prepass = CullDataConstant.IsPrepass == 1;
+		bool visible = IsVisible(gID, prepass);
+
+		uint localMetadataIndex = CullDataConstant.MetaDataOffset + gID;
+
+		uint lastVisibilityIndex = MetadataBuffer.ObjectsMetadata[localMetadataIndex].LastVisibilityIndex;
+		bool drawMesh = prepass ? visible : visible && LastVisibilityBuffer.Visibility[lastVisibilityIndex] == 0;
+
+		if(drawMesh) {
+
+			uint batchID = MetadataBuffer.ObjectsMetadata[localMetadataIndex].DrawBatchID;
+			uint batchOffset = BatchOffsetsBuffer.BatchOffsets[CullDataConstant.BatchOffset + batchID];
+
+			uint localIndex = atomicAdd(DrawCountBuffer.DrawCounts[CullDataConstant.DrawCountOffset + batchOffset], 1);
+
+			uint localDrawCommandIndex = CullDataConstant.DrawCommandOffset + batchOffset + localIndex;
+
+			DrawCommandsBuffer.DrawCommands[localDrawCommandIndex].VertexCount = MetadataBuffer.ObjectsMetadata[localMetadataIndex].IndexCount;
+			DrawCommandsBuffer.DrawCommands[localDrawCommandIndex].InstanceCount = 1;
+			DrawCommandsBuffer.DrawCommands[localDrawCommandIndex].FirstVertex = 0;
+			DrawCommandsBuffer.DrawCommands[localDrawCommandIndex].FirstInstance = localMetadataIndex;
+		}
+
+		if (!prepass) {
+
+			uint currVisibilityIndex = MetadataBuffer.ObjectsMetadata[localMetadataIndex].CurrentVisibilityIndex;
+			CurrentVisibilityBuffer.Visibility[currVisibilityIndex] = visible ? 1 : 0;
+		}
+	}
+}

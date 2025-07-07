@@ -9,7 +9,7 @@ namespace Spike {
 
 		None = 0,
 
-		TextureAsset,
+		Texture2DAsset,
 		CubeTextureAsset,
 		MaterialAsset,
 		MeshAsset
@@ -32,6 +32,6 @@ namespace Spike {
 
 	public:
 
-		GUID Guid;
+		AssetID Guid;
 	};
 }

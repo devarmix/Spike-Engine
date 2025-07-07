@@ -20,26 +20,24 @@ Spike::Application* Spike::CreateApplication() {
 	ApplicationCreateInfo appInfo{
 
 		.Name = "Spike Editor",
+		.UsingImGui = true,
 		.WinInfo = winInfo
 	};
 
 	return new SpikeEditor::SpikeEditor(appInfo);
 }
 
-
+SpikeEditor::SpikeEditor* SpikeEditor::GEditor = nullptr;
 
 namespace SpikeEditor {
 
-	SpikeEditor* SpikeEditor::m_Instance;
-
 	SpikeEditor::SpikeEditor(const Spike::ApplicationCreateInfo& info) : Application(info) {
 
-		assert(m_Instance == nullptr);
-		m_Instance = this;
+		GEditor = this;
 
-		m_GUILayer = new EditorGUILayer();
-		PushLayer(m_GUILayer);
+		m_EditorLayer = new EditorLayer();
+		PushOverlay(m_EditorLayer);
 	}
 
-	SpikeEditor::~SpikeEditor() {}
+	SpikeEditor::~SpikeEditor() { Destroy(); }
 }

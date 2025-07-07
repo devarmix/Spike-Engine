@@ -58,38 +58,6 @@ namespace Spike {
 		SDL_Event event;
 	};
 
-	class SceneViewportResizeEvent : public GenericEvent {
-	public:
-		SceneViewportResizeEvent(uint32_t width, uint32_t height) : m_Width(width), m_Height(height) {}
-
-		uint32_t GetWidth() const { return m_Width; }
-		uint32_t GetHeight() const { return m_Height; }
-
-		std::string GetName() const override { return "Scene Viewport Resize Event"; }
-
-		EVENT_CLASS_TYPE(SceneViewportResize)
-
-	private:
-		uint32_t m_Width;
-		uint32_t m_Height;
-	};
-
-	class SceneViewportMinimizeEvent : public GenericEvent {
-	public:
-		SceneViewportMinimizeEvent() {}
-		std::string GetName() const override { return "Scene Viewport Minimize Event"; }
-
-		EVENT_CLASS_TYPE(SceneViewportMinimize)
-	};
-
-	class SceneViewportRestoreEvent : public GenericEvent {
-	public:
-		SceneViewportRestoreEvent() {}
-		std::string GetName() const override { return "Scene Viewport Restore Event"; }
-
-		EVENT_CLASS_TYPE(SceneViewportRestore)
-	};
-
 	class KeyPressEvent : public GenericEvent {
 	public:
 		KeyPressEvent(SDL_Keycode key) : m_Key(key) {}

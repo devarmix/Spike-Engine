@@ -7,10 +7,10 @@
 
 namespace Spike {
 
-	Ref<Window> Window::Create(const WindowCreateInfo& info) {
+	Window* Window::Create(const WindowCreateInfo& info) {
 
 #ifdef ENGINE_PLATFORM_WINDOWS
-		return CreateRef<WindowsWindow>(info);
+		return new WindowsWindow(info);
 #else
 #error Spike Engine supports only Windows!
 		return nullptr;

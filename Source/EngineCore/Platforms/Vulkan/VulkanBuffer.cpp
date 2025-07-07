@@ -1,9 +1,13 @@
 #include <Platforms/Vulkan/VulkanBuffer.h>
-#include <Platforms/Vulkan/VulkanRenderer.h>
 
 namespace Spike {
 
-	VulkanBuffer* VulkanBuffer::Create(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memUsage) {
+	VulkanBuffer::VulkanBuffer() :
+		Buffer(nullptr),
+		Allocation(nullptr),
+		AllocationInfo{} {}
+
+	VulkanBuffer::VulkanBuffer(VulkanDevice* device, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memUsage) {
 
 		VkBufferCreateInfo bufferInfo = { .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
 		bufferInfo.pNext = nullptr;
@@ -15,19 +19,15 @@ namespace Spike {
 		vmaAllocInfo.usage = memUsage;
 		vmaAllocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
-		VulkanBuffer* newBuffer = new VulkanBuffer();
-
-		VK_CHECK(vmaCreateBuffer(VulkanRenderer::Device.Allocator, &bufferInfo, &vmaAllocInfo, &newBuffer->Buffer,
-			&newBuffer->Allocation, &newBuffer->AllocationInfo));
-
-		return newBuffer;
+		VK_CHECK(vmaCreateBuffer(device->Allocator, &bufferInfo, &vmaAllocInfo, &Buffer,
+			&Allocation, &AllocationInfo));
 	}
 
-	void VulkanBuffer::Destroy() {
+	void VulkanBuffer::Destroy(VulkanDevice* device) {
 
 		if (Buffer != VK_NULL_HANDLE) {
 
-			vmaDestroyBuffer(VulkanRenderer::Device.Allocator, Buffer, Allocation);
+			vmaDestroyBuffer(device->Allocator, Buffer, Allocation);
 			Buffer = VK_NULL_HANDLE;
 		}
 	}

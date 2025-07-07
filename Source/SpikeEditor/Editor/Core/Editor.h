@@ -1,20 +1,20 @@
 #pragma once
 
 #include <Engine/Spike.h>
-#include <Editor/Layers/EditorGUILayer.h>
+#include <Editor/Layers/EditorLayer.h>
 
 namespace SpikeEditor {
 
 	class SpikeEditor : public Spike::Application {
 	public:
 		SpikeEditor(const Spike::ApplicationCreateInfo& info);
-		~SpikeEditor() override;
-
-		static SpikeEditor& Get() { return *m_Instance; }
+		virtual ~SpikeEditor() override;
 
 	private:
-		static SpikeEditor* m_Instance;
 
-		EditorGUILayer* m_GUILayer;
+		EditorLayer* m_EditorLayer;
 	};
+
+	// global editor pointer
+	extern SpikeEditor* GEditor;
 }

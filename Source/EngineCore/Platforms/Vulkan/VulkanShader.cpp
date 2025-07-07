@@ -1,11 +1,11 @@
 #include <Platforms/Vulkan/VulkanShader.h>
-#include <Platforms/Vulkan/VulkanRenderer.h>
+#include <Platforms/Vulkan/VulkanGfxDevice.h>
 
 #include <fstream>
 
 namespace Spike {
 
-	static bool LoadShaderModule(const char* filePath, VkShaderModule* outShaderModule) {
+	static bool LoadShaderModule(VulkanDevice* device, const char* filePath, VkShaderModule* outShaderModule) {
 
 		std::ifstream file(filePath, std::ios::ate | std::ios::binary);
 
@@ -29,7 +29,7 @@ namespace Spike {
 		createInfo.pCode = buffer.data();
 
 		VkShaderModule shaderModule;
-		if (vkCreateShaderModule(VulkanRenderer::Device.Device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+		if (vkCreateShaderModule(device->Device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
 			return false;
 		}
 
@@ -37,33 +37,50 @@ namespace Spike {
 		return true;
 	}
 
-	VulkanShader* VulkanShader::Create(const char* vertexPath, const char* fragmentPath) {
+    VulkanShader::VulkanShader() : 
+		FragmentModule(nullptr),
+		VertexModule(nullptr) {}
 
-		VulkanShader* shader = new VulkanShader();
+	VulkanShader::VulkanShader(VulkanDevice* device, const char* vertexPath, const char* fragmentPath) {
 
-		if (!(LoadShaderModule(fragmentPath, &shader->FragmentModule) && LoadShaderModule(vertexPath, &shader->VertexModule))) {
+		if (!(LoadShaderModule(device, fragmentPath, &FragmentModule) && LoadShaderModule(device, vertexPath, &VertexModule))) {
 
 			ENGINE_ERROR("Failed to load shader modules from paths: {0}, {1}", vertexPath, fragmentPath);
-			delete shader;
-
-			return nullptr;
 		}
-
-		return shader;
 	}
 
-	void VulkanShader::Destroy() {
+	void VulkanShader::Destroy(VulkanDevice* device) {
 
 		if (VertexModule != VK_NULL_HANDLE) {
 
-			vkDestroyShaderModule(VulkanRenderer::Device.Device, VertexModule, nullptr);
+			vkDestroyShaderModule(device->Device, VertexModule, nullptr);
 			VertexModule = VK_NULL_HANDLE;
 		}
 
 		if (FragmentModule != VK_NULL_HANDLE)  {
 			 
-			vkDestroyShaderModule(VulkanRenderer::Device.Device, FragmentModule, nullptr);
+			vkDestroyShaderModule(device->Device, FragmentModule, nullptr);
 			FragmentModule = VK_NULL_HANDLE;
+		}
+	}
+
+
+	VulkanComputeShader::VulkanComputeShader() : ComputeModule(nullptr) {}
+
+	VulkanComputeShader::VulkanComputeShader(VulkanDevice* device, const char* filePath) {
+
+		if (!LoadShaderModule(device, filePath, &ComputeModule)) {
+
+			ENGINE_ERROR("Failed to load compute shader module from path: {0}", filePath);
+		}
+	}
+
+	void VulkanComputeShader::Destroy(VulkanDevice* device) {
+
+		if (ComputeModule != VK_NULL_HANDLE) {
+
+			vkDestroyShaderModule(device->Device, ComputeModule, nullptr);
+			ComputeModule = VK_NULL_HANDLE;
 		}
 	}
 }

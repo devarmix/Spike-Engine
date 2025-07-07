@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Engine/Core/Core.h>
 #include <Engine/Events/Event.h>
 
 namespace Spike {
@@ -15,7 +14,7 @@ namespace Spike {
 
 	class Window {
 	public:
-		static Ref<Window> Create(const WindowCreateInfo& info);
+		static Window* Create(const WindowCreateInfo& info);
 		virtual ~Window() = default;
 
 		virtual uint32_t GetWidth() const = 0;

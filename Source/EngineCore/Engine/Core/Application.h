@@ -1,13 +1,10 @@
 #pragma once
 
 #include <Engine/Core/Window.h>
+#include <Engine/Renderer/GfxDevice.h>
 #include <Engine/Events/ApplicationEvents.h>
 #include <Engine/Core/LayerStack.h>
-
-#include <Engine/Layers/RendererLayer.h>
 #include <Engine/Layers/SceneLayer.h>
-#include <Engine/Layers/ImGuiLayer.h>
-
 #include <Engine/Core/Timestep.h>
 #include <Engine/Core/Core.h>
 
@@ -16,6 +13,7 @@ namespace Spike {
 	struct ApplicationCreateInfo {
 
 		std::string Name;
+		bool UsingImGui;
 		WindowCreateInfo WinInfo;
 	};
 
@@ -31,52 +29,44 @@ namespace Spike {
 
 		void PushOverlay(Layer* layer);
 		void PopOverlay(Layer* layer);
-
-		template<typename T, typename... Args>
-		Ref<T> CreateGUIWindow(Args&&... args) {
-
-			return m_ImGuiLayer->CreateGUI<T>(std::forward<Args>(args)...);
-		}
-
-		//void DestroyGUIWindow();
-
 		// entry point
 		void Run();
 
 		// events
 		void OnEvent(const GenericEvent& event);
 
-		Ref<Window> GetMainWindow() const { return m_Window; }
+		Window* GetMainWindow() { return m_Window; }
+		RenderThread& GetRenderThread() { return m_RenderThread; }
 
-		static Application& Get() { return *m_Instance; }
-		ImGuiLayer* GetImGUILayer() { return m_ImGuiLayer; }
-
-		void CleanAll();
+		void Destroy();
 
 	private:
 
-		bool OnWindowResize(const WindowResizeEvent& event);
-		bool OnWindowClose(const WindowCloseEvent& event);
-		bool OnWindowMinimize(const WindowMinimizeEvent& event);
-		bool OnWindowRestore(const WindowRestoreEvent& event);
+		Window* m_Window;
 
-	private:
-
-		Ref<Window> m_Window;
 		LayerStack m_LayerStack;
+		RenderThread m_RenderThread;
+
+		//std::vector<GenericEvent> m_EventQueue;
+		//std::mutex m_EventQueueMutex;
+
+		//TaskScheduler m_TaskScheduler;
+		//SyncStructures m_SyncStructures;
 
 		bool m_Running = false;
 		bool m_Minimized = false;
+		bool m_UsingImGui = false;
 
-		ImGuiLayer* m_ImGuiLayer;
-		RendererLayer* m_RendererLayer;
 		SceneLayer* m_SceneLayer;
 
 		Time m_Time;
-
-		static Application* m_Instance;
 	};
 
 	// to be defined in client
 	Application* CreateApplication();
+
+	// global application pointer
+	extern Application* GApplication;
 }
+
+#define EXECUTE_ON_RENDER_THREAD(task) Spike::GApplication->GetRenderThread().PushTask(std::move(task));

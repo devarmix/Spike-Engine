@@ -2,72 +2,108 @@
 
 #include <Engine/Core/Core.h>
 #include <Engine/Math/Vector4.h>
-#include <Engine/Renderer/Texture.h>
+#include <Engine/Renderer/Texture2D.h>
 #include <Engine/Asset/Asset.h>
+#include <Engine/Renderer/RenderResource.h>
+using namespace Spike;
 
-#include <glm/glm.hpp>
 #include <map>
+
+namespace Spike {
+
+	enum EMaterialSurfaceType : uint8_t {
+
+		ESurfaceTypeOpaque,
+		ESurfaceTypeTransparent
+	};
+
+	class MaterialResource : public RenderResource {
+	public:
+
+		MaterialResource(EMaterialSurfaceType surfaceType)
+			: m_SurfaceType(surfaceType), m_GPUData(nullptr) {}
+
+		virtual ~MaterialResource() override {}
+
+		ResourceGPUData* GetGPUData() { return m_GPUData; }
+
+		virtual void InitGPUData() override;
+		virtual void ReleaseGPUData() override;
+
+		EMaterialSurfaceType GetSurfaceType() const { return m_SurfaceType; }
+
+	private:
+
+		ResourceGPUData* m_GPUData;
+
+		EMaterialSurfaceType m_SurfaceType;
+	};
+}
 
 namespace SpikeEngine {
 
 	struct ScalarParameter {
+
+		float Value;
 
 		uint8_t DataBindIndex;
 	};
 
 	struct ColorParameter {
 
+		Vector4 Value;
+
 		uint8_t DataBindIndex;
 	};
 
 	struct TextureParameter {
 
-		Ref<Texture> Value;
+		Ref<Texture2D> Value;
 
 		uint8_t DataBindIndex;
 	};
 
-	enum MaterialSurfaceType : uint8_t {
 
-		Opaque,
-		Transparent
-	};
-
-
-	class Material : public Spike::Asset {
+	class Material : public Asset {
 	public:
-		virtual ~Material() = default;
 
-		static Ref<Material> Create();
+		Material(EMaterialSurfaceType surfaceType);
+		virtual ~Material() override;
 
-		virtual const void* GetData() const = 0;
+		static Ref<Material> Create(EMaterialSurfaceType surfaceType);
 
-		virtual void SetScalarParameter(const std::string& name, float value) = 0;
-		virtual void SetColorParameter(const std::string& name, Vector4 value) = 0;
-		virtual void SetTextureParameter(const std::string& name, Ref<Texture> value) = 0;
+		void SetScalarParameter(const std::string& name, float value);
+		void SetColorParameter(const std::string& name, Vector4 value);
+		void SetTextureParameter(const std::string& name, Ref<Texture2D> value);
 
-		virtual const float GetScalarParameter(const std::string& name) = 0;
-		virtual const Vector4 GetColorParameter(const std::string& name) = 0;
-		virtual const Ref<Texture> GetTextureParameter(const std::string& name) = 0;
+		float GetScalarParameter(const std::string& name);
+		Vector4 GetColorParameter(const std::string& name);
+		Ref<Texture2D> GetTextureParameter(const std::string& name);
 
-		const MaterialSurfaceType GetSurfaceType() const { return m_SurfaceType; }
+		EMaterialSurfaceType GetSurfaceType() const { return m_RenderResource->GetSurfaceType(); }
 
-		ASSET_CLASS_TYPE(MaterialAsset);
+		MaterialResource* GetResource() { return m_RenderResource; }
+		void ReleaseResource();
+		void CreateResource(EMaterialSurfaceType surfaceType);
+
+		ASSET_CLASS_TYPE(MaterialAsset)
 
 	public:
 
-		virtual void AddScalarParameter(const std::string& name, uint8_t valIndex, float value) = 0;
-		virtual void AddColorParameter(const std::string& name, uint8_t valIndex, glm::vec4 value) = 0;
-		virtual void AddTextureParameter(const std::string& name, uint8_t valIndex, Ref<Texture> value) = 0;
+		void AddScalarParameter(const std::string& name, uint8_t valIndex, float value);
+		void AddColorParameter(const std::string& name, uint8_t valIndex, Vector4 value);
+		void AddTextureParameter(const std::string& name, uint8_t valIndex, Ref<Texture2D> value);
 
-		virtual void RemoveScalarParameter(const std::string& name) = 0;
-		virtual void RemoveColorParameter(const std::string& name) = 0;
-		virtual void RemoveTextureParameter(const std::string& name) = 0;
+		void RemoveScalarParameter(const std::string& name);
+		void RemoveColorParameter(const std::string& name);
+		void RemoveTextureParameter(const std::string& name);
 
 		std::map<std::string, ScalarParameter> m_ScalarParameters;
 		std::map<std::string, ColorParameter> m_ColorParameters;
 		std::map<std::string, TextureParameter> m_TextureParameters;
 
-		MaterialSurfaceType m_SurfaceType;
+	private:
+
+		MaterialResource* m_RenderResource;
 	};
 }

@@ -1,17 +1,18 @@
 #pragma once
 
 #include <Platforms/Vulkan/VulkanCommon.h>
+#include <Platforms/Vulkan/VulkanDevice.h>
 
 namespace Spike {
 
-	struct VulkanSwapchain {
+	class VulkanSwapchain {
+	public:
+		VulkanSwapchain();
 
-		VulkanSwapchain() = default;
+		void Init(VulkanDevice* device, uint32_t width, uint32_t height);
+		void Resize(VulkanDevice* device, uint32_t width, uint32_t height);
 
-		void Init(uint32_t width, uint32_t height);
-		void Resize(uint32_t width, uint32_t height);
-
-		void Destroy();
+		void Destroy(VulkanDevice* device);
 
 		VkSwapchainKHR Swapchain;
 		VkFormat Format;

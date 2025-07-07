@@ -7,8 +7,8 @@ std::string Spike::GetStringFromAssetType(Spike::AssetType type) {
 	case Spike::None:
 		return "None";
 		break;
-	case Spike::TextureAsset:
-		return "Texture";
+	case Spike::Texture2DAsset:
+		return "Texture2D";
 		break;
 	case Spike::CubeTextureAsset:
 		return "CubeTexture";
@@ -28,7 +28,7 @@ std::string Spike::GetStringFromAssetType(Spike::AssetType type) {
 Spike::AssetType Spike::GetAssetTypeFromString(std::string s) {
 
 	if (s == "None") return AssetType::None;
-	if (s == "Texture") return AssetType::TextureAsset;
+	if (s == "Texture2D") return AssetType::Texture2DAsset;
 	if (s == "CubeTexture") return AssetType::CubeTextureAsset;
 	if (s == "Material") return AssetType::MaterialAsset;
 	if (s == "Mesh") return AssetType::MeshAsset;

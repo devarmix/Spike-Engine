@@ -1,18 +1,21 @@
 #pragma once
 
 #include <Platforms/Vulkan/VulkanCommon.h>
+#include <Platforms/Vulkan/VulkanDevice.h>
 #include <Engine/Core/Core.h>
 
 namespace Spike {
 
-	struct VulkanBuffer {
+	class VulkanBuffer {
+	public:
+		VulkanBuffer();
+		VulkanBuffer(VulkanDevice* device, size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memUsage);
 
-		VulkanBuffer() = default;
-		~VulkanBuffer() { Destroy(); }
+		~VulkanBuffer() {}
 
-		void Destroy();
+		void Destroy(VulkanDevice* device);
 
-		static VulkanBuffer* Create(size_t allocSize, VkBufferUsageFlags usage, VmaMemoryUsage memUsage);
+	public:
 
 		VkBuffer Buffer;
 		VmaAllocation Allocation;

@@ -1,6 +1,8 @@
 #include <Editor/Renderer/EditorCamera.h>
 #include <Engine/Core/Log.h>
 
+#include <Engine/Core/Application.h>
+
 namespace SpikeEditor {
 
 	EditorCamera::EditorCamera() {}
@@ -9,28 +11,26 @@ namespace SpikeEditor {
 
 	void EditorCamera::OnUpdate(float deltaTime) {
 
-		// if not holding right mouse button, reset velocity
-		if (!m_MouseRightButton) m_TargetVelocity = Vector3(0.f, 0.f, 0.f);
+		// if not controlling camera, reset velocity
+		if (!m_IsControlled) m_TargetVelocity = Vector3();
+		//if (m_CurrentVelocity == Vector3() && !m_IsControlled) return;
 
 		m_CurrentVelocity = Vector3::MoveTowards(m_CurrentVelocity, m_TargetVelocity, m_AccelerationSpeed * deltaTime);
+		Vector3 v = m_CurrentVelocity * deltaTime * 7.f * m_Speed * m_SpeedMultiplier * m_SpeedScrollMultiplier;
 
 		glm::mat4 cameraRotation = GetRotationMatrix();
-
-		Vector3 v = m_CurrentVelocity * deltaTime * 7.f * m_Speed * m_SpeedMultiplier * m_SpeedScrollMultiplier;
 		m_Position += glm::vec3(cameraRotation * glm::vec4(v.x, v.y, v.z, 0.f));
-
-		SetCameraPosition(m_Position);
 	}
 
-	void EditorCamera::PollEvents(const Spike::GenericEvent& event) {
+	void EditorCamera::OnEvent(const Spike::GenericEvent& event) {
 		 
 		Spike::EventHandler handler(event);
 		handler.Handle<Spike::MouseButtonPressEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonPress));
 		handler.Handle<Spike::MouseButtonReleaseEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonRelease));
 		handler.Handle<Spike::MouseScrollEvent>(BIND_FUNCTION(EditorCamera::OnMouseScroll));
 
-		// poll movement events, only when right mouse button is pressed
-		if (m_MouseRightButton) {
+		// poll movement events, only when controlling camera
+		if (m_IsControlled) {
 
 			handler.Handle<Spike::KeyPressEvent>(BIND_FUNCTION(EditorCamera::OnKeyPress));
 			handler.Handle<Spike::KeyReleaseEvent>(BIND_FUNCTION(EditorCamera::OnKeyRelease));
@@ -40,89 +40,120 @@ namespace SpikeEditor {
 
 	bool EditorCamera::OnKeyPress(const Spike::KeyPressEvent& event) {
 
-		if (event.GetKey() == SDLK_w) { m_TargetVelocity.z = -1; }
-		else if (event.GetKey() == SDLK_s) { m_TargetVelocity.z = 1; }
-		else if (event.GetKey() == SDLK_a) { m_TargetVelocity.x = -1; }
-		else if (event.GetKey() == SDLK_d) { m_TargetVelocity.x = 1; }
-		else if (event.GetKey() == SDLK_q) { m_TargetVelocity.y = -1; }
-		else if (event.GetKey() == SDLK_e) { m_TargetVelocity.y = 1; }
+		Spike::KeyPressEvent e = event;
+
+		EXECUTE_ON_RENDER_THREAD(([=, this]() {
+
+			if (e.GetKey() == SDLK_w) { m_TargetVelocity.z = -1; }
+			else if (e.GetKey() == SDLK_s) { m_TargetVelocity.z = 1; }
+			else if (e.GetKey() == SDLK_a) { m_TargetVelocity.x = -1; }
+			else if (e.GetKey() == SDLK_d) { m_TargetVelocity.x = 1; }
+			else if (e.GetKey() == SDLK_q) { m_TargetVelocity.y = -1; }
+			else if (e.GetKey() == SDLK_e) { m_TargetVelocity.y = 1; }
+			}));
 
 		return false;
 	}
 
 	bool EditorCamera::OnKeyRelease(const Spike::KeyReleaseEvent& event) {
 
-		if (event.GetKey() == SDLK_w && m_TargetVelocity.z < 0) { m_TargetVelocity.z = 0; }
-		else if (event.GetKey() == SDLK_s && m_TargetVelocity.z > 0) { m_TargetVelocity.z = 0; }
-		else if (event.GetKey() == SDLK_a && m_TargetVelocity.x < 0) { m_TargetVelocity.x = 0; }
-		else if (event.GetKey() == SDLK_d && m_TargetVelocity.x > 0) { m_TargetVelocity.x = 0; }
-		else if (event.GetKey() == SDLK_q && m_TargetVelocity.y < 0) { m_TargetVelocity.y = 0; }
-		else if (event.GetKey() == SDLK_e && m_TargetVelocity.y > 0) { m_TargetVelocity.y = 0; }
+		Spike::KeyReleaseEvent e = event;
+
+		EXECUTE_ON_RENDER_THREAD(([=, this]() {
+
+			if (e.GetKey() == SDLK_w && m_TargetVelocity.z < 0) { m_TargetVelocity.z = 0; }
+			else if (e.GetKey() == SDLK_s && m_TargetVelocity.z > 0) { m_TargetVelocity.z = 0; }
+			else if (e.GetKey() == SDLK_a && m_TargetVelocity.x < 0) { m_TargetVelocity.x = 0; }
+			else if (e.GetKey() == SDLK_d && m_TargetVelocity.x > 0) { m_TargetVelocity.x = 0; }
+			else if (e.GetKey() == SDLK_q && m_TargetVelocity.y < 0) { m_TargetVelocity.y = 0; }
+			else if (e.GetKey() == SDLK_e && m_TargetVelocity.y > 0) { m_TargetVelocity.y = 0; }
+			}));
 
 		return false;
 	}
 
 	bool EditorCamera::OnMouseMotion(const Spike::MouseMotionEvent& event) {
 
-		m_Yaw += event.GetDeltaX() / 200.f;
-		m_Pitch -= event.GetDeltaY() / 200.f;
+		Spike::MouseMotionEvent e = event;
 
-		//m_Yaw = Mathf::Clamp(m_Yaw, 0.f, 90.f);
+		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
-		//SE_CORE_WARN("Yaw: {0}", m_Yaw);
-		//SE_CORE_WARN("Pitch: {0}", m_Pitch);
+			m_Yaw += e.GetDeltaX() / 200.f;
+			m_Pitch -= e.GetDeltaY() / 200.f;
 
-		SetCameraRotation(glm::vec3{ m_Pitch, m_Yaw, 0.f });
+			//m_Yaw = Mathf::Clamp(m_Yaw, 0.f, 90.f);
+
+			//SE_CORE_WARN("Yaw: {0}", m_Yaw);
+			//SE_CORE_WARN("Pitch: {0}", m_Pitch);
+
+			//SetCameraRotation(glm::vec3{ m_Pitch, m_Yaw, 0.f });
+
+			m_Rotation = glm::vec3(m_Pitch, m_Yaw, 0.f);
+			}));
 
 		return false;
 	}
 
 	bool EditorCamera::OnMouseButtonPress(const Spike::MouseButtonPressEvent& event) {
 
-		if (event.GetButton() == SDL_BUTTON_RIGHT && m_ViewportHovered) {
+		Spike::MouseButtonPressEvent e = event;
 
-			// hide cursor to control camera
-			SDL_SetRelativeMouseMode(SDL_TRUE);
-			SDL_ShowCursor(SDL_DISABLE);
+		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
-			m_MouseRightButton = true;
-		}
+			if (e.GetButton() == SDL_BUTTON_RIGHT && m_ViewportHovered) {
+
+				// hide cursor to control camera
+				SDL_SetRelativeMouseMode(SDL_TRUE);
+				SDL_ShowCursor(SDL_DISABLE);
+
+				m_IsControlled = true;
+			}
+			}));
 
 		return false;
 	}
 
 	bool EditorCamera::OnMouseButtonRelease(const Spike::MouseButtonReleaseEvent& event) {
 
-		if (event.GetButton() == SDL_BUTTON_RIGHT) {
+		Spike::MouseButtonReleaseEvent e = event;
 
-			// show cursor back
-			SDL_SetRelativeMouseMode(SDL_FALSE);
-			SDL_ShowCursor(SDL_ENABLE);
+		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
-			m_MouseRightButton = false;
-		}
+			if (e.GetButton() == SDL_BUTTON_RIGHT && m_IsControlled) {
+
+				// show cursor back
+				SDL_SetRelativeMouseMode(SDL_FALSE);
+				SDL_ShowCursor(SDL_ENABLE);
+
+				m_IsControlled = false;
+			}
+			}));
 
 		return false;
 	}
 
 	bool EditorCamera::OnMouseScroll(const Spike::MouseScrollEvent& event) {
 
-		if (m_MouseRightButton) {
+		Spike::MouseScrollEvent e = event;
 
-			// change scroll speed multiplier
-			m_SpeedScrollMultiplier += event.GetScrollY() * m_ScrollSpeedDeltaFactor;
-			m_SpeedScrollMultiplier = Mathf::Clamp(m_SpeedScrollMultiplier, 0.01f, m_MaxSpeedScrollMultiplier);
+		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
-		} else if (m_ViewportHovered) {
+			if (m_IsControlled) {
 
-			// scroll camera
-			float distance = event.GetScrollY() * m_ScrollSpeed;
-			glm::mat4 cameraRotation = GetRotationMatrix();
+				// change scroll speed multiplier
+				m_SpeedScrollMultiplier += e.GetScrollY() * m_ScrollSpeedDeltaFactor;
+				m_SpeedScrollMultiplier = Mathf::Clamp(m_SpeedScrollMultiplier, 0.01f, m_MaxSpeedScrollMultiplier);
 
-			m_Position += glm::vec3(cameraRotation * glm::vec4(0.f, 0.f, -distance, 0.f));
+			}
+			else if (m_ViewportHovered) {
 
-			SetCameraPosition(m_Position);
-		}
+				// scroll camera
+				float distance = e.GetScrollY() * m_ScrollSpeed;
+				glm::mat4 cameraRotation = GetRotationMatrix();
+
+				m_Position += glm::vec3(cameraRotation * glm::vec4(0.f, 0.f, -distance, 0.f));
+			}
+			}));
 
 		return false;
 	}
