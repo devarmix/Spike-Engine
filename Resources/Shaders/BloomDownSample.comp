@@ -1,0 +1,129 @@
+#version 450
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D SamplerTexture;
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D OutTexture;
+
+layout(push_constant) uniform Constants {
+
+    vec2 SrcSize;
+    vec2 OutSize;
+
+    uint MipLevel;
+    float Threadshold;
+    float SoftThreadshold;
+
+    float pad0;
+} BloomConstants;
+
+vec3 PowVec3(vec3 v, float p)
+{
+    return vec3(pow(v.x, p), pow(v.y, p), pow(v.z, p));
+}
+
+const float invGamma = 1.0 / 2.2;
+vec3 ToSRGB(vec3 v)   { return PowVec3(v, invGamma); }
+
+float sRGBToLuma(vec3 col) {
+
+	return dot(col, vec3(0.299f, 0.587f, 0.114f));
+}
+
+float KarisAverage(vec3 col) {
+
+	float luma = sRGBToLuma(ToSRGB(col)) * 0.25f;
+	return 1.0f / (1.0f + luma);
+}
+
+vec3 Prefilter(vec3 color, vec4 f) {
+
+    float brightness = max(color.r, max(color.g, color.b));
+    float soft = brightness - f.y;
+    soft = clamp(soft, 0, f.z);
+    soft = soft * soft * f.w;
+    float contribution = max(soft, brightness - f.x);
+    contribution /= max(brightness, 0.00001f);
+
+    return color * contribution;
+}
+
+vec3 DownSample13(vec2 texCoord) {
+
+    vec2 srcTexelSize = 1.0f / BloomConstants.SrcSize;
+	float x = srcTexelSize.x;
+	float y = srcTexelSize.y;
+
+    vec3 a = texture(SamplerTexture, vec2(texCoord.x - 2*x, texCoord.y + 2*y)).rgb;
+	vec3 b = texture(SamplerTexture, vec2(texCoord.x,       texCoord.y + 2*y)).rgb;
+	vec3 c = texture(SamplerTexture, vec2(texCoord.x + 2*x, texCoord.y + 2*y)).rgb;
+
+	vec3 d = texture(SamplerTexture, vec2(texCoord.x - 2*x, texCoord.y)).rgb;
+	vec3 e = texture(SamplerTexture, vec2(texCoord.x,       texCoord.y)).rgb;
+	vec3 f = texture(SamplerTexture, vec2(texCoord.x + 2*x, texCoord.y)).rgb;
+
+	vec3 g = texture(SamplerTexture, vec2(texCoord.x - 2*x, texCoord.y - 2*y)).rgb;
+	vec3 h = texture(SamplerTexture, vec2(texCoord.x,       texCoord.y - 2*y)).rgb;
+	vec3 i = texture(SamplerTexture, vec2(texCoord.x + 2*x, texCoord.y - 2*y)).rgb;
+
+	vec3 j = texture(SamplerTexture, vec2(texCoord.x - x, texCoord.y + y)).rgb;
+	vec3 k = texture(SamplerTexture, vec2(texCoord.x + x, texCoord.y + y)).rgb;
+	vec3 l = texture(SamplerTexture, vec2(texCoord.x - x, texCoord.y - y)).rgb;
+	vec3 m = texture(SamplerTexture, vec2(texCoord.x + x, texCoord.y - y)).rgb;
+
+    vec3 downsample;
+	vec3 groups[5];
+
+	switch (BloomConstants.MipLevel)
+	{
+	case 0:
+	    groups[0] = (a+b+d+e) * (0.125f/4.0f);
+	    groups[1] = (b+c+e+f) * (0.125f/4.0f);
+	    groups[2] = (d+e+g+h) * (0.125f/4.0f);
+	    groups[3] = (e+f+h+i) * (0.125f/4.0f);
+	    groups[4] = (j+k+l+m) * (0.5f/4.0f);
+	    groups[0] *= KarisAverage(groups[0]);
+	    groups[1] *= KarisAverage(groups[1]);
+	    groups[2] *= KarisAverage(groups[2]);
+	    groups[3] *= KarisAverage(groups[3]);
+	    groups[4] *= KarisAverage(groups[4]);
+	    downsample = groups[0]+groups[1]+groups[2]+groups[3]+groups[4];
+	    downsample = max(downsample, 0.0001f);
+	    break;
+
+	default:
+	    downsample = e*0.125f;             
+	    downsample += (a+c+g+i)*0.03125f;  
+	    downsample += (b+d+f+h)*0.0625f;   
+	    downsample += (j+k+l+m)*0.125f; 
+	    break;
+    }
+
+    return downsample;
+}
+
+void main() {
+
+    ivec2 invocID = ivec2(gl_GlobalInvocationID);
+
+    vec2 imgSize = BloomConstants.OutSize;
+    vec2 texCoord = vec2(float(invocID.x) / imgSize.x, float(invocID.y) / imgSize.y);
+    texCoord += (1.0f / imgSize) * 0.5f;
+
+    vec3 color = DownSample13(texCoord);
+    if (BloomConstants.MipLevel == 0) {
+
+        // first downsample so prefilter color
+        float knee = BloomConstants.Threadshold * BloomConstants.SoftThreadshold;
+
+        vec4 f;
+        f.x = BloomConstants.Threadshold;
+        f.y = f.x - knee;
+        f.z = 2.0f * knee;
+        f.w = 0.25f / (knee + 0.00001f);
+
+        color = Prefilter(color, f);
+    }
+
+    imageStore(OutTexture, invocID, vec4(color, 1.0f));
+}

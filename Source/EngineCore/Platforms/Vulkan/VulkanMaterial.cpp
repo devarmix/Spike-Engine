@@ -95,50 +95,23 @@ namespace Spike {
 
 	void VulkanMaterialManager::BuildMaterialPipeline(VkPipeline* outPipeline, VkPipelineLayout* outLayout, VulkanDevice* device, VkDescriptorSetLayout frameSetLayout, VulkanShader shader, EMaterialSurfaceType surfaceType) {
 
-		VkPushConstantRange matrixRange{};
-		matrixRange.offset = 0;
-		matrixRange.size = sizeof(MaterialPushConstants);
-		matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		VulkanTools::VulkanGraphicsPipelineInfo info{};
+		info.VertexModule = shader.VertexModule;
+		info.FragmentModule = shader.FragmentModule;
 
-		VkDescriptorSetLayout layouts[] = { frameSetLayout, DataSetLayout };
+		VkDescriptorSetLayout layouts[2] = { frameSetLayout, DataSetLayout };
+		info.SetLayouts = layouts;
+		info.SetLayoutsCount = 2;
+		info.PushConstantSize = sizeof(MaterialPushConstants);
 
-		VkPipelineLayoutCreateInfo mesh_Layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-		mesh_Layout_Info.setLayoutCount = 2;
-		mesh_Layout_Info.pSetLayouts = layouts;
-		mesh_Layout_Info.pPushConstantRanges = &matrixRange;
-		mesh_Layout_Info.pushConstantRangeCount = 1;
+		VkFormat colorAttachmentFormats[3] = { VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8B8A8_UNORM };
+		info.ColorAttachmentFormats = colorAttachmentFormats;
+		info.ColorAttachmentCount = 3;
+		info.EnableDepthTest = true;
+		info.EnableDepthWrite = true;
+		info.DepthCompare = VK_COMPARE_OP_GREATER_OR_EQUAL;
 
-		VK_CHECK(vkCreatePipelineLayout(device->Device, &mesh_Layout_Info, nullptr, outLayout));
-
-		PipelineBuilder pipelineBulder;
-		pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
-		pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-		pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
-		pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-		pipelineBulder.SetMultisamplingNone();
-
-		VkFormat colorAttachmentFormats[3] = { VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8B8A8_UNORM };
-
-		pipelineBulder.SetColorAttachments(colorAttachmentFormats, 3);
-		pipelineBulder.SetDepthFormat(VK_FORMAT_D32_SFLOAT);
-
-		pipelineBulder.PipelineLayout = *outLayout;
-
-		if (surfaceType == ESurfaceTypeOpaque) {
-
-			pipelineBulder.DisableBlending();
-			pipelineBulder.EnableDepthTest(true, VK_COMPARE_OP_GREATER);
-
-			*outPipeline = pipelineBulder.BuildPipeline(device->Device);
-		}
-		else if (surfaceType == ESurfaceTypeTransparent) {
-
-			pipelineBulder.EnableBlendingAdditive();
-
-			pipelineBulder.EnableDepthTest(false, VK_COMPARE_OP_GREATER);
-
-			*outPipeline = pipelineBulder.BuildPipeline(device->Device);
-		}
+		VulkanTools::CreateVulkanGraphicsPipeline(device->Device, info, outPipeline, outLayout);
 	}
 
 	uint32_t VulkanMaterialManager::GetFreeTextureIndex() {

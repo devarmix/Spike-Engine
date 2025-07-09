@@ -1,4 +1,5 @@
 #include <Platforms/Vulkan/VulkanTools.h>
+#include <Platforms/Vulkan/VulkanPipeline.h>
 
 
 VkCommandPoolCreateInfo Spike::VulkanTools::CommandPoolCreateInfo(uint32_t queueFamilyIndex, VkCommandPoolCreateFlags flags) {
@@ -556,4 +557,68 @@ VkImageUsageFlags Spike::VulkanTools::TextureUsageFlagsToVulkan(ETextureUsageFla
 uint32_t Spike::VulkanTools::GetComputeGroupCount(uint32_t threadCount, uint32_t groupSize) {
 
 	return (threadCount + groupSize - 1) / groupSize;
+}
+
+uint32_t Spike::VulkanTools::GetNumMips(uint32_t width, uint32_t height) {
+
+	return uint32_t(std::floor(std::log2(std::max(width, height)))) + 1;
+}
+
+void Spike::VulkanTools::CreateVulkanGraphicsPipeline(VkDevice device, const VulkanGraphicsPipelineInfo& info, VkPipeline* outPipeline, VkPipelineLayout* outPipelineLayout) {
+
+	VkPushConstantRange pushRange{};
+	pushRange.offset = 0;
+	pushRange.size = info.PushConstantSize;
+	pushRange.stageFlags = info.PushConstantStage;
+
+	VkPipelineLayoutCreateInfo layout_Info = PipelineLayoutCreateInfo();
+	layout_Info.setLayoutCount = info.SetLayoutsCount;
+	layout_Info.pSetLayouts = info.SetLayouts;
+	layout_Info.pPushConstantRanges = (info.PushConstantSize > 0) ? &pushRange : nullptr;
+	layout_Info.pushConstantRangeCount = (info.PushConstantSize > 0) ? 1 : 0;
+
+	VK_CHECK(vkCreatePipelineLayout(device, &layout_Info, nullptr, outPipelineLayout));
+
+	PipelineBuilder pipelineBulder;
+	pipelineBulder.SetShaders(info.VertexModule, info.FragmentModule);
+	pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+	pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
+	pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+	pipelineBulder.SetMultisamplingNone();
+	pipelineBulder.DisableBlending();
+	pipelineBulder.SetColorAttachments(info.ColorAttachmentFormats, info.ColorAttachmentCount);
+
+	if (info.EnableDepthTest) {
+
+		pipelineBulder.SetDepthFormat(VK_FORMAT_D32_SFLOAT);
+		pipelineBulder.EnableDepthTest(info.EnableDepthWrite, info.DepthCompare);
+	}
+
+	pipelineBulder.PipelineLayout = *outPipelineLayout;
+	*outPipeline = pipelineBulder.BuildPipeline(device);
+}
+
+void Spike::VulkanTools::CreateVulkanComputePipeline(VkDevice device, const VulkanComputePipelineInfo& info, VkPipeline* outPipeline, VkPipelineLayout* outPipelineLayout) {
+
+	VkPushConstantRange pushRange{};
+	pushRange.offset = 0;
+	pushRange.size = info.PushConstantSize;
+	pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+	VkPipelineLayoutCreateInfo layout_Info = PipelineLayoutCreateInfo();
+	layout_Info.setLayoutCount = info.SetLayoutsCount;
+	layout_Info.pSetLayouts = info.SetLayouts;
+	layout_Info.pPushConstantRanges = (info.PushConstantSize > 0) ? &pushRange : nullptr;
+	layout_Info.pushConstantRangeCount = (info.PushConstantSize > 0) ? 1 : 0;
+
+	VK_CHECK(vkCreatePipelineLayout(device, &layout_Info, nullptr, outPipelineLayout));
+
+	VkPipelineShaderStageCreateInfo stageInfo = VulkanTools::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_COMPUTE_BIT, info.ComputeModule);
+
+	VkComputePipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	pipelineInfo.stage = stageInfo;
+	pipelineInfo.layout = *outPipelineLayout;
+
+	VK_CHECK(vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, outPipeline));
 }

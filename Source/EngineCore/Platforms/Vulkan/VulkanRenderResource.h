@@ -31,30 +31,22 @@ namespace Spike {
 
 	struct VulkanDepthMapNativeData {
 
-		VkImage Image;
-		VkImageView View;
-		VmaAllocation Allocation;
+		VulkanTextureNativeData Depth;
 
-		struct {
-
-			VkImage Image;
-			VkImageView View;
-			VkImageView ViewMips[16];
-			VmaAllocation Allocation;
-
-		} DepthPyramid;
+		VulkanTextureNativeData Pyramid;
+		VkImageView PyramidViews[16];
 	};
 
 	class VulkanDepthMapGPUData : public ResourceGPUData {
 	public:
 
 		VulkanDepthMapGPUData() 
-			: NativeGPUData{ .Image = nullptr, .View = nullptr, .Allocation = nullptr, 
-			.DepthPyramid{.Image = nullptr, .Allocation = nullptr} } 
+			: NativeGPUData{.Depth = {nullptr, nullptr, nullptr}, 
+			.Pyramid = {nullptr, nullptr, nullptr}}
 		{
 			for (int i = 0; i < 16; i++) {
 
-				NativeGPUData.DepthPyramid.ViewMips[i] = nullptr;
+				NativeGPUData.PyramidViews[i] = nullptr;
 			}
 
 		}
@@ -66,6 +58,41 @@ namespace Spike {
 	public:
 
 		VulkanDepthMapNativeData NativeGPUData;
+	};
+
+
+	struct VulkanBloomMapNativeData {
+
+		VulkanTextureNativeData BloomComposite;
+		VulkanTextureNativeData BloomDownSample;
+		VulkanTextureNativeData BloomUpSample;
+
+		VkImageView DownSampleViews[16];
+		VkImageView UpSampleViews[16];
+	};
+
+	class VulkanBloomMapGPUData : public ResourceGPUData {
+	public:
+
+		VulkanBloomMapGPUData() 
+			: NativeGPUData{ .BloomComposite = {nullptr, nullptr, nullptr}, 
+			.BloomDownSample{nullptr, nullptr, nullptr}, 
+			.BloomUpSample{nullptr, nullptr, nullptr} } 
+		{
+			for (int i = 0; i < 16; i++) {
+
+				NativeGPUData.DownSampleViews[i] = nullptr;
+				NativeGPUData.UpSampleViews[i] = nullptr;
+			}
+		}
+
+		virtual ~VulkanBloomMapGPUData() {}
+
+		virtual void* GetNativeData() override { return (void*)&NativeGPUData; }
+
+	public:
+
+		VulkanBloomMapNativeData NativeGPUData;
 	};
 
 

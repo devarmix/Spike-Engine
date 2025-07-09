@@ -20,7 +20,7 @@ namespace SpikeEditor {
 			SafeRenderResourceInit(m_GBuffer);
 
 			m_SceneViewport->ReleaseResource();
-		    m_SceneViewport->CreateResource(m_Width, m_Height, EFormatRGBA16SFloat, EUsageFlagColorAttachment | EUsageFlagTransferSrc | EUsageFlagSampled);
+		    m_SceneViewport->CreateResource(m_Width, m_Height, EFormatRGBA16SFloat, EUsageFlagStorage | EUsageFlagTransferSrc | EUsageFlagSampled);
 		}
 
 		Texture2DResource* outTexResource = m_SceneViewport->GetResource();
@@ -75,7 +75,7 @@ namespace SpikeEditor {
 			{
 				SceneLightProxy light{};
 
-				light.Intensity = 10;
+				light.Intensity = 30;
 				light.Color = { 0.9f, 0.2f, 1.0f, 1.0f };
 				light.Position = { -3.f, 0.f, -5.f, 0.f };
 				light.Type = 1;
@@ -163,7 +163,7 @@ namespace SpikeEditor {
 
 	void EditorLayer::OnAttach() {
 
-		m_SceneViewport = Texture2D::Create(1920, 1080, EFormatRGBA16SFloat, EUsageFlagColorAttachment | EUsageFlagTransferSrc | EUsageFlagSampled);
+		m_SceneViewport = Texture2D::Create(1920, 1080, EFormatRGBA16SFloat, EUsageFlagStorage | EUsageFlagTransferSrc | EUsageFlagSampled);
 
 		m_SkyboxTexture = CubeTexture::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/HDR/AmbienceExposure4k.hdr", 1024);
 		m_IrradianceTexture = CubeTexture::CreateFiltered(64, EFormatRGBA32SFloat, EUsageFlagTransferDst | EUsageFlagSampled, m_SkyboxTexture, EFilterIrradiance);

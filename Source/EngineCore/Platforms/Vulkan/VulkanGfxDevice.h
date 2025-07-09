@@ -164,6 +164,9 @@ namespace Spike {
 		virtual ResourceGPUData* CreateDepthMapGPUData(uint32_t width, uint32_t height, uint32_t depthPyramidSize) override;
 		virtual void DestroyDepthMapGPUData(ResourceGPUData* data) override;
 
+		virtual ResourceGPUData* CreateBloomMapGPUData(uint32_t width, uint32_t height) override;
+		virtual void DestroyBloomMapGPUData(ResourceGPUData* data) override;
+
 		virtual void SetMaterialScalarParameter(MaterialResource* material, uint8_t dataBindIndex, float newValue) override;
 		virtual void SetMaterialColorParameter(MaterialResource* material, uint8_t dataBindIndex, Vector4 newValue) override;
 		virtual void SetMaterialTextureParameter(MaterialResource* material, uint8_t dataBindIndex, Texture2DResource* newValue) override;
@@ -187,8 +190,11 @@ namespace Spike {
 
 		void ImmediateSubmit(std::function<void(VkCommandBuffer cmd)>&& func);
 
-		void CreateVulkanCubeTexture(uint32_t size, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanCubeTextureGPUData* outTexture);
-		void CreateVulkanTexture2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanTexture2DGPUData* outTexture);
+		void CreateVulkanCubeTexture(uint32_t size, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanCubeTextureNativeData* outTexture);
+		void DestroyVulkanCubeTexture(VulkanCubeTextureNativeData texture);
+
+		void CreateVulkanTexture2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanTextureNativeData* outTexture);
+		void DestroyVulkanTexture2D(VulkanTextureNativeData texture);
 
 		void InitPipelines();
 		void InitCommands();
@@ -206,12 +212,15 @@ namespace Spike {
 		void InitIrradianceGenPipeline();
 		void InitRadianceGenPipeline();
 		void InitBRDFLutPipeline();
+		void InitBloomDownSamplePipeline();
+		void InitBloomUpSamplePipeline();
 
 		void GBufferPass(SceneRenderProxy* scene, RenderContext context, VkDescriptorSet geometrySet);
 		void CullPass(SceneRenderProxy* scene, VkDescriptorSet geometrySet, bool prepass);
 		void GeometryDrawPass(SceneRenderProxy* scene, RenderContext context, VkDescriptorSet geometrySet, bool prepass);
 		void SkyboxPass(RenderContext context, VkDescriptorSet lightingSet);
 		void LightingPass(SceneRenderProxy* scene, RenderContext context, VkDescriptorSet lightingSet);
+		void BloomPass(RenderContext context);
 
 		void DrawImGui(VkCommandBuffer cmd, VkImageView targetImageView, bool clearSwapchain = true);
 
@@ -220,6 +229,7 @@ namespace Spike {
 		VulkanDevice m_Device;
 		VulkanSwapchain m_Swapchain;
 
+		VkSampler m_DefSamplerLinearClamped;
 		VkSampler m_DefSamplerLinear;
 		VkSampler m_DefSamplerNearest;
 
@@ -281,7 +291,6 @@ namespace Spike {
 			VkPipelineLayout PipelineLayout;
 			VkDescriptorSetLayout SetLayout;
 			VkSampler DepthPyramidSampler;
-
 		} m_DepthPyramidPipeline;
 
 		struct alignas(16) DepthReduceData {
@@ -296,7 +305,6 @@ namespace Spike {
 			VkPipelineLayout PipelineLayout;
 			VkDescriptorSetLayout SetLayout;
 			VkDescriptorSet Set;
-
 		} m_CubeTextureGenPipeline;
 
 		struct {
@@ -305,7 +313,6 @@ namespace Spike {
 			VkPipelineLayout PipelineLayout;
 			VkDescriptorSetLayout SetLayout;
 			VkDescriptorSet Set;
-
 		} m_IrradianceGenPipeline;
 
 		struct {
@@ -314,7 +321,6 @@ namespace Spike {
 			VkPipelineLayout PipelineLayout;
 			VkDescriptorSetLayout SetLayout;
 			VkDescriptorSet Set;
-
 		} m_RadianceGenPipeline;
 
 		struct alignas(16) CubeFilteringData {
@@ -322,6 +328,43 @@ namespace Spike {
 			glm::mat4 MVP;
 
 			float Roughness;
+			float pad0[3];
+		};
+
+		struct {
+
+			VkPipeline Pipeline;
+			VkPipelineLayout PipelineLayout;
+			VkDescriptorSetLayout SetLayout;
+		} m_BloomDownSamplePipeline;
+
+		struct alignas(16) BloomDownSampleData {
+
+			glm::vec2 SrcSize;
+			glm::vec2 OutSize;
+
+			uint32_t MipLevel;
+			float Threadshold;
+			float SoftThreadshold;
+
+			float pad0;
+		};
+
+		struct {
+
+			VkPipeline Pipeline;
+			VkPipelineLayout PipelineLayout;
+			VkDescriptorSetLayout SetLayout;
+		} m_BloomUpSamplePipeline;
+
+		struct alignas(16) BloomUpSampleData {
+
+			glm::vec2 OutSize;
+
+			uint32_t IsComposite;
+			float BloomIntensity;
+			float FilterRadius;
+
 			float pad0[3];
 		};
 

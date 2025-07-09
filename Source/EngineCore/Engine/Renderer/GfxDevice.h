@@ -22,7 +22,7 @@ namespace Spike {
 
 		GBufferResource(uint32_t width, uint32_t height) 
 			: m_AlbedoMapData(nullptr), m_MaterialMapData(nullptr), m_DepthMapData(nullptr),
-		      m_NormalMapData(nullptr), m_Width(width), m_Height(height) 
+		      m_NormalMapData(nullptr), m_BloomMapData(nullptr), m_Width(width), m_Height(height)
 		{
 			m_DepthPyramidSize = RoundUpToPowerOfTwo((float)glm::max(width, height));
 		}
@@ -37,6 +37,8 @@ namespace Spike {
 		ResourceGPUData* GetDepthMapData() { return m_DepthMapData; }
 		ResourceGPUData* GetNormalMapData() { return m_NormalMapData; }
 
+		ResourceGPUData* GetBloomMapData() { return m_BloomMapData; }
+
 		uint32_t GetWidth() const { return m_Width; }
 		uint32_t GetHeight() const { return m_Height; }
 
@@ -48,6 +50,8 @@ namespace Spike {
 		ResourceGPUData* m_MaterialMapData;
 		ResourceGPUData* m_DepthMapData;
 		ResourceGPUData* m_NormalMapData;
+
+		ResourceGPUData* m_BloomMapData;
 
 		uint32_t m_Width;
 		uint32_t m_Height;
@@ -139,6 +143,9 @@ namespace Spike {
 
 		virtual ResourceGPUData* CreateDepthMapGPUData(uint32_t width, uint32_t height, uint32_t depthPyramidSize) = 0;
 		virtual void DestroyDepthMapGPUData(ResourceGPUData* data) = 0;
+
+		virtual ResourceGPUData* CreateBloomMapGPUData(uint32_t width, uint32_t height) = 0;
+		virtual void DestroyBloomMapGPUData(ResourceGPUData* data) = 0;
 
 		virtual void SetMaterialScalarParameter(MaterialResource* material, uint8_t dataBindIndex, float newValue) = 0;
 		virtual void SetMaterialColorParameter(MaterialResource* material, uint8_t dataBindIndex, Vector4 newValue) = 0;

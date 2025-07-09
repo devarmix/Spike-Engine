@@ -92,6 +92,8 @@ namespace Spike {
 		InitIrradianceGenPipeline();
 		InitRadianceGenPipeline();
 		InitBRDFLutPipeline();
+		InitBloomDownSamplePipeline();
+		InitBloomUpSamplePipeline();
 	}
 
 	void VulkanGfxDevice::InitCommands() {
@@ -311,56 +313,46 @@ namespace Spike {
 		sampl.minFilter = VK_FILTER_LINEAR;
 
 		sampl.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		sampl.maxLod = 50;
+		sampl.maxLod = 16;
 
 		vkCreateSampler(m_Device.Device, &sampl, nullptr, &m_DefSamplerLinear);
+
+		sampl.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampl.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		sampl.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+		vkCreateSampler(m_Device.Device, &sampl, nullptr, &m_DefSamplerLinearClamped);
 
 		m_MainDeletionQueue.PushFunction([this]() {
 
 			vkDestroySampler(m_Device.Device, m_DefSamplerNearest, nullptr);
 			vkDestroySampler(m_Device.Device, m_DefSamplerLinear, nullptr);
+			vkDestroySampler(m_Device.Device, m_DefSamplerLinearClamped, nullptr);
 			});
 	}
 
 	void VulkanGfxDevice::InitSkyboxPipeline() {
 
-		// init pipeline
+		// init pipeline 
 		{
-			VkPushConstantRange matrixRange{};
-			matrixRange.offset = 0;
-			matrixRange.size = sizeof(SkyboxData);
-			matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-			VkDescriptorSetLayout layouts[] = { m_LightingSetLayout };
-
-			VkPipelineLayoutCreateInfo layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-			layout_Info.setLayoutCount = 1;
-			layout_Info.pSetLayouts = layouts;
-			layout_Info.pPushConstantRanges = &matrixRange;
-			layout_Info.pushConstantRangeCount = 1;
-
-			VK_CHECK(vkCreatePipelineLayout(m_Device.Device, &layout_Info, nullptr, &m_SkyboxPipeline.PipelineLayout));
-
 			VulkanShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/Skybox.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/Skybox.frag.spv");
 
-			PipelineBuilder pipelineBulder;
-			pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
-			pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-			pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
-			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-			pipelineBulder.SetMultisamplingNone();
+			VulkanTools::VulkanGraphicsPipelineInfo info{};
+			info.VertexModule = shader.VertexModule;
+			info.FragmentModule = shader.FragmentModule;
+			info.SetLayouts = &m_LightingSetLayout;
+			info.SetLayoutsCount = 1;
+			info.PushConstantSize = sizeof(SkyboxData);
+			info.PushConstantStage = VK_SHADER_STAGE_VERTEX_BIT;
 
-			VkFormat colorAttachmentFormat = VK_FORMAT_R16G16B16A16_SFLOAT;
+			VkFormat colorAttachmentFormats[1] = { VK_FORMAT_R16G16B16A16_SFLOAT };
+			info.ColorAttachmentFormats = colorAttachmentFormats;
+			info.ColorAttachmentCount = 1;
+			info.EnableDepthTest = true;
+			info.EnableDepthWrite = false;
+			info.DepthCompare = VK_COMPARE_OP_GREATER_OR_EQUAL;
 
-			pipelineBulder.SetColorAttachments(&colorAttachmentFormat, 1);
-			pipelineBulder.SetDepthFormat(VK_FORMAT_D32_SFLOAT);
-			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
-
-			pipelineBulder.PipelineLayout = m_SkyboxPipeline.PipelineLayout;
-			pipelineBulder.DisableBlending();
-			pipelineBulder.EnableDepthTest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-			m_SkyboxPipeline.Pipeline = pipelineBulder.BuildPipeline(m_Device.Device);
+			VulkanTools::CreateVulkanGraphicsPipeline(m_Device.Device, info, &m_SkyboxPipeline.Pipeline, &m_SkyboxPipeline.PipelineLayout);
 
 			shader.Destroy(&m_Device);
 		}
@@ -374,42 +366,23 @@ namespace Spike {
 
 	void VulkanGfxDevice::InitLightPipeline() {
 
-		// init pipeline
+		// init pipeline 
 		{
-			VkPushConstantRange matrixRange{};
-			matrixRange.offset = 0;
-			matrixRange.size = sizeof(LightingData); // scene data offset, lights offset, lights count
-			matrixRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-			VkDescriptorSetLayout layouts[] = { m_LightingSetLayout };
-
-			VkPipelineLayoutCreateInfo layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-			layout_Info.setLayoutCount = 1;
-			layout_Info.pSetLayouts = layouts;
-			layout_Info.pPushConstantRanges = &matrixRange;
-			layout_Info.pushConstantRangeCount = 1;
-
-			VK_CHECK(vkCreatePipelineLayout(m_Device.Device, &layout_Info, nullptr, &m_LightingPipeline.PipelineLayout));
-
 			VulkanShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/LightingPBR.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/LightingPBR.frag.spv");
 
-			PipelineBuilder pipelineBulder;
-			pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
-			pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-			pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
-			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-			pipelineBulder.SetMultisamplingNone();
+			VulkanTools::VulkanGraphicsPipelineInfo info{};
+			info.VertexModule = shader.VertexModule;
+			info.FragmentModule = shader.FragmentModule;
+			info.SetLayouts = &m_LightingSetLayout;
+			info.SetLayoutsCount = 1;
+			info.PushConstantSize = sizeof(LightingData);
+			info.PushConstantStage = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 			VkFormat colorAttachmentFormats[1] = { VK_FORMAT_R16G16B16A16_SFLOAT };
+			info.ColorAttachmentFormats = colorAttachmentFormats;
+			info.ColorAttachmentCount = 1;
 
-			pipelineBulder.SetColorAttachments(colorAttachmentFormats, 1);
-			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
-
-			pipelineBulder.PipelineLayout = m_LightingPipeline.PipelineLayout;
-			pipelineBulder.DisableBlending();
-			//pipelineBulder.EnableDepthTest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-			m_LightingPipeline.Pipeline = pipelineBulder.BuildPipeline(m_Device.Device);
+			VulkanTools::CreateVulkanGraphicsPipeline(m_Device.Device, info, &m_LightingPipeline.Pipeline, &m_LightingPipeline.PipelineLayout);
 
 			shader.Destroy(&m_Device);
 		}
@@ -431,33 +404,17 @@ namespace Spike {
 			m_DepthPyramidPipeline.SetLayout = builder.Build(m_Device.Device, VK_SHADER_STAGE_COMPUTE_BIT);
 		}
 
-		// init pipeline
+		// init pipeline 
 		{
-			VkPushConstantRange matrixRange{};
-			matrixRange.offset = 0;
-			matrixRange.size = sizeof(DepthReduceData); 
-			matrixRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-			VkDescriptorSetLayout layouts[] = { m_DepthPyramidPipeline.SetLayout };
-
-			VkPipelineLayoutCreateInfo layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-			layout_Info.setLayoutCount = 1;
-			layout_Info.pSetLayouts = layouts;
-			layout_Info.pPushConstantRanges = &matrixRange;
-			layout_Info.pushConstantRangeCount = 1;
-
-			VK_CHECK(vkCreatePipelineLayout(m_Device.Device, &layout_Info, nullptr, &m_DepthPyramidPipeline.PipelineLayout));
-
 			VulkanComputeShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/DepthPyramid.comp.spv");
 
-			VkPipelineShaderStageCreateInfo stageInfo = VulkanTools::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_COMPUTE_BIT, shader.ComputeModule);
+			VulkanTools::VulkanComputePipelineInfo info{};
+			info.ComputeModule = shader.ComputeModule;
+			info.SetLayouts = &m_DepthPyramidPipeline.SetLayout;
+			info.SetLayoutsCount = 1;
+			info.PushConstantSize = sizeof(DepthReduceData);
 
-			VkComputePipelineCreateInfo pipelineInfo = {};
-			pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-			pipelineInfo.stage = stageInfo;
-			pipelineInfo.layout = m_DepthPyramidPipeline.PipelineLayout;
-
-			VK_CHECK(vkCreateComputePipelines(m_Device.Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_DepthPyramidPipeline.Pipeline));
+			VulkanTools::CreateVulkanComputePipeline(m_Device.Device, info, &m_DepthPyramidPipeline.Pipeline, &m_DepthPyramidPipeline.PipelineLayout);
 
 			shader.Destroy(&m_Device);
 		}
@@ -494,33 +451,17 @@ namespace Spike {
 
 	void VulkanGfxDevice::InitCullPipeline() {
 
-		// init pipeline
+		// init pipeline 
 		{
-			VkPushConstantRange matrixRange{};
-			matrixRange.offset = 0;
-			matrixRange.size = sizeof(CullPushData);
-			matrixRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-			VkDescriptorSetLayout layouts[] = { m_GeometrySetLayout };
-
-			VkPipelineLayoutCreateInfo layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-			layout_Info.setLayoutCount = 1;
-			layout_Info.pSetLayouts = layouts;
-			layout_Info.pPushConstantRanges = &matrixRange;
-			layout_Info.pushConstantRangeCount = 1;
-
-			VK_CHECK(vkCreatePipelineLayout(m_Device.Device, &layout_Info, nullptr, &m_CullPipeline.PipelineLayout));
-
 			VulkanComputeShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/IndirectCull.comp.spv");
 
-			VkPipelineShaderStageCreateInfo stageInfo = VulkanTools::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_COMPUTE_BIT, shader.ComputeModule);
+			VulkanTools::VulkanComputePipelineInfo info{};
+			info.ComputeModule = shader.ComputeModule;
+			info.SetLayouts = &m_GeometrySetLayout;
+			info.SetLayoutsCount = 1;
+			info.PushConstantSize = sizeof(CullPushData);
 
-			VkComputePipelineCreateInfo pipelineInfo = {};
-			pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-			pipelineInfo.stage = stageInfo;
-			pipelineInfo.layout = m_CullPipeline.PipelineLayout;
-
-			VK_CHECK(vkCreateComputePipelines(m_Device.Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_CullPipeline.Pipeline));
+			VulkanTools::CreateVulkanComputePipeline(m_Device.Device, info, &m_CullPipeline.Pipeline, &m_CullPipeline.PipelineLayout);
 
 			shader.Destroy(&m_Device);
 		}
@@ -542,28 +483,16 @@ namespace Spike {
 			m_CubeTextureGenPipeline.SetLayout = builder.Build(m_Device.Device, VK_SHADER_STAGE_COMPUTE_BIT);
 		}
 
-		// init pipeline
+		// init pipeline 
 		{
-			VkDescriptorSetLayout layouts[] = { m_CubeTextureGenPipeline.SetLayout };
-
-			VkPipelineLayoutCreateInfo layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-			layout_Info.setLayoutCount = 1;
-			layout_Info.pSetLayouts = layouts;
-			layout_Info.pPushConstantRanges = nullptr;
-			layout_Info.pushConstantRangeCount = 0;
-
-			VK_CHECK(vkCreatePipelineLayout(m_Device.Device, &layout_Info, nullptr, &m_CubeTextureGenPipeline.PipelineLayout));
-
 			VulkanComputeShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/CubeMapGen.comp.spv");
 
-			VkPipelineShaderStageCreateInfo stageInfo = VulkanTools::PipelineShaderStageCreateInfo(VK_SHADER_STAGE_COMPUTE_BIT, shader.ComputeModule);
+			VulkanTools::VulkanComputePipelineInfo info{};
+			info.ComputeModule = shader.ComputeModule;
+			info.SetLayouts = &m_CubeTextureGenPipeline.SetLayout;
+			info.SetLayoutsCount = 1;
 
-			VkComputePipelineCreateInfo pipelineInfo = {};
-			pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-			pipelineInfo.stage = stageInfo;
-			pipelineInfo.layout = m_CubeTextureGenPipeline.PipelineLayout;
-
-			VK_CHECK(vkCreateComputePipelines(m_Device.Device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_CubeTextureGenPipeline.Pipeline));
+			VulkanTools::CreateVulkanComputePipeline(m_Device.Device, info, &m_CubeTextureGenPipeline.Pipeline, &m_CubeTextureGenPipeline.PipelineLayout);
 
 			shader.Destroy(&m_Device);
 		}
@@ -591,42 +520,22 @@ namespace Spike {
 			m_IrradianceGenPipeline.SetLayout = builder.Build(m_Device.Device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 		}
 
-		// init pipeline
+		// init pipeline 
 		{
-			VkPushConstantRange matrixRange{};
-			matrixRange.offset = 0;
-			matrixRange.size = sizeof(CubeFilteringData);
-			matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-			VkDescriptorSetLayout layouts[] = { m_IrradianceGenPipeline.SetLayout };
-
-			VkPipelineLayoutCreateInfo layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-			layout_Info.setLayoutCount = 1;
-			layout_Info.pSetLayouts = layouts;
-			layout_Info.pPushConstantRanges = &matrixRange;
-			layout_Info.pushConstantRangeCount = 1;
-
-			VK_CHECK(vkCreatePipelineLayout(m_Device.Device, &layout_Info, nullptr, &m_IrradianceGenPipeline.PipelineLayout));
-
 			VulkanShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/CubeMap.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/IrradianceMap.frag.spv");
 
-			PipelineBuilder pipelineBulder;
-			pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
-			pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-			pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
-			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-			pipelineBulder.SetMultisamplingNone();
+			VulkanTools::VulkanGraphicsPipelineInfo info{};
+			info.VertexModule = shader.VertexModule;
+			info.FragmentModule = shader.FragmentModule;
+			info.SetLayouts = &m_IrradianceGenPipeline.SetLayout;
+			info.SetLayoutsCount = 1;
+			info.PushConstantSize = sizeof(CubeFilteringData);
 
 			VkFormat colorAttachmentFormats[1] = { VK_FORMAT_R32G32B32A32_SFLOAT };
+			info.ColorAttachmentFormats = colorAttachmentFormats;
+			info.ColorAttachmentCount = 1;
 
-			pipelineBulder.SetColorAttachments(colorAttachmentFormats, 1);
-			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
-
-			pipelineBulder.PipelineLayout = m_IrradianceGenPipeline.PipelineLayout;
-			pipelineBulder.DisableBlending();
-			//pipelineBulder.EnableDepthTest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-			m_IrradianceGenPipeline.Pipeline = pipelineBulder.BuildPipeline(m_Device.Device);
+			VulkanTools::CreateVulkanGraphicsPipeline(m_Device.Device, info, &m_IrradianceGenPipeline.Pipeline, &m_IrradianceGenPipeline.PipelineLayout);
 
 			shader.Destroy(&m_Device);
 		}
@@ -653,42 +562,22 @@ namespace Spike {
 			m_RadianceGenPipeline.SetLayout = builder.Build(m_Device.Device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 		}
 
-		// init pipeline
+		// init pipeline 
 		{
-			VkPushConstantRange matrixRange{};
-			matrixRange.offset = 0;
-			matrixRange.size = sizeof(CubeFilteringData); 
-			matrixRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-			VkDescriptorSetLayout layouts[] = { m_RadianceGenPipeline.SetLayout };
-
-			VkPipelineLayoutCreateInfo layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-			layout_Info.setLayoutCount = 1;
-			layout_Info.pSetLayouts = layouts;
-			layout_Info.pPushConstantRanges = &matrixRange;
-			layout_Info.pushConstantRangeCount = 1;
-
-			VK_CHECK(vkCreatePipelineLayout(m_Device.Device, &layout_Info, nullptr, &m_RadianceGenPipeline.PipelineLayout));
-
 			VulkanShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/CubeMap.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/EnvironmentMap.frag.spv");
 
-			PipelineBuilder pipelineBulder;
-			pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
-			pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-			pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
-			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-			pipelineBulder.SetMultisamplingNone();
+			VulkanTools::VulkanGraphicsPipelineInfo info{};
+			info.VertexModule = shader.VertexModule;
+			info.FragmentModule = shader.FragmentModule;
+			info.SetLayouts = &m_RadianceGenPipeline.SetLayout;
+			info.SetLayoutsCount = 1;
+			info.PushConstantSize = sizeof(CubeFilteringData);
 
 			VkFormat colorAttachmentFormats[1] = { VK_FORMAT_R32G32B32A32_SFLOAT };
+			info.ColorAttachmentFormats = colorAttachmentFormats;
+			info.ColorAttachmentCount = 1;
 
-			pipelineBulder.SetColorAttachments(colorAttachmentFormats, 1);
-			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
-
-			pipelineBulder.PipelineLayout = m_RadianceGenPipeline.PipelineLayout;
-			pipelineBulder.DisableBlending();
-			//pipelineBulder.EnableDepthTest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-			m_RadianceGenPipeline.Pipeline = pipelineBulder.BuildPipeline(m_Device.Device);
+			VulkanTools::CreateVulkanGraphicsPipeline(m_Device.Device, info, &m_RadianceGenPipeline.Pipeline, &m_RadianceGenPipeline.PipelineLayout);
 
 			shader.Destroy(&m_Device);
 		}
@@ -708,35 +597,19 @@ namespace Spike {
 
 	void VulkanGfxDevice::InitBRDFLutPipeline() {
 
-		// init pipeline
+		// init pipeline 
 		{
-			VkPipelineLayoutCreateInfo layout_Info = VulkanTools::PipelineLayoutCreateInfo();
-			layout_Info.setLayoutCount = 0;
-			layout_Info.pSetLayouts = nullptr;
-			layout_Info.pPushConstantRanges = nullptr;
-			layout_Info.pushConstantRangeCount = 0;
-
-			VK_CHECK(vkCreatePipelineLayout(m_Device.Device, &layout_Info, nullptr, &m_BRDFLutPipeline.PipelineLayout));
-
 			VulkanShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/BRDFLut.vert.spv", "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/BRDFLut.frag.spv");
 
-			PipelineBuilder pipelineBulder;
-			pipelineBulder.SetShaders(shader.VertexModule, shader.FragmentModule);
-			pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-			pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
-			pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
-			pipelineBulder.SetMultisamplingNone();
+			VulkanTools::VulkanGraphicsPipelineInfo info{};
+			info.VertexModule = shader.VertexModule;
+			info.FragmentModule = shader.FragmentModule;
 
 			VkFormat colorAttachmentFormats[1] = { VK_FORMAT_R16G16_SFLOAT };
+			info.ColorAttachmentFormats = colorAttachmentFormats;
+			info.ColorAttachmentCount = 1;
 
-			pipelineBulder.SetColorAttachments(colorAttachmentFormats, 1);
-			//pipelineBulder.SetDepthFormat(VulkanRenderer::GBuffer.DepthMap->GetRawData()->Format);
-
-			pipelineBulder.PipelineLayout = m_BRDFLutPipeline.PipelineLayout;
-			pipelineBulder.DisableBlending();
-			//pipelineBulder.EnableDepthTest(false, VK_COMPARE_OP_GREATER_OR_EQUAL);
-
-			m_BRDFLutPipeline.Pipeline = pipelineBulder.BuildPipeline(m_Device.Device);
+			VulkanTools::CreateVulkanGraphicsPipeline(m_Device.Device, info, &m_BRDFLutPipeline.Pipeline, &m_BRDFLutPipeline.PipelineLayout);
 
 			shader.Destroy(&m_Device);
 		}
@@ -753,7 +626,7 @@ namespace Spike {
 		static constexpr uint32_t BRDF_LUT_SIZE = 256;
 
 		m_BRDFLutTexture = new VulkanTexture2DGPUData();
-		CreateVulkanTexture2D(BRDF_LUT_SIZE, BRDF_LUT_SIZE, VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, m_BRDFLutTexture);
+		CreateVulkanTexture2D(BRDF_LUT_SIZE, BRDF_LUT_SIZE, VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, &m_BRDFLutTexture->NativeGPUData);
 
 		ImmediateSubmit([&](VkCommandBuffer cmd) {
 
@@ -792,7 +665,74 @@ namespace Spike {
 			});
 	}
 
-	void VulkanGfxDevice::CreateVulkanTexture2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanTexture2DGPUData* outTexture) {
+	void VulkanGfxDevice::InitBloomDownSamplePipeline() {
+
+		// create desc set layout
+		{
+			DescriptorLayoutBuilder builder;
+			builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);           // sampler image
+			builder.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);                    // dest image
+			m_BloomDownSamplePipeline.SetLayout = builder.Build(m_Device.Device, VK_SHADER_STAGE_COMPUTE_BIT);
+		}
+
+		// init pipeline 
+		{
+			VulkanComputeShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/BloomDownSample.comp.spv");
+
+			VulkanTools::VulkanComputePipelineInfo info{};
+			info.ComputeModule = shader.ComputeModule;
+			info.SetLayouts = &m_BloomDownSamplePipeline.SetLayout;
+			info.SetLayoutsCount = 1;
+			info.PushConstantSize = sizeof(BloomDownSampleData);
+
+			VulkanTools::CreateVulkanComputePipeline(m_Device.Device, info, &m_BloomDownSamplePipeline.Pipeline, &m_BloomDownSamplePipeline.PipelineLayout);
+
+			shader.Destroy(&m_Device);
+		}
+
+		m_MainDeletionQueue.PushFunction([this]() {
+
+			vkDestroyPipelineLayout(m_Device.Device, m_BloomDownSamplePipeline.PipelineLayout, nullptr);
+			vkDestroyPipeline(m_Device.Device, m_BloomDownSamplePipeline.Pipeline, nullptr);
+			vkDestroyDescriptorSetLayout(m_Device.Device, m_BloomDownSamplePipeline.SetLayout, nullptr);
+			});
+	}
+
+	void VulkanGfxDevice::InitBloomUpSamplePipeline() {
+
+		// create desc set layout
+		{
+			DescriptorLayoutBuilder builder;
+			builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);           // sampler image a
+			builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);           // sampler image b
+			builder.AddBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);                    // dest image
+			m_BloomUpSamplePipeline.SetLayout = builder.Build(m_Device.Device, VK_SHADER_STAGE_COMPUTE_BIT);
+		}
+
+		// init pipeline 
+		{
+			VulkanComputeShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/BloomUpSample.comp.spv");
+
+			VulkanTools::VulkanComputePipelineInfo info{};
+			info.ComputeModule = shader.ComputeModule;
+			info.SetLayouts = &m_BloomUpSamplePipeline.SetLayout;
+			info.SetLayoutsCount = 1;
+			info.PushConstantSize = sizeof(BloomUpSampleData);
+
+			VulkanTools::CreateVulkanComputePipeline(m_Device.Device, info, &m_BloomUpSamplePipeline.Pipeline, &m_BloomUpSamplePipeline.PipelineLayout);
+
+			shader.Destroy(&m_Device);
+		}
+
+		m_MainDeletionQueue.PushFunction([this]() {
+
+			vkDestroyPipelineLayout(m_Device.Device, m_BloomUpSamplePipeline.PipelineLayout, nullptr);
+			vkDestroyPipeline(m_Device.Device, m_BloomUpSamplePipeline.Pipeline, nullptr);
+			vkDestroyDescriptorSetLayout(m_Device.Device, m_BloomUpSamplePipeline.SetLayout, nullptr);
+			});
+	}
+
+	void VulkanGfxDevice::CreateVulkanTexture2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanTextureNativeData* outTexture) {
 
 		VkImageCreateInfo img_info = VulkanTools::ImageCreateInfo(format, usageFlags, {width, height, 1});
 		img_info.mipLevels = numMips;
@@ -802,15 +742,30 @@ namespace Spike {
 		allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		// allocate and create the image
-		VK_CHECK(vmaCreateImage(m_Device.Allocator, &img_info, &allocinfo, &outTexture->NativeGPUData.Image, &outTexture->NativeGPUData.Allocation, nullptr));
+		VK_CHECK(vmaCreateImage(m_Device.Allocator, &img_info, &allocinfo, &outTexture->Image, &outTexture->Allocation, nullptr));
 
 		VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
+		if (format == VK_FORMAT_D32_SFLOAT)
+			aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
 
 		// build a image-view for the image
-		VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(format, outTexture->NativeGPUData.Image, aspectFlag);
+		VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(format, outTexture->Image, aspectFlag);
 		view_info.subresourceRange.levelCount = img_info.mipLevels;
 
-		VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &outTexture->NativeGPUData.View));
+		VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &outTexture->View));
+	}
+
+	void VulkanGfxDevice::DestroyVulkanTexture2D(VulkanTextureNativeData texture) {
+
+		if (texture.View) {
+
+			vkDestroyImageView(m_Device.Device, texture.View, nullptr);
+		}
+
+		if (texture.Image) {
+
+			vmaDestroyImage(m_Device.Allocator, texture.Image, texture.Allocation);
+		}
 	}
 
 	ResourceGPUData* VulkanGfxDevice::CreateTexture2DGPUData(uint32_t width, uint32_t height, ETextureFormat format, ETextureUsageFlags usageFlags, bool mipmap, void* pixelData) {
@@ -822,9 +777,9 @@ namespace Spike {
 
 		uint32_t numMips = 1;
 		if (mipmap)
-			numMips = uint32_t(std::floor(std::log2(std::max(width, height)))) + 1;
+			numMips = VulkanTools::GetNumMips(width, height);
 
-		CreateVulkanTexture2D(width, height, vFormat, vUsageFlags, numMips, texData);
+		CreateVulkanTexture2D(width, height, vFormat, vUsageFlags, numMips, &texData->NativeGPUData);
 
 		// populate texture with pixel data
 		if (pixelData) {
@@ -881,21 +836,13 @@ namespace Spike {
 
 			VulkanTextureNativeData* nativeData = (VulkanTextureNativeData*)data->GetNativeData();
 
-			if (nativeData->View != VK_NULL_HANDLE) {
-
-				vkDestroyImageView(m_Device.Device, nativeData->View, nullptr);
-			}
-
-			if (nativeData->Image != VK_NULL_HANDLE) {
-
-				vmaDestroyImage(m_Device.Allocator, nativeData->Image, nativeData->Allocation);
-			}
+			DestroyVulkanTexture2D(*nativeData);
 
 			delete data;
 			});
 	}
 
-	void VulkanGfxDevice::CreateVulkanCubeTexture(uint32_t size, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanCubeTextureGPUData* outTexture) {
+	void VulkanGfxDevice::CreateVulkanCubeTexture(uint32_t size, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanCubeTextureNativeData* outTexture) {
 
 		VkImageCreateInfo img_info = VulkanTools::CubeImageCreateInfo(format, usageFlags, size);
 		img_info.mipLevels = numMips;
@@ -905,15 +852,28 @@ namespace Spike {
 		allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
 		// allocate and create the image
-		VK_CHECK(vmaCreateImage(m_Device.Allocator, &img_info, &allocinfo, &outTexture->NativeGPUData.Image, &outTexture->NativeGPUData.Allocation, nullptr));
+		VK_CHECK(vmaCreateImage(m_Device.Allocator, &img_info, &allocinfo, &outTexture->Image, &outTexture->Allocation, nullptr));
 
 		VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
 
 		// build a image-view for the image
-		VkImageViewCreateInfo view_info = VulkanTools::CubeImageviewCreateInfo(format, outTexture->NativeGPUData.Image, aspectFlag);
+		VkImageViewCreateInfo view_info = VulkanTools::CubeImageviewCreateInfo(format, outTexture->Image, aspectFlag);
 		view_info.subresourceRange.levelCount = img_info.mipLevels;
 
-		VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &outTexture->NativeGPUData.View));
+		VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &outTexture->View));
+	}
+
+	void VulkanGfxDevice::DestroyVulkanCubeTexture(VulkanCubeTextureNativeData texture) {
+
+		if (texture.View) {
+
+			vkDestroyImageView(m_Device.Device, texture.View, nullptr);
+		}
+
+		if (texture.Image) {
+
+			vmaDestroyImage(m_Device.Allocator, texture.Image, texture.Allocation);
+		}
 	}
 
 	ResourceGPUData* VulkanGfxDevice::CreateCubeTextureGPUData(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, TextureResource* samplerTexture) {
@@ -923,7 +883,7 @@ namespace Spike {
 		VkFormat vFormat = VulkanTools::TextureFormatToVulkan(format);
 		VkImageUsageFlags vUsageFlags = VulkanTools::TextureUsageFlagsToVulkan(usageFlags);
 
-		CreateVulkanCubeTexture(size, vFormat, vUsageFlags, 1, texData);
+		CreateVulkanCubeTexture(size, vFormat, vUsageFlags, 1, &texData->NativeGPUData);
 		VulkanTextureNativeData* samplerNativeData = (VulkanTextureNativeData*)samplerTexture->GetGPUData()->GetNativeData();
 
 		ImmediateSubmit([&](VkCommandBuffer cmd) {
@@ -964,16 +924,16 @@ namespace Spike {
 
 		uint32_t numMips = 1;
 		if (filterMode == EFilterRadiance)
-		    numMips = uint32_t(std::floor(std::log2(size))) + 1;
+		    numMips = VulkanTools::GetNumMips(size, size);
 
-		CreateVulkanCubeTexture(size, vFormat, vUsageFlags, numMips, texData);
+		CreateVulkanCubeTexture(size, vFormat, vUsageFlags, numMips, &texData->NativeGPUData);
 		VulkanCubeTextureNativeData* samplerNativeData = (VulkanCubeTextureNativeData*)samplerTexture->GetGPUData()->GetNativeData();
 
 		//ResourceGPUData* offscreen = CreateTexture2DGPUData(size, size, format, EUsageFlagColorAttachment | EUsageFlagTransferSrc, false, nullptr);
 		//VulkanTextureNativeData* offscreenData = (VulkanTextureNativeData*)offscreen->GetNativeData();
 
 		VulkanTexture2DGPUData* offscreen = new VulkanTexture2DGPUData();
-		CreateVulkanTexture2D(size, size, vFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, 1, offscreen);
+		CreateVulkanTexture2D(size, size, vFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, 1, &offscreen->NativeGPUData);
 
 		std::array<glm::mat4, 6> matrices = {
 
@@ -1107,15 +1067,7 @@ namespace Spike {
 
 			VulkanCubeTextureNativeData* nativeData = (VulkanCubeTextureNativeData*)data->GetNativeData();
 
-			if (nativeData->View != VK_NULL_HANDLE) {
-
-				vkDestroyImageView(m_Device.Device, nativeData->View, nullptr);
-			}
-
-			if (nativeData->Image != VK_NULL_HANDLE) {
-
-				vmaDestroyImage(m_Device.Allocator, nativeData->Image, nativeData->Allocation);
-			}
+			DestroyVulkanCubeTexture(*nativeData);
 
 			delete data;
 			});
@@ -1255,74 +1207,21 @@ namespace Spike {
 	ResourceGPUData* VulkanGfxDevice::CreateDepthMapGPUData(uint32_t width, uint32_t height, uint32_t depthPyramidSize) {
 
 		VulkanDepthMapGPUData* mapData = new VulkanDepthMapGPUData();
-		uint32_t numMips  = uint32_t(std::floor(std::log2(std::max(width, height)))) + 1;
 
-		VkExtent3D size {
+		CreateVulkanTexture2D(width, height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, &mapData->NativeGPUData.Depth);
 
-			width,
-			height,
-			1
-		};
+		uint32_t numPyramidMips = VulkanTools::GetNumMips(depthPyramidSize, depthPyramidSize);
+		CreateVulkanTexture2D(depthPyramidSize, depthPyramidSize, VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, numPyramidMips, &mapData->NativeGPUData.Pyramid);
 
-		// generate main depth image and view
+		// generate depth pyramid views
 		{
-			VkImageCreateInfo img_info = VulkanTools::ImageCreateInfo(VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, size);
-			img_info.mipLevels = numMips;
-
-			VmaAllocationCreateInfo allocinfo = {};
-			allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-			allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-			// allocate and create the image
-			VK_CHECK(vmaCreateImage(m_Device.Allocator, &img_info, &allocinfo, &mapData->NativeGPUData.Image, &mapData->NativeGPUData.Allocation, nullptr));
-
-			VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_DEPTH_BIT;
-
-			// build a image-view for the image
-			VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(VK_FORMAT_D32_SFLOAT, mapData->NativeGPUData.Image, aspectFlag);
-			view_info.subresourceRange.levelCount = numMips;
-
-			VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &mapData->NativeGPUData.View));
-		}
-
-		// generate depth pyramid image and views
-		{
-			VkExtent3D pyramidSize {
-
-				depthPyramidSize,
-				depthPyramidSize,
-				1
-			};
-
-			//uint32_t numPyramidMips = uint32_t(std::floor(std::log2(depthPyramidSize))) + 1;
-			uint32_t numPyramidMips = uint32_t(glm::log2(float(depthPyramidSize))) + 1;
-
-			VkImageCreateInfo img_info = VulkanTools::ImageCreateInfo(VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, pyramidSize);
-			img_info.mipLevels = numPyramidMips;
-
-			VmaAllocationCreateInfo allocinfo = {};
-			allocinfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
-			allocinfo.requiredFlags = VkMemoryPropertyFlags(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-			// allocate and create the image
-			VK_CHECK(vmaCreateImage(m_Device.Allocator, &img_info, &allocinfo, &mapData->NativeGPUData.DepthPyramid.Image, &mapData->NativeGPUData.DepthPyramid.Allocation, nullptr));
-
-			VkImageAspectFlags aspectFlag = VK_IMAGE_ASPECT_COLOR_BIT;
-
-			// build a image-view for the image
-			VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(VK_FORMAT_R32_SFLOAT, mapData->NativeGPUData.DepthPyramid.Image, aspectFlag);
-			view_info.subresourceRange.levelCount = numPyramidMips;
-
-			VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &mapData->NativeGPUData.DepthPyramid.View));
-
-			// build image views for pyramid
 			for (uint32_t i = 0; i < numPyramidMips; i++) {
 
-				VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(VK_FORMAT_R32_SFLOAT, mapData->NativeGPUData.DepthPyramid.Image, aspectFlag);
+				VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(VK_FORMAT_R32_SFLOAT, mapData->NativeGPUData.Pyramid.Image, VK_IMAGE_ASPECT_COLOR_BIT);
 				view_info.subresourceRange.levelCount = 1;
 				view_info.subresourceRange.baseMipLevel = i;
 
-				VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &mapData->NativeGPUData.DepthPyramid.ViewMips[i]));
+				VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &mapData->NativeGPUData.PyramidViews[i]));
 			}
 		}
 
@@ -1335,33 +1234,89 @@ namespace Spike {
 
 			VulkanDepthMapNativeData* nativeData = (VulkanDepthMapNativeData*)data->GetNativeData();
 
-			if (nativeData->View) {
-
-				vkDestroyImageView(m_Device.Device, nativeData->View, nullptr);
-			}
-
-			if (nativeData->Image) {
-
-				vmaDestroyImage(m_Device.Allocator, nativeData->Image, nativeData->Allocation);
-			}
-
-			if (nativeData->DepthPyramid.View) {
-
-				vkDestroyImageView(m_Device.Device, nativeData->DepthPyramid.View, nullptr);
-			}
+			DestroyVulkanTexture2D(nativeData->Depth);
 
 			for (int i = 0; i < 16; i++) {
 
-				if (nativeData->DepthPyramid.ViewMips[i]) {
+				if (nativeData->PyramidViews[i]) {
 
-					vkDestroyImageView(m_Device.Device, nativeData->DepthPyramid.ViewMips[i], nullptr);
+					vkDestroyImageView(m_Device.Device, nativeData->PyramidViews[i], nullptr);
 				}
 			}
 
-			if (nativeData->DepthPyramid.Image) {
+			DestroyVulkanTexture2D(nativeData->Pyramid);
 
-				vmaDestroyImage(m_Device.Allocator, nativeData->DepthPyramid.Image, nativeData->DepthPyramid.Allocation);
+			delete data;
+			});
+	}
+
+	ResourceGPUData* VulkanGfxDevice::CreateBloomMapGPUData(uint32_t width, uint32_t height) {
+
+		VulkanBloomMapGPUData* mapData = new VulkanBloomMapGPUData();
+
+		CreateVulkanTexture2D(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, &mapData->NativeGPUData.BloomComposite);
+
+		uint32_t sampleWidth = width >> 1;
+		uint32_t sampleHeight = height >> 1;
+
+		uint32_t numSampleMips = VulkanTools::GetNumMips(sampleWidth, sampleHeight);
+
+		CreateVulkanTexture2D(sampleWidth, sampleHeight, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, numSampleMips, &mapData->NativeGPUData.BloomDownSample);
+		CreateVulkanTexture2D(sampleWidth, sampleHeight, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, numSampleMips - 1, &mapData->NativeGPUData.BloomUpSample);
+
+		// create down / up sample views
+		{
+			for (int i = 0; i < numSampleMips; i++) {
+
+				// downsample view
+				{
+					VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(VK_FORMAT_R16G16B16A16_SFLOAT, mapData->NativeGPUData.BloomDownSample.Image, VK_IMAGE_ASPECT_COLOR_BIT);
+					view_info.subresourceRange.levelCount = 1;
+					view_info.subresourceRange.baseMipLevel = i;
+
+					VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &mapData->NativeGPUData.DownSampleViews[i]));
+				}
+
+				// upsample view
+				{
+					if (i < numSampleMips - 1) {
+
+						VkImageViewCreateInfo view_info = VulkanTools::ImageviewCreateInfo(VK_FORMAT_R16G16B16A16_SFLOAT, mapData->NativeGPUData.BloomUpSample.Image, VK_IMAGE_ASPECT_COLOR_BIT);
+						view_info.subresourceRange.levelCount = 1;
+						view_info.subresourceRange.baseMipLevel = i;
+
+						VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &mapData->NativeGPUData.UpSampleViews[i]));
+					}
+				}
 			}
+		}
+
+		return mapData;
+	}
+
+	void VulkanGfxDevice::DestroyBloomMapGPUData(ResourceGPUData* data) {
+
+		GetCurrentFrame().ExecutionQueue.PushFunction([=, this]() {
+
+			VulkanBloomMapNativeData* nativeData = (VulkanBloomMapNativeData*)data->GetNativeData();
+
+			DestroyVulkanTexture2D(nativeData->BloomComposite);
+
+			for (int i = 0; i < 16; i++) {
+
+				if (nativeData->DownSampleViews[i]) {
+
+					vkDestroyImageView(m_Device.Device, nativeData->DownSampleViews[i], nullptr);
+				}
+
+				if (nativeData->UpSampleViews[i]) {
+
+					vkDestroyImageView(m_Device.Device, nativeData->UpSampleViews[i], nullptr);
+				}
+			}
+
+			DestroyVulkanTexture2D(nativeData->BloomDownSample);
+			DestroyVulkanTexture2D(nativeData->BloomUpSample);
 
 			delete data;
 			});
@@ -1524,6 +1479,7 @@ namespace Spike {
 		GBufferPass(scene, renderContext, geometrySet);
 		LightingPass(scene, renderContext, lightingSet);
 		SkyboxPass(renderContext, lightingSet);
+		BloomPass(renderContext);
 
 		// update offsets
 		frame.SceneDataBufferOffset++;
@@ -1614,7 +1570,7 @@ namespace Spike {
 		VkClearValue depthClear = { .depthStencil = {0.0f, 0} };
 		VkClearValue colorClear = { .color = {0.0f, 0.0f, 0.0f, 1.0f} };
 
-		VkRenderingAttachmentInfo depthAttachment = VulkanTools::DepthAttachmentInfo(depthNativeData->View, prepass ? &depthClear : nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+		VkRenderingAttachmentInfo depthAttachment = VulkanTools::DepthAttachmentInfo(depthNativeData->Depth.View, prepass ? &depthClear : nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
 		std::array<VkRenderingAttachmentInfo, 3> colorAttachments{};
 		colorAttachments[0] = VulkanTools::AttachmentInfo(albedoMapNativeData->View, prepass ? &colorClear : nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
@@ -1784,8 +1740,8 @@ namespace Spike {
 			writer.WriteBuffer(3, frame.SceneObjectMetaBuffer.Buffer, scene->Objects.size() * sizeof(SceneObjectMetadata), frame.SceneObjectFirstIndex * sizeof(SceneObjectMetadata), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 			writer.WriteBuffer(4, frame.BatchOffsetsBuffer.Buffer, m_DrawBatchIDCounter * sizeof(uint32_t), frame.SceneBatchOffsetFirstIndex * sizeof(uint32_t), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 
-			VulkanTools::TransitionImage(cmd, depthNativeData->DepthPyramid.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			writer.WriteImage(5, depthNativeData->DepthPyramid.View, m_DepthPyramidPipeline.DepthPyramidSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			VulkanTools::TransitionImage(cmd, depthNativeData->Pyramid.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			writer.WriteImage(5, depthNativeData->Pyramid.View, m_DepthPyramidPipeline.DepthPyramidSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 
 			writer.WriteBuffer(6, frame.CullDataBuffer.Buffer, sizeof(CullData), frame.SceneCullDataFirstIndex * sizeof(CullData), VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 			writer.WriteBuffer(7, frame.VisibilityBuffer.Buffer, scene->Objects.size() * sizeof(uint32_t), frame.SceneVisibilityBufferFirstIndex * sizeof(uint32_t), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
@@ -1804,20 +1760,21 @@ namespace Spike {
 			VulkanTools::TransitionImage(cmd, albedoMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 			VulkanTools::TransitionImage(cmd, normalMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 			VulkanTools::TransitionImage(cmd, materialMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
-			VulkanTools::TransitionImage(cmd, depthNativeData->Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+			VulkanTools::TransitionImage(cmd, depthNativeData->Depth.Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
 			GeometryDrawPass(scene, context, geometrySet, true);
 		}
 
 		// generate depth pyramid
 		{
-			VulkanTools::TransitionImage(cmd, depthNativeData->Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			VulkanTools::TransitionImage(cmd, depthNativeData->DepthPyramid.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+			VulkanTools::TransitionImage(cmd, depthNativeData->Depth.Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			VulkanTools::TransitionImage(cmd, depthNativeData->Pyramid.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
 
 			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_DepthPyramidPipeline.Pipeline);
 
-			//uint32_t numMips = uint32_t(std::floor(std::log2(gBuffer->GetPyramidSize()))) + 1;
-			uint32_t numMips = uint32_t(glm::log2(float(gBuffer->GetPyramidSize()))) + 1;;
+			uint32_t pyramidSize = gBuffer->GetPyramidSize();
+			uint32_t numMips = VulkanTools::GetNumMips(pyramidSize, pyramidSize);
+
 			for (uint32_t i = 0; i < numMips; i++) {
 
 				VkDescriptorSet depthSet = frame.FrameAllocator.Allocate(m_Device.Device, m_DepthPyramidPipeline.SetLayout);
@@ -1825,15 +1782,15 @@ namespace Spike {
 				// write set
 				{
 					DescriptorWriter writer;
-					writer.WriteImage(0, depthNativeData->DepthPyramid.ViewMips[i], m_DepthPyramidPipeline.DepthPyramidSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+					writer.WriteImage(0, depthNativeData->PyramidViews[i], m_DepthPyramidPipeline.DepthPyramidSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
 
 					if (i == 0) {
 
-						writer.WriteImage(1, depthNativeData->View, m_DepthPyramidPipeline.DepthPyramidSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+						writer.WriteImage(1, depthNativeData->Depth.View, m_DepthPyramidPipeline.DepthPyramidSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 					}
 					else {
 
-						writer.WriteImage(1, depthNativeData->DepthPyramid.ViewMips[i - 1], m_DepthPyramidPipeline.DepthPyramidSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+						writer.WriteImage(1, depthNativeData->PyramidViews[i - 1], m_DepthPyramidPipeline.DepthPyramidSampler, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 					}
 
 					writer.UpdateSet(m_Device.Device, depthSet);
@@ -1841,19 +1798,17 @@ namespace Spike {
 
 				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_DepthPyramidPipeline.PipelineLayout, 0, 1, &depthSet, 0, nullptr);
 
-				uint32_t levelSize = gBuffer->GetPyramidSize() >> i;
-				//if (levelSize < 1) levelSize = 1;
-
+				uint32_t levelSize = pyramidSize >> i;
 				DepthReduceData reduceData = { .PyramidSize = levelSize };
 
 				// execute the shader
 				vkCmdPushConstants(cmd, m_DepthPyramidPipeline.PipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(reduceData), &reduceData);
 				vkCmdDispatch(cmd, VulkanTools::GetComputeGroupCount(levelSize, 32), VulkanTools::GetComputeGroupCount(levelSize, 32), 1);
 
-				VulkanTools::TransitionImage(cmd, depthNativeData->DepthPyramid.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT);
+				VulkanTools::TransitionImage(cmd, depthNativeData->Pyramid.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT);
 			}
 
-			VulkanTools::TransitionImage(cmd, depthNativeData->DepthPyramid.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			VulkanTools::TransitionImage(cmd, depthNativeData->Pyramid.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 
 		// second cull pass
@@ -1866,7 +1821,7 @@ namespace Spike {
 
 			CullPass(scene, geometrySet, false);
 
-			VulkanTools::TransitionImage(cmd, depthNativeData->Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
+			VulkanTools::TransitionImage(cmd, depthNativeData->Depth.Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
 			GeometryDrawPass(scene, context, geometrySet, false);
 		}
@@ -1898,14 +1853,15 @@ namespace Spike {
 
 		VulkanCubeTextureNativeData* envMapNativeData = (VulkanCubeTextureNativeData*)context.EnvironmentTexture->GetGPUData()->GetNativeData();
 		VulkanCubeTextureNativeData* irradiaceMapNativeData = (VulkanCubeTextureNativeData*)context.IrradianceTexture->GetGPUData()->GetNativeData();
-		VulkanTextureNativeData* outTextureNativeData = (VulkanTextureNativeData*)context.OutTexture->GetGPUData()->GetNativeData();
+		//VulkanTextureNativeData* outTextureNativeData = (VulkanTextureNativeData*)context.OutTexture->GetGPUData()->GetNativeData();
+		VulkanBloomMapNativeData* bloomNativeData = (VulkanBloomMapNativeData*)context.GBuffer->GetBloomMapData()->GetNativeData();
 
 		// transition images
 		{
 			VulkanTools::TransitionImage(cmd, albedoMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			VulkanTools::TransitionImage(cmd, normalMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			VulkanTools::TransitionImage(cmd, materialMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			VulkanTools::TransitionImage(cmd, depthNativeData->Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			VulkanTools::TransitionImage(cmd, depthNativeData->Depth.Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		}
 
 		// write desc set
@@ -1915,7 +1871,7 @@ namespace Spike {
 			writer.WriteImage(1, albedoMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			writer.WriteImage(2, normalMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			writer.WriteImage(3, materialMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			writer.WriteImage(4, depthNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(4, depthNativeData->Depth.View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			writer.WriteImage(5, envMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			writer.WriteBuffer(6, frame.LightsBuffer.Buffer, scene->Lights.size() * sizeof(SceneLightProxy), frame.SceneLightFirstIndex * sizeof(SceneLightProxy), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 			writer.WriteImage(7, irradiaceMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -1925,7 +1881,7 @@ namespace Spike {
 
 		// render frame
 		{
-			VulkanTools::TransitionImage(cmd, outTextureNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			VulkanTools::TransitionImage(cmd, bloomNativeData->BloomComposite.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 			VkExtent2D drawExtent = {
 
@@ -1934,7 +1890,7 @@ namespace Spike {
 			};
 
 			VkClearValue colorClear = { .color = {0.0f, 0.0f, 0.0f, 1.0f} };
-			VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(outTextureNativeData->View, &colorClear, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(bloomNativeData->BloomComposite.View, &colorClear, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 			VkRenderingInfo renderInfo = VulkanTools::RenderingInfo(drawExtent, &colorAttachment, 1, VK_NULL_HANDLE);
 			vkCmdBeginRendering(cmd, &renderInfo);
@@ -1978,14 +1934,15 @@ namespace Spike {
 
 	void VulkanGfxDevice::SkyboxPass(RenderContext context, VkDescriptorSet lightingSet) {
 
-		VulkanTextureNativeData* outTextureNativeData = (VulkanTextureNativeData*)context.OutTexture->GetGPUData()->GetNativeData();
+		//VulkanTextureNativeData* outTextureNativeData = (VulkanTextureNativeData*)context.OutTexture->GetGPUData()->GetNativeData();
 		VulkanTextureNativeData* depthNativeData = (VulkanTextureNativeData*)context.GBuffer->GetDepthMapData()->GetNativeData();
+		VulkanBloomMapNativeData* bloomNativeData = (VulkanBloomMapNativeData*)context.GBuffer->GetBloomMapData()->GetNativeData();
 
 		FrameData& frame = GetCurrentFrame();
 		VkCommandBuffer cmd = frame.MainCommandBuffer;
 
 		VulkanTools::TransitionImage(cmd, depthNativeData->Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
-		VulkanTools::TransitionImage(cmd, outTextureNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+		VulkanTools::TransitionImage(cmd, bloomNativeData->BloomComposite.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 		// render skybox
 		{
@@ -1995,7 +1952,7 @@ namespace Spike {
 				context.OutTexture->GetHeight()
 			};
 
-			VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(outTextureNativeData->View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(bloomNativeData->BloomComposite.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 			VkRenderingAttachmentInfo depthAttachment = VulkanTools::DepthAttachmentInfo(depthNativeData->View, nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 
 			VkRenderingInfo renderInfo = VulkanTools::RenderingInfo(drawExtent, &colorAttachment, 1, &depthAttachment);
@@ -2033,8 +1990,154 @@ namespace Spike {
 			vkCmdEndRendering(cmd);
 		}
 
-		VulkanTools::TransitionImage(cmd, outTextureNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VulkanTools::TransitionImage(cmd, bloomNativeData->BloomComposite.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 		VulkanTools::TransitionImage(cmd, depthNativeData->Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	}
+
+	void VulkanGfxDevice::BloomPass(RenderContext context) {
+
+		FrameData& frame = GetCurrentFrame();
+		VkCommandBuffer cmd = frame.MainCommandBuffer;
+		GBufferResource* gBuffer = context.GBuffer;
+
+		VulkanTextureNativeData* outTextureNativeData = (VulkanTextureNativeData*)context.OutTexture->GetGPUData()->GetNativeData();
+		VulkanBloomMapNativeData* bloomNativeData = (VulkanBloomMapNativeData*)gBuffer->GetBloomMapData()->GetNativeData();
+
+		uint32_t width = gBuffer->GetWidth() >> 1;
+		uint32_t height = gBuffer->GetHeight() >> 1;
+
+		uint32_t numMips = VulkanTools::GetNumMips(width, height);
+
+		// downsample
+		{
+			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_BloomDownSamplePipeline.Pipeline);
+
+			VulkanTools::TransitionImage(cmd, bloomNativeData->BloomDownSample.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+			for (int i = 0; i < numMips; i++) {
+
+				VkDescriptorSet bloomSet = frame.FrameAllocator.Allocate(m_Device.Device, m_BloomDownSamplePipeline.SetLayout);
+
+				// write set
+				{
+					DescriptorWriter writer;
+
+					if (i == 0) {
+
+						writer.WriteImage(0, bloomNativeData->BloomComposite.View, m_DefSamplerLinearClamped, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+					}
+					else {
+
+						writer.WriteImage(0, bloomNativeData->DownSampleViews[i - 1], m_DefSamplerLinearClamped, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+					}
+
+					writer.WriteImage(1, bloomNativeData->DownSampleViews[i], m_DefSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+					writer.UpdateSet(m_Device.Device, bloomSet);
+				}
+
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_BloomDownSamplePipeline.PipelineLayout, 0, 1, &bloomSet, 0, nullptr);
+
+				BloomDownSampleData downSampleData{};
+		
+				uint32_t srcWidth = gBuffer->GetWidth() >> i;
+				uint32_t srcHeight = gBuffer->GetHeight() >> i;
+
+				uint32_t levelWidth = width >> i;
+				uint32_t levelHeight = height >> i;
+
+				downSampleData.SrcSize = glm::vec2(srcWidth, srcHeight);
+				downSampleData.OutSize = glm::vec2(levelWidth, levelHeight);
+				downSampleData.MipLevel = i;
+				downSampleData.Threadshold = 2.0f;
+				downSampleData.SoftThreadshold = 0.5f;
+
+				vkCmdPushConstants(cmd, m_BloomDownSamplePipeline.PipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(downSampleData), &downSampleData);
+				vkCmdDispatch(cmd, VulkanTools::GetComputeGroupCount(levelWidth, 32), VulkanTools::GetComputeGroupCount(levelHeight, 32), 1);
+
+				VulkanTools::TransitionImage(cmd, bloomNativeData->BloomDownSample.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT);
+			}
+
+			VulkanTools::TransitionImage(cmd, bloomNativeData->BloomDownSample.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
+
+		// upsample
+		{
+			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_BloomUpSamplePipeline.Pipeline);
+
+			VulkanTools::TransitionImage(cmd, bloomNativeData->BloomUpSample.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+			 
+			for (int i = numMips - 2; i >= 0; i--) {
+
+				VkDescriptorSet bloomSet = frame.FrameAllocator.Allocate(m_Device.Device, m_BloomUpSamplePipeline.SetLayout);
+
+				// write set
+				{
+					DescriptorWriter writer;
+
+					if (i == numMips - 2) {
+
+						writer.WriteImage(0, bloomNativeData->DownSampleViews[i + 1], m_DefSamplerLinearClamped, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+					}
+					else {
+
+						writer.WriteImage(0, bloomNativeData->UpSampleViews[i + 1], m_DefSamplerLinearClamped, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+					}
+
+					writer.WriteImage(1, bloomNativeData->DownSampleViews[i], m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+					writer.WriteImage(2, bloomNativeData->UpSampleViews[i], m_DefSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+					writer.UpdateSet(m_Device.Device, bloomSet);
+				} 
+
+				vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_BloomUpSamplePipeline.PipelineLayout, 0, 1, &bloomSet, 0, nullptr);
+
+				BloomUpSampleData upSampleData{};
+
+				uint32_t levelWidth = width >> i;
+				uint32_t levelHeight = height >> i;
+
+				upSampleData.OutSize = glm::vec2(levelWidth, levelHeight);
+				upSampleData.FilterRadius = 0.005f;
+				upSampleData.IsComposite = 0;
+
+				vkCmdPushConstants(cmd, m_BloomUpSamplePipeline.PipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(upSampleData), &upSampleData);
+				vkCmdDispatch(cmd, VulkanTools::GetComputeGroupCount(levelWidth, 32), VulkanTools::GetComputeGroupCount(levelHeight, 32), 1);
+
+				VulkanTools::TransitionImage(cmd, bloomNativeData->BloomUpSample.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_2_SHADER_WRITE_BIT, VK_ACCESS_2_SHADER_READ_BIT);
+			}
+
+			VulkanTools::TransitionImage(cmd, bloomNativeData->BloomUpSample.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
+
+		// composite
+		{
+			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_BloomUpSamplePipeline.Pipeline);
+
+			VulkanTools::TransitionImage(cmd, outTextureNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+			VkDescriptorSet bloomSet = frame.FrameAllocator.Allocate(m_Device.Device, m_BloomUpSamplePipeline.SetLayout);
+
+			// write set
+			{
+				DescriptorWriter writer;
+				writer.WriteImage(0, bloomNativeData->UpSampleViews[0], m_DefSamplerLinearClamped, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+				writer.WriteImage(1, bloomNativeData->BloomComposite.View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+				writer.WriteImage(2, outTextureNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+
+				writer.UpdateSet(m_Device.Device, bloomSet);
+			}
+
+			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_BloomUpSamplePipeline.PipelineLayout, 0, 1, &bloomSet, 0, nullptr);
+
+			BloomUpSampleData compositeData{};
+			compositeData.OutSize = glm::vec2(gBuffer->GetWidth(), gBuffer->GetHeight());
+			compositeData.FilterRadius = 0.005f;
+			compositeData.IsComposite = 1;
+			compositeData.BloomIntensity = 0.4f;
+
+			vkCmdPushConstants(cmd, m_BloomUpSamplePipeline.PipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(compositeData), &compositeData);
+			vkCmdDispatch(cmd, VulkanTools::GetComputeGroupCount(gBuffer->GetWidth(), 32), VulkanTools::GetComputeGroupCount(gBuffer->GetHeight(), 32), 1);
+
+			VulkanTools::TransitionImage(cmd, outTextureNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
 	}
 
 	void VulkanGfxDevice::BeginFrameCommandRecording() {

@@ -24,11 +24,12 @@ namespace Spike {
 		textureFlags |= EUsageFlagColorAttachment;
 		textureFlags |= EUsageFlagSampled;
 
-		m_AlbedoMapData = GGfxDevice->CreateTexture2DGPUData(m_Width, m_Height, EFormatRGBA8Unorm, textureFlags, false, nullptr);
+		m_AlbedoMapData = GGfxDevice->CreateTexture2DGPUData(m_Width, m_Height, EFormatRGBA16SFloat, textureFlags, false, nullptr);
 		m_MaterialMapData = GGfxDevice->CreateTexture2DGPUData(m_Width, m_Height, EFormatRGBA8Unorm, textureFlags, false, nullptr);
 		m_NormalMapData = GGfxDevice->CreateTexture2DGPUData(m_Width, m_Height, EFormatRGBA16SFloat, textureFlags, false, nullptr);
-
 		m_DepthMapData = GGfxDevice->CreateDepthMapGPUData(m_Width, m_Height, m_DepthPyramidSize);
+
+		m_BloomMapData = GGfxDevice->CreateBloomMapGPUData(m_Width, m_Height);
 	}
 
 	void GBufferResource::ReleaseGPUData() {
@@ -36,8 +37,9 @@ namespace Spike {
 		GGfxDevice->DestroyTexture2DGPUData(m_AlbedoMapData);
 		GGfxDevice->DestroyTexture2DGPUData(m_MaterialMapData);
 		GGfxDevice->DestroyTexture2DGPUData(m_NormalMapData);
-
 		GGfxDevice->DestroyDepthMapGPUData(m_DepthMapData);
+
+		GGfxDevice->DestroyBloomMapGPUData(m_BloomMapData);
 	}
 
 	void GfxDevice::Create(Window* window, bool useImGui) {

@@ -55,5 +55,36 @@ namespace Spike {
 		VkImageUsageFlags TextureUsageFlagsToVulkan(ETextureUsageFlags usageFlags);
 
 		uint32_t GetComputeGroupCount(uint32_t threadCount, uint32_t groupSize);
+		uint32_t GetNumMips(uint32_t width, uint32_t height);
+
+		struct VulkanGraphicsPipelineInfo {
+
+			VkShaderModule VertexModule;
+			VkShaderModule FragmentModule;
+
+			VkDescriptorSetLayout* SetLayouts = nullptr;
+			uint32_t SetLayoutsCount = 0;
+			uint32_t PushConstantSize = 0;
+			VkShaderStageFlags PushConstantStage = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+			VkFormat* ColorAttachmentFormats = nullptr;
+			uint32_t ColorAttachmentCount = 0;
+
+			bool EnableDepthTest = false;
+			bool EnableDepthWrite = false;
+			VkCompareOp DepthCompare;
+		};
+
+		struct VulkanComputePipelineInfo {
+
+			VkShaderModule ComputeModule;
+
+			VkDescriptorSetLayout* SetLayouts = nullptr;
+			uint32_t SetLayoutsCount = 0;
+			uint32_t PushConstantSize = 0;
+		};
+
+		void CreateVulkanGraphicsPipeline(VkDevice device, const VulkanGraphicsPipelineInfo& info, VkPipeline* outPipeline, VkPipelineLayout* outPipelineLayout);
+		void CreateVulkanComputePipeline(VkDevice device, const VulkanComputePipelineInfo& info, VkPipeline* outPipeline, VkPipelineLayout* outPipelineLayout);
 	}
 }
