@@ -12,6 +12,7 @@
 #include <glm/gtx/transform.hpp>
 
 #include <Engine/Core/Timestep.h>
+#include <random>
 
 
 namespace Spike {
@@ -38,8 +39,6 @@ namespace Spike {
 	VulkanGfxDevice::~VulkanGfxDevice() {
 
 		vkDeviceWaitIdle(m_Device.Device);
-
-		DestroyTexture2DGPUData(m_BRDFLutTexture);
 
 		for (int i = 0; i < FRAME_OVERLAP; i++) {
 
@@ -94,6 +93,8 @@ namespace Spike {
 		InitBRDFLutPipeline();
 		InitBloomDownSamplePipeline();
 		InitBloomUpSamplePipeline();
+		InitSSAOPipeline();
+		InitSSAOBlurPipeline();
 	}
 
 	void VulkanGfxDevice::InitCommands() {
@@ -183,6 +184,7 @@ namespace Spike {
 			builder.AddBinding(6, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);                       // lights buffer
 			builder.AddBinding(7, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);               // irradiance image
 			builder.AddBinding(8, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);               // brdf lut image
+			builder.AddBinding(9, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);               // ssao image
 
 			m_LightingSetLayout = builder.Build(m_Device.Device, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 		}
@@ -192,14 +194,14 @@ namespace Spike {
 			// create a descriptor pool
 			std::array<DescriptorAllocator::PoolSizeRatio, 4> frameSizes = {
 
-			    DescriptorAllocator::PoolSizeRatio{.Type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .Ratio = 20 * MAX_SCENE_DRAWS_PER_FRAME},
-			    DescriptorAllocator::PoolSizeRatio{.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .Ratio = 20 * MAX_SCENE_DRAWS_PER_FRAME},
-				DescriptorAllocator::PoolSizeRatio{.Type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .Ratio = 20 * MAX_SCENE_DRAWS_PER_FRAME},
-			    DescriptorAllocator::PoolSizeRatio{.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .Ratio = 20 * MAX_SCENE_DRAWS_PER_FRAME}
+			    DescriptorAllocator::PoolSizeRatio{.Type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .Ratio = 40 * MAX_SCENE_DRAWS_PER_FRAME},
+			    DescriptorAllocator::PoolSizeRatio{.Type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .Ratio = 40 * MAX_SCENE_DRAWS_PER_FRAME},
+				DescriptorAllocator::PoolSizeRatio{.Type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .Ratio = 40 * MAX_SCENE_DRAWS_PER_FRAME},
+			    DescriptorAllocator::PoolSizeRatio{.Type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .Ratio = 40 * MAX_SCENE_DRAWS_PER_FRAME}
 			};
 
 			m_Frames[i].FrameAllocator = DescriptorAllocator{};
-			m_Frames[i].FrameAllocator.InitPool(m_Device.Device, 20 * MAX_SCENE_DRAWS_PER_FRAME, frameSizes);
+			m_Frames[i].FrameAllocator.InitPool(m_Device.Device, 40 * MAX_SCENE_DRAWS_PER_FRAME, frameSizes);
 
 			m_Frames[i].SceneDataBuffer = VulkanBuffer(&m_Device, MAX_SCENE_DRAWS_PER_FRAME * sizeof(SceneDrawData), VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
 			m_Frames[i].LightsBuffer = VulkanBuffer(&m_Device, MAX_LIGHTS_PER_FRAME * sizeof(SceneLightProxy), VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
@@ -625,14 +627,14 @@ namespace Spike {
 
 		static constexpr uint32_t BRDF_LUT_SIZE = 256;
 
-		m_BRDFLutTexture = new VulkanTexture2DGPUData();
-		CreateVulkanTexture2D(BRDF_LUT_SIZE, BRDF_LUT_SIZE, VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, &m_BRDFLutTexture->NativeGPUData);
+		//m_BRDFLutTexture = new VulkanTexture2DGPUData();
+		CreateVulkanTexture2D(BRDF_LUT_SIZE, BRDF_LUT_SIZE, VK_FORMAT_R16G16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, nullptr, &m_BRDFLutTexture);
 
 		ImmediateSubmit([&](VkCommandBuffer cmd) {
 
-			VulkanTools::TransitionImage(cmd, m_BRDFLutTexture->NativeGPUData.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			VulkanTools::TransitionImage(cmd, m_BRDFLutTexture.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
-			VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(m_BRDFLutTexture->NativeGPUData.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(m_BRDFLutTexture.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 			VkRenderingInfo renderInfo = VulkanTools::RenderingInfo({BRDF_LUT_SIZE, BRDF_LUT_SIZE}, &colorAttachment, 1, VK_NULL_HANDLE);
 			vkCmdBeginRendering(cmd, &renderInfo);
@@ -661,7 +663,12 @@ namespace Spike {
 
 			vkCmdEndRendering(cmd);
 
-			VulkanTools::TransitionImage(cmd, m_BRDFLutTexture->NativeGPUData.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			VulkanTools::TransitionImage(cmd, m_BRDFLutTexture.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+			});
+
+		m_MainDeletionQueue.PushFunction([this]() {
+
+			DestroyVulkanTexture2D(m_BRDFLutTexture);
 			});
 	}
 
@@ -732,7 +739,95 @@ namespace Spike {
 			});
 	}
 
-	void VulkanGfxDevice::CreateVulkanTexture2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanTextureNativeData* outTexture) {
+	void VulkanGfxDevice::InitSSAOPipeline() {
+
+		// create desc set layout
+		{
+			DescriptorLayoutBuilder builder;
+			builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);              // noise texture
+			builder.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);              // depth gbuffer texture
+			builder.AddBinding(2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);              // normal gbuffer texture
+			builder.AddBinding(3, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);                       // out ssao texture
+			m_SSAOPipeline.SetLayout = builder.Build(m_Device.Device, VK_SHADER_STAGE_COMPUTE_BIT);
+		}
+
+		// init pipeline
+		{
+			VulkanComputeShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/SSAO.comp.spv");
+
+			VulkanTools::VulkanComputePipelineInfo info{};
+			info.ComputeModule = shader.ComputeModule;
+
+			VkDescriptorSetLayout layouts[2] = { m_SSAOPipeline.SetLayout, m_GeometrySetLayout };
+			info.SetLayouts = layouts;
+			info.SetLayoutsCount = 2;
+			info.PushConstantSize = sizeof(SSAOData);
+
+			VulkanTools::CreateVulkanComputePipeline(m_Device.Device, info, &m_SSAOPipeline.Pipeline, &m_SSAOPipeline.PipelineLayout);
+
+			shader.Destroy(&m_Device);
+		}
+
+		// generate noise
+		{
+			std::uniform_real_distribution<float> randomFloats(0.0f, 1.0f); 
+			std::default_random_engine generator;
+
+			std::vector<glm::vec4> ssaoNoise;
+			ssaoNoise.reserve(16);
+
+			for (int i = 0; i < 16; i++)
+			{
+				glm::vec3 noise(randomFloats(generator) * 2.0f - 1.0, randomFloats(generator) * 2.0f - 1.0f, 0.0f);
+				ssaoNoise.push_back(glm::vec4(noise, 1.0f));
+			}
+
+			CreateVulkanTexture2D(4, 4, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, 1, ssaoNoise.data(), &m_SSAONoiseTexture);
+		}
+
+		m_MainDeletionQueue.PushFunction([this]() {
+
+			vkDestroyPipelineLayout(m_Device.Device, m_SSAOPipeline.PipelineLayout, nullptr);
+			vkDestroyPipeline(m_Device.Device, m_SSAOPipeline.Pipeline, nullptr);
+			vkDestroyDescriptorSetLayout(m_Device.Device, m_SSAOPipeline.SetLayout, nullptr);
+			DestroyVulkanTexture2D(m_SSAONoiseTexture);
+			});
+	}
+
+	void VulkanGfxDevice::InitSSAOBlurPipeline() {
+
+		// create desc set
+		{
+			DescriptorLayoutBuilder builder;
+			builder.AddBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);       // ssao sampler texture
+			builder.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);                // out blur texture
+			m_SSAOBlurPipeline.SetLayout = builder.Build(m_Device.Device, VK_SHADER_STAGE_COMPUTE_BIT);
+		}
+
+		// init pipeline
+		{
+			VulkanComputeShader shader(&m_Device, "C:/Users/Artem/Desktop/Spike-Engine/Resources/Shaders/SSAOBlur.comp.spv");
+
+			VulkanTools::VulkanComputePipelineInfo info{};
+			info.ComputeModule = shader.ComputeModule;
+			info.SetLayouts = &m_SSAOBlurPipeline.SetLayout;
+			info.SetLayoutsCount = 1;
+			info.PushConstantSize = sizeof(SSAOBlurData);
+
+			VulkanTools::CreateVulkanComputePipeline(m_Device.Device, info, &m_SSAOBlurPipeline.Pipeline, &m_SSAOBlurPipeline.PipelineLayout);
+
+			shader.Destroy(&m_Device);
+		}
+
+		m_MainDeletionQueue.PushFunction([this]() {
+
+			vkDestroyPipelineLayout(m_Device.Device, m_SSAOBlurPipeline.PipelineLayout, nullptr);
+			vkDestroyPipeline(m_Device.Device, m_SSAOBlurPipeline.Pipeline, nullptr);
+			vkDestroyDescriptorSetLayout(m_Device.Device, m_SSAOBlurPipeline.SetLayout, nullptr);
+			});
+	}
+
+	void VulkanGfxDevice::CreateVulkanTexture2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, void* pixelData, VulkanTextureNativeData* outTexture) {
 
 		VkImageCreateInfo img_info = VulkanTools::ImageCreateInfo(format, usageFlags, {width, height, 1});
 		img_info.mipLevels = numMips;
@@ -753,6 +848,51 @@ namespace Spike {
 		view_info.subresourceRange.levelCount = img_info.mipLevels;
 
 		VK_CHECK(vkCreateImageView(m_Device.Device, &view_info, nullptr, &outTexture->View));
+
+		if (pixelData) {
+
+			size_t data_size = 0;
+			if (format == VK_FORMAT_R32G32B32A32_SFLOAT) {
+				data_size = width * height * 16;
+			}
+			else {
+				data_size = width * height * 4;
+			}
+
+			VulkanBuffer uploadbuffer(&m_Device, data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
+
+			memcpy(uploadbuffer.AllocationInfo.pMappedData, pixelData, data_size);
+
+			ImmediateSubmit([&](VkCommandBuffer cmd) {
+
+				VulkanTools::TransitionImage(cmd, outTexture->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+				VkBufferImageCopy copyRegion = {};
+				copyRegion.bufferOffset = 0;
+				copyRegion.bufferRowLength = 0;
+				copyRegion.bufferImageHeight = 0;
+
+				copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+				copyRegion.imageSubresource.mipLevel = 0;
+				copyRegion.imageSubresource.baseArrayLayer = 0;
+				copyRegion.imageSubresource.layerCount = 1;
+				copyRegion.imageExtent = { width, height, 1 };
+
+				// copy the buffer into the image
+				vkCmdCopyBufferToImage(cmd, uploadbuffer.Buffer, outTexture->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+					&copyRegion);
+
+				if (numMips > 1) {
+					VulkanTools::GenerateMipmaps(cmd, outTexture->Image, VkExtent2D{ width, height });
+				}
+				else {
+					VulkanTools::TransitionImage(cmd, outTexture->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+				}
+				});
+
+			uploadbuffer.Destroy(&m_Device);
+		}
 	}
 
 	void VulkanGfxDevice::DestroyVulkanTexture2D(VulkanTextureNativeData texture) {
@@ -779,53 +919,7 @@ namespace Spike {
 		if (mipmap)
 			numMips = VulkanTools::GetNumMips(width, height);
 
-		CreateVulkanTexture2D(width, height, vFormat, vUsageFlags, numMips, &texData->NativeGPUData);
-
-		// populate texture with pixel data
-		if (pixelData) {
-
-			size_t data_size = 0;
-			if (vFormat == VK_FORMAT_R32G32B32A32_SFLOAT) {
-				data_size = width * height * 16;
-			}
-			else {
-				data_size = width * height * 4;
-			}
-
-			VulkanBuffer uploadbuffer(&m_Device, data_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU);
-
-			memcpy(uploadbuffer.AllocationInfo.pMappedData, pixelData, data_size);
-
-			ImmediateSubmit([&](VkCommandBuffer cmd) {
-
-				VulkanTools::TransitionImage(cmd, texData->NativeGPUData.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-
-				VkBufferImageCopy copyRegion = {};
-				copyRegion.bufferOffset = 0;
-				copyRegion.bufferRowLength = 0;
-				copyRegion.bufferImageHeight = 0;
-
-				copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-				copyRegion.imageSubresource.mipLevel = 0;
-				copyRegion.imageSubresource.baseArrayLayer = 0;
-				copyRegion.imageSubresource.layerCount = 1;
-				copyRegion.imageExtent = {width, height, 1};
-
-				// copy the buffer into the image
-				vkCmdCopyBufferToImage(cmd, uploadbuffer.Buffer, texData->NativeGPUData.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-					&copyRegion);
-
-				if (mipmap) {
-					VulkanTools::GenerateMipmaps(cmd, texData->NativeGPUData.Image, VkExtent2D { width, height });
-				}
-				else {
-					VulkanTools::TransitionImage(cmd, texData->NativeGPUData.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-						VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-				}
-				});
-
-			uploadbuffer.Destroy(&m_Device);
-		}
+		CreateVulkanTexture2D(width, height, vFormat, vUsageFlags, numMips, pixelData, &texData->NativeGPUData);
 
 		return texData;
 	}
@@ -929,11 +1023,8 @@ namespace Spike {
 		CreateVulkanCubeTexture(size, vFormat, vUsageFlags, numMips, &texData->NativeGPUData);
 		VulkanCubeTextureNativeData* samplerNativeData = (VulkanCubeTextureNativeData*)samplerTexture->GetGPUData()->GetNativeData();
 
-		//ResourceGPUData* offscreen = CreateTexture2DGPUData(size, size, format, EUsageFlagColorAttachment | EUsageFlagTransferSrc, false, nullptr);
-		//VulkanTextureNativeData* offscreenData = (VulkanTextureNativeData*)offscreen->GetNativeData();
-
-		VulkanTexture2DGPUData* offscreen = new VulkanTexture2DGPUData();
-		CreateVulkanTexture2D(size, size, vFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, 1, &offscreen->NativeGPUData);
+		VulkanTextureNativeData offscreen{};
+		CreateVulkanTexture2D(size, size, vFormat, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, 1, nullptr, &offscreen);
 
 		std::array<glm::mat4, 6> matrices = {
 
@@ -949,7 +1040,7 @@ namespace Spike {
 
 			VulkanTools::TransitionImageCube(cmd, texData->NativeGPUData.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 			//VulkanTools::TransitionImageCube(cmd, samplerNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			VulkanTools::TransitionImage(cmd, offscreen->NativeGPUData.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+			VulkanTools::TransitionImage(cmd, offscreen.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 			VkDescriptorSet descSet = m_IrradianceGenPipeline.Set;
 			if (filterMode == EFilterRadiance)
@@ -974,7 +1065,7 @@ namespace Spike {
 
 				for (uint32_t m = 0; m < numMips; m++) {
 
-					VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(offscreen->NativeGPUData.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+					VkRenderingAttachmentInfo colorAttachment = VulkanTools::AttachmentInfo(offscreen.View, nullptr, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
 					uint32_t mipSize = size >> m;
 					if (mipSize < 1) mipSize = 1;
@@ -1017,7 +1108,7 @@ namespace Spike {
 
 					// copy from offscreen image to cube texture
 					{
-						VulkanTools::TransitionImage(cmd, offscreen->NativeGPUData.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+						VulkanTools::TransitionImage(cmd, offscreen.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
 
 						VkImageCopy2 copyRegion{};
 						copyRegion.sType = VK_STRUCTURE_TYPE_IMAGE_COPY_2;
@@ -1039,7 +1130,7 @@ namespace Spike {
 
 						VkCopyImageInfo2 copyInfo{};
 						copyInfo.sType = VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2;
-						copyInfo.srcImage = offscreen->NativeGPUData.Image;
+						copyInfo.srcImage = offscreen.Image;
 						copyInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 						copyInfo.dstImage = texData->NativeGPUData.Image;
 						copyInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -1048,7 +1139,7 @@ namespace Spike {
 
 						vkCmdCopyImage2(cmd, &copyInfo);
 
-						VulkanTools::TransitionImage(cmd, offscreen->NativeGPUData.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+						VulkanTools::TransitionImage(cmd, offscreen.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 					}
 				}
 			}
@@ -1056,7 +1147,7 @@ namespace Spike {
 			VulkanTools::TransitionImageCube(cmd, texData->NativeGPUData.Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 			});
 
-		DestroyTexture2DGPUData(offscreen);
+		DestroyVulkanTexture2D(offscreen);
 
 		return texData;
 	}
@@ -1208,10 +1299,10 @@ namespace Spike {
 
 		VulkanDepthMapGPUData* mapData = new VulkanDepthMapGPUData();
 
-		CreateVulkanTexture2D(width, height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, &mapData->NativeGPUData.Depth);
+		CreateVulkanTexture2D(width, height, VK_FORMAT_D32_SFLOAT, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, nullptr, &mapData->NativeGPUData.Depth);
 
 		uint32_t numPyramidMips = VulkanTools::GetNumMips(depthPyramidSize, depthPyramidSize);
-		CreateVulkanTexture2D(depthPyramidSize, depthPyramidSize, VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, numPyramidMips, &mapData->NativeGPUData.Pyramid);
+		CreateVulkanTexture2D(depthPyramidSize, depthPyramidSize, VK_FORMAT_R32_SFLOAT, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, numPyramidMips, nullptr, &mapData->NativeGPUData.Pyramid);
 
 		// generate depth pyramid views
 		{
@@ -1254,15 +1345,15 @@ namespace Spike {
 
 		VulkanBloomMapGPUData* mapData = new VulkanBloomMapGPUData();
 
-		CreateVulkanTexture2D(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, &mapData->NativeGPUData.BloomComposite);
+		CreateVulkanTexture2D(width, height, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 1, nullptr, &mapData->NativeGPUData.BloomComposite);
 
 		uint32_t sampleWidth = width >> 1;
 		uint32_t sampleHeight = height >> 1;
 
 		uint32_t numSampleMips = VulkanTools::GetNumMips(sampleWidth, sampleHeight);
 
-		CreateVulkanTexture2D(sampleWidth, sampleHeight, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, numSampleMips, &mapData->NativeGPUData.BloomDownSample);
-		CreateVulkanTexture2D(sampleWidth, sampleHeight, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, numSampleMips - 1, &mapData->NativeGPUData.BloomUpSample);
+		CreateVulkanTexture2D(sampleWidth, sampleHeight, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, numSampleMips, nullptr, &mapData->NativeGPUData.BloomDownSample);
+		CreateVulkanTexture2D(sampleWidth, sampleHeight, VK_FORMAT_R16G16B16A16_SFLOAT, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, numSampleMips - 1, nullptr, &mapData->NativeGPUData.BloomUpSample);
 
 		// create down / up sample views
 		{
@@ -1477,6 +1568,7 @@ namespace Spike {
 
 		// render passes
 		GBufferPass(scene, renderContext, geometrySet);
+		SSAOPass(renderContext, geometrySet);
 		LightingPass(scene, renderContext, lightingSet);
 		SkyboxPass(renderContext, lightingSet);
 		BloomPass(renderContext);
@@ -1825,6 +1917,86 @@ namespace Spike {
 
 			GeometryDrawPass(scene, context, geometrySet, false);
 		}
+
+		VulkanTools::TransitionImage(cmd, albedoMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VulkanTools::TransitionImage(cmd, normalMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VulkanTools::TransitionImage(cmd, materialMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		VulkanTools::TransitionImage(cmd, depthNativeData->Depth.Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	}
+
+	void VulkanGfxDevice::SSAOPass(RenderContext context, VkDescriptorSet geometrySet) {
+
+		FrameData& frame = GetCurrentFrame();
+		VkCommandBuffer cmd = frame.MainCommandBuffer;
+
+		GBufferResource* gBuffer = context.GBuffer;
+		VulkanTextureNativeData* normalMapNativeData = (VulkanTextureNativeData*)gBuffer->GetNormalMapData()->GetNativeData();
+		VulkanDepthMapNativeData* depthNativeData = (VulkanDepthMapNativeData*)gBuffer->GetDepthMapData()->GetNativeData();
+		VulkanTextureNativeData* ssaoMapNativeData = (VulkanTextureNativeData*)gBuffer->GetSSAOMapData()->GetNativeData();
+		VulkanTextureNativeData* ssaoBlurNativeData = (VulkanTextureNativeData*)gBuffer->GetSSAOBlurMapData()->GetNativeData();
+
+		uint32_t width = gBuffer->GetWidth();
+		uint32_t height = gBuffer->GetHeight();
+
+		// gen ssao
+		{
+			VulkanTools::TransitionImage(cmd, ssaoMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_SSAOPipeline.Pipeline);
+
+			VkDescriptorSet ssaoSet = frame.FrameAllocator.Allocate(m_Device.Device, m_SSAOPipeline.SetLayout);
+
+			// write set
+			{
+				DescriptorWriter writer;
+				writer.WriteImage(0, m_SSAONoiseTexture.View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+				writer.WriteImage(1, depthNativeData->Depth.View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+				writer.WriteImage(2, normalMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+				writer.WriteImage(3, ssaoMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+				writer.UpdateSet(m_Device.Device, ssaoSet);
+			}
+
+			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_SSAOPipeline.PipelineLayout, 0, 1, &ssaoSet, 0, nullptr);
+			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_SSAOPipeline.PipelineLayout, 1, 1, &geometrySet, 0, nullptr);
+
+			SSAOData ssaoData{};
+			ssaoData.TexSize = glm::vec2(width, height);
+			ssaoData.Radius = 0.5f;
+			ssaoData.Bias = 0.025f;
+			ssaoData.SceneDataOffset = frame.SceneDataBufferOffset;
+			ssaoData.NumSamples = 32;
+			ssaoData.Intensity = 1.5f;
+
+			vkCmdPushConstants(cmd, m_SSAOPipeline.PipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ssaoData), &ssaoData);
+			vkCmdDispatch(cmd, VulkanTools::GetComputeGroupCount(width, 32), VulkanTools::GetComputeGroupCount(height, 32), 1);
+
+			VulkanTools::TransitionImage(cmd, ssaoMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
+
+		// blur ssao
+		{
+			VulkanTools::TransitionImage(cmd, ssaoBlurNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+			vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_SSAOBlurPipeline.Pipeline);
+
+			VkDescriptorSet blurSet = frame.FrameAllocator.Allocate(m_Device.Device, m_SSAOBlurPipeline.SetLayout);
+
+			// write set
+			{
+				DescriptorWriter writer;
+				writer.WriteImage(0, ssaoMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+				writer.WriteImage(1, ssaoBlurNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_GENERAL, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE);
+				writer.UpdateSet(m_Device.Device, blurSet);
+			}
+
+			vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_SSAOBlurPipeline.PipelineLayout, 0, 1, &blurSet, 0, nullptr);
+
+			SSAOBlurData blurData{};
+			blurData.TexSize = glm::vec2(width, height);
+
+			vkCmdPushConstants(cmd, m_SSAOBlurPipeline.PipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(blurData), &blurData);
+			vkCmdDispatch(cmd, VulkanTools::GetComputeGroupCount(width, 32), VulkanTools::GetComputeGroupCount(height, 32), 1);
+
+			VulkanTools::TransitionImage(cmd, ssaoBlurNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		}
 	}
 
 	void VulkanGfxDevice::LightingPass(SceneRenderProxy* scene, RenderContext context, VkDescriptorSet lightingSet) {
@@ -1855,14 +2027,7 @@ namespace Spike {
 		VulkanCubeTextureNativeData* irradiaceMapNativeData = (VulkanCubeTextureNativeData*)context.IrradianceTexture->GetGPUData()->GetNativeData();
 		//VulkanTextureNativeData* outTextureNativeData = (VulkanTextureNativeData*)context.OutTexture->GetGPUData()->GetNativeData();
 		VulkanBloomMapNativeData* bloomNativeData = (VulkanBloomMapNativeData*)context.GBuffer->GetBloomMapData()->GetNativeData();
-
-		// transition images
-		{
-			VulkanTools::TransitionImage(cmd, albedoMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			VulkanTools::TransitionImage(cmd, normalMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			VulkanTools::TransitionImage(cmd, materialMapNativeData->Image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-			VulkanTools::TransitionImage(cmd, depthNativeData->Depth.Image, VK_IMAGE_ASPECT_DEPTH_BIT, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-		}
+		VulkanTextureNativeData* ssaoBlurNativeData = (VulkanTextureNativeData*)gBuffer->GetSSAOBlurMapData()->GetNativeData();
 
 		// write desc set
 		{
@@ -1875,7 +2040,8 @@ namespace Spike {
 			writer.WriteImage(5, envMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			writer.WriteBuffer(6, frame.LightsBuffer.Buffer, scene->Lights.size() * sizeof(SceneLightProxy), frame.SceneLightFirstIndex * sizeof(SceneLightProxy), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
 			writer.WriteImage(7, irradiaceMapNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-			writer.WriteImage(8, m_BRDFLutTexture->NativeGPUData.View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(8, m_BRDFLutTexture.View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+			writer.WriteImage(9, ssaoBlurNativeData->View, m_DefSamplerLinear, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
 			writer.UpdateSet(m_Device.Device, lightingSet);
 		}
 

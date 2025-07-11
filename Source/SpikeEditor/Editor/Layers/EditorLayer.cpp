@@ -20,7 +20,7 @@ namespace SpikeEditor {
 			SafeRenderResourceInit(m_GBuffer);
 
 			m_SceneViewport->ReleaseResource();
-		    m_SceneViewport->CreateResource(m_Width, m_Height, EFormatRGBA16SFloat, EUsageFlagStorage | EUsageFlagTransferSrc | EUsageFlagSampled);
+		    m_SceneViewport->CreateResource(m_Width, m_Height, EFormatRGBA16F, EUsageFlagStorage | EUsageFlagTransferSrc | EUsageFlagSampled);
 		}
 
 		Texture2DResource* outTexResource = m_SceneViewport->GetResource();
@@ -163,13 +163,13 @@ namespace SpikeEditor {
 
 	void EditorLayer::OnAttach() {
 
-		m_SceneViewport = Texture2D::Create(1920, 1080, EFormatRGBA16SFloat, EUsageFlagStorage | EUsageFlagTransferSrc | EUsageFlagSampled);
+		m_SceneViewport = Texture2D::Create(1920, 1080, EFormatRGBA16F, EUsageFlagStorage | EUsageFlagTransferSrc | EUsageFlagSampled);
 
 		m_SkyboxTexture = CubeTexture::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/HDR/AmbienceExposure4k.hdr", 1024);
-		m_IrradianceTexture = CubeTexture::CreateFiltered(64, EFormatRGBA32SFloat, EUsageFlagTransferDst | EUsageFlagSampled, m_SkyboxTexture, EFilterIrradiance);
-		m_EnvironmentTexture = CubeTexture::CreateFiltered(m_SkyboxTexture->GetSize(), EFormatRGBA32SFloat, EUsageFlagTransferDst | EUsageFlagSampled, m_SkyboxTexture, EFilterRadiance);
+		m_IrradianceTexture = CubeTexture::CreateFiltered(64, EFormatRGBA32F, EUsageFlagTransferDst | EUsageFlagSampled, m_SkyboxTexture, EFilterIrradiance);
+		m_EnvironmentTexture = CubeTexture::CreateFiltered(m_SkyboxTexture->GetSize(), EFormatRGBA32F, EUsageFlagTransferDst | EUsageFlagSampled, m_SkyboxTexture, EFilterRadiance);
 
-		m_LoadedMeshes = Mesh::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/models/plane2.glb");
+		m_LoadedMeshes = Mesh::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/models/sphereSmooth.glb");
 		{
 			float roughness = 0.0f;
 			float metallic = 1.0f;
@@ -181,7 +181,7 @@ namespace SpikeEditor {
 
 			Ref<Texture2D> albedoMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_albedo.png");
 			Ref<Texture2D> normalMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_normal-ogl.png");
-			Ref<Texture2D> aoMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_ao.png");
+		    Ref<Texture2D> aoMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_ao.png");
 			Ref<Texture2D> metMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_metallic.png");
 			Ref<Texture2D> rougMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_roughness.png");
 
@@ -189,7 +189,7 @@ namespace SpikeEditor {
 			PBRMat->AddTextureParameter("NormalMap", 1, normalMap);
 			PBRMat->AddTextureParameter("AOMap", 2, aoMap);
 			PBRMat->AddTextureParameter("MetallicMap", 3, metMap);
-			PBRMat->AddTextureParameter("RoughnessMap", 4, rougMap);
+		    PBRMat->AddTextureParameter("RoughnessMap", 4, rougMap);
 
 			for (int i = 0; i < m_LoadedMeshes[0]->SubMeshes.size(); i++) {
 

@@ -522,17 +522,20 @@ VkFormat Spike::VulkanTools::TextureFormatToVulkan(ETextureFormat format) {
 	case Spike::EFormatNone:
 		return VK_FORMAT_UNDEFINED;
 		break;
-	case Spike::EFormatRGBA8Unorm:
+	case Spike::EFormatRGBA8U:
 		return VK_FORMAT_R8G8B8A8_UNORM;
 		break;
-	case Spike::EFormatRGBA16SFloat:
+	case Spike::EFormatRGBA16F:
 		return VK_FORMAT_R16G16B16A16_SFLOAT;
 		break;
-	case Spike::EFormatRGBA32SFloat:
+	case Spike::EFormatRGBA32F:
 		return VK_FORMAT_R32G32B32A32_SFLOAT;
 		break;
-	case Spike::EFormatD32SFloat:
+	case Spike::EFormatD32F:
 		return VK_FORMAT_D32_SFLOAT;
+		break;
+	case Spike::EFormatR32F:
+		return VK_FORMAT_R32_SFLOAT;
 		break;
 	default:
 		return VK_FORMAT_UNDEFINED;
@@ -583,7 +586,7 @@ void Spike::VulkanTools::CreateVulkanGraphicsPipeline(VkDevice device, const Vul
 	pipelineBulder.SetShaders(info.VertexModule, info.FragmentModule);
 	pipelineBulder.SetInputTopology(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 	pipelineBulder.SetPolygonMode(VK_POLYGON_MODE_FILL);
-	pipelineBulder.SetCullMode(VK_CULL_MODE_NONE, VK_FRONT_FACE_CLOCKWISE);
+	pipelineBulder.SetCullMode(info.CullMode, info.FrontFace);
 	pipelineBulder.SetMultisamplingNone();
 	pipelineBulder.DisableBlending();
 	pipelineBulder.SetColorAttachments(info.ColorAttachmentFormats, info.ColorAttachmentCount);

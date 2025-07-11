@@ -46,7 +46,7 @@ namespace SpikeEngine {
 		CubeTexture(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, TextureResource* samplerTexture, ECubeTextureFilterMode filterMode);
 		virtual ~CubeTexture() override;
 
-		static Ref<CubeTexture> Create(const char* filePath, uint32_t size, ETextureFormat format = EFormatRGBA32SFloat);
+		static Ref<CubeTexture> Create(const char* filePath, uint32_t size, ETextureFormat format = EFormatRGBA32F);
 		static Ref<CubeTexture> Create(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, Ref<Texture2D> samplerTexture);
 		static Ref<CubeTexture> CreateFiltered(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, Ref<CubeTexture> samplerTexture, ECubeTextureFilterMode filterMode);
 

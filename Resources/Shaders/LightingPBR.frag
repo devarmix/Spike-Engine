@@ -35,6 +35,7 @@ layout(set = 0, binding = 4) uniform sampler2D DepthMap;
 layout(set = 0, binding = 5) uniform samplerCube EnvMap;
 layout(set = 0, binding = 7) uniform samplerCube IrrMap;
 layout(set = 0, binding = 8) uniform sampler2D BRDFMap;
+layout(set = 0, binding = 9) uniform sampler2D SSAOMap;
 
 struct SceneLight {
 
@@ -291,6 +292,7 @@ void main() {
         }
     }
 
-    color = material.AO * color;
+    float ssao = texture(SSAOMap, fragUV).r;
+    color = material.AO * ssao * color;
     outColor = vec4(color, 1.0f);
 }

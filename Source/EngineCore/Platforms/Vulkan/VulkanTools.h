@@ -73,6 +73,9 @@ namespace Spike {
 			bool EnableDepthTest = false;
 			bool EnableDepthWrite = false;
 			VkCompareOp DepthCompare;
+
+			VkCullModeFlags CullMode = VK_CULL_MODE_NONE; 
+			VkFrontFace FrontFace = VK_FRONT_FACE_CLOCKWISE;
 		};
 
 		struct VulkanComputePipelineInfo {

@@ -22,7 +22,8 @@ namespace Spike {
 
 		GBufferResource(uint32_t width, uint32_t height) 
 			: m_AlbedoMapData(nullptr), m_MaterialMapData(nullptr), m_DepthMapData(nullptr),
-		      m_NormalMapData(nullptr), m_BloomMapData(nullptr), m_Width(width), m_Height(height)
+		      m_NormalMapData(nullptr), m_BloomMapData(nullptr), m_SSAOMapData(nullptr),
+			  m_SSAOBlurMapData(nullptr), m_Width(width), m_Height(height)
 		{
 			m_DepthPyramidSize = RoundUpToPowerOfTwo((float)glm::max(width, height));
 		}
@@ -38,6 +39,8 @@ namespace Spike {
 		ResourceGPUData* GetNormalMapData() { return m_NormalMapData; }
 
 		ResourceGPUData* GetBloomMapData() { return m_BloomMapData; }
+		ResourceGPUData* GetSSAOMapData() { return m_SSAOMapData; }
+		ResourceGPUData* GetSSAOBlurMapData() { return m_SSAOBlurMapData; }
 
 		uint32_t GetWidth() const { return m_Width; }
 		uint32_t GetHeight() const { return m_Height; }
@@ -52,6 +55,8 @@ namespace Spike {
 		ResourceGPUData* m_NormalMapData;
 
 		ResourceGPUData* m_BloomMapData;
+		ResourceGPUData* m_SSAOMapData;
+		ResourceGPUData* m_SSAOBlurMapData;
 
 		uint32_t m_Width;
 		uint32_t m_Height;

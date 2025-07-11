@@ -193,7 +193,7 @@ namespace Spike {
 		void CreateVulkanCubeTexture(uint32_t size, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanCubeTextureNativeData* outTexture);
 		void DestroyVulkanCubeTexture(VulkanCubeTextureNativeData texture);
 
-		void CreateVulkanTexture2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, VulkanTextureNativeData* outTexture);
+		void CreateVulkanTexture2D(uint32_t width, uint32_t height, VkFormat format, VkImageUsageFlags usageFlags, uint32_t numMips, void* pixelData, VulkanTextureNativeData* outTexture);
 		void DestroyVulkanTexture2D(VulkanTextureNativeData texture);
 
 		void InitPipelines();
@@ -214,6 +214,8 @@ namespace Spike {
 		void InitBRDFLutPipeline();
 		void InitBloomDownSamplePipeline();
 		void InitBloomUpSamplePipeline();
+		void InitSSAOPipeline();
+		void InitSSAOBlurPipeline();
 
 		void GBufferPass(SceneRenderProxy* scene, RenderContext context, VkDescriptorSet geometrySet);
 		void CullPass(SceneRenderProxy* scene, VkDescriptorSet geometrySet, bool prepass);
@@ -221,6 +223,7 @@ namespace Spike {
 		void SkyboxPass(RenderContext context, VkDescriptorSet lightingSet);
 		void LightingPass(SceneRenderProxy* scene, RenderContext context, VkDescriptorSet lightingSet);
 		void BloomPass(RenderContext context);
+		void SSAOPass(RenderContext context, VkDescriptorSet geometrySet);
 
 		void DrawImGui(VkCommandBuffer cmd, VkImageView targetImageView, bool clearSwapchain = true);
 
@@ -369,7 +372,43 @@ namespace Spike {
 		};
 
 		VulkanPipeline m_BRDFLutPipeline;
-		VulkanTexture2DGPUData* m_BRDFLutTexture;
+		VulkanTextureNativeData m_BRDFLutTexture;
+
+		struct {
+
+			VkPipeline Pipeline;
+			VkPipelineLayout PipelineLayout;
+			VkDescriptorSetLayout SetLayout;
+		} m_SSAOPipeline;
+
+		struct alignas(16) SSAOData {
+
+		    glm::vec2 TexSize;
+
+			float Radius;
+			float Bias;
+
+			uint32_t SceneDataOffset;
+			uint32_t NumSamples;
+			float Intensity;
+
+			float pad0;
+		};
+
+		struct {
+
+			VkPipeline Pipeline;
+			VkPipelineLayout PipelineLayout;
+			VkDescriptorSetLayout SetLayout;
+		} m_SSAOBlurPipeline;
+
+		struct alignas(16) SSAOBlurData {
+
+			glm::vec2 TexSize;
+			float pad0[2];
+		};
+
+		VulkanTextureNativeData m_SSAONoiseTexture;
 		 
 		DescriptorAllocator m_DescriptorAllocator;
 

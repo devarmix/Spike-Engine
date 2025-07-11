@@ -45,7 +45,7 @@ namespace SpikeEngine {
 		Texture2D(uint32_t width, uint32_t height, ETextureFormat format, ETextureUsageFlags usageFlags, bool mipmap, void* pixelData, bool needCPUData);
 		virtual ~Texture2D() override;
 
-		static Ref<Texture2D> Create(const char* filePath, ETextureFormat format = EFormatRGBA8Unorm);
+		static Ref<Texture2D> Create(const char* filePath, ETextureFormat format = EFormatRGBA8U);
 		static Ref<Texture2D> Create(uint32_t width, uint32_t height, ETextureFormat format, ETextureUsageFlags usageFlags, bool mipmap = false, void* pixelData = nullptr, bool needCPUData = false);
 
 		Texture2DResource* GetResource() { return m_RenderResource; }

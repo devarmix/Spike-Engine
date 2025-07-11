@@ -110,6 +110,8 @@ namespace Spike {
 		info.EnableDepthTest = true;
 		info.EnableDepthWrite = true;
 		info.DepthCompare = VK_COMPARE_OP_GREATER_OR_EQUAL;
+		info.CullMode = VK_CULL_MODE_BACK_BIT;
+		info.FrontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
 		VulkanTools::CreateVulkanGraphicsPipeline(device->Device, info, outPipeline, outLayout);
 	}

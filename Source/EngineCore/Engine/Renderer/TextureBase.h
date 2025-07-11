@@ -8,10 +8,11 @@ namespace Spike {
 	enum ETextureFormat {
 
 		EFormatNone = 0,
-		EFormatRGBA8Unorm,
-		EFormatRGBA16SFloat,
-		EFormatRGBA32SFloat,
-		EFormatD32SFloat
+		EFormatRGBA8U,
+		EFormatRGBA16F,
+		EFormatRGBA32F,
+		EFormatD32F,
+		EFormatR32F
 	};
 
 	enum ETextureUsageFlagsBits {

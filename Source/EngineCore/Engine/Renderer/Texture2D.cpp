@@ -59,7 +59,7 @@ namespace SpikeEngine {
 		Ref<Texture2D> texture = nullptr;
 		void* data = nullptr;
 
-		if (format == EFormatRGBA32SFloat) {
+		if (format == EFormatRGBA32F) {
 			data = stbi_loadf(filePath, &width, &height, &nrChannels, 4);
 		}
 		else {
