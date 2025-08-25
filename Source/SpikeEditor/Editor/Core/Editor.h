@@ -7,7 +7,7 @@ namespace SpikeEditor {
 
 	class SpikeEditor : public Spike::Application {
 	public:
-		SpikeEditor(const Spike::ApplicationCreateInfo& info);
+		SpikeEditor(const Spike::ApplicationDesc& desc);
 		virtual ~SpikeEditor() override;
 
 	private:

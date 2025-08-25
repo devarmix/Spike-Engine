@@ -1,32 +1,32 @@
 #include <Engine/Core/Application.h> 
+#include <Engine/Renderer/FrameRenderer.h>
 #include <Engine/Core/Log.h>
 
 #include <Engine/Core/Stats.h>
-#include "imgui_impl_sdl2.h"
 
 Spike::Application* Spike::GApplication = nullptr;
 
 namespace Spike {
 
-	Application::Application(const ApplicationCreateInfo& info) {
+	Application::Application(const ApplicationDesc& desc) {
 
-		m_Window = Window::Create(info.WinInfo);
+		m_Window = Window::Create(desc.WindowDesc);
 		m_Window->SetEventCallback(BIND_FUNCTION(Application::OnEvent));
 
-		//m_TaskScheduler.Init(5);
-		m_UsingImGui = info.UsingImGui;
+		m_UsingImGui = desc.UsingImGui;
 
-		// initialize globals
+		// initialize core globals
 		GApplication = this;
-		//GTaskScheduler = &m_TaskScheduler;
-		GfxDevice::Create(m_Window, m_UsingImGui);
+		RHIDevice::Create(m_Window, m_UsingImGui);
 
-		ENGINE_WARN("Created an application: " + info.Name);
+		ENGINE_WARN("Created an application: " + desc.Name);
 
 		m_SceneLayer = new SceneLayer();
+		m_RenderLayer = new RenderLayer();
 
 		// push default layers
 		PushLayer(m_SceneLayer);
+		PushOverlay(m_RenderLayer);
 
 		m_Running = true;
 	}
@@ -37,7 +37,7 @@ namespace Spike {
 
 		EXECUTE_ON_RENDER_THREAD([]() {
 
-			delete GGfxDevice;
+			delete GRHIDevice;
 			});
 
 		m_RenderThread.Terminate();
@@ -63,7 +63,7 @@ namespace Spike {
 
 			EXECUTE_ON_RENDER_THREAD([]() {
 
-				GGfxDevice->BeginFrameCommandRecording();
+				GFrameRenderer->BeginFrame();
 				});
 
 			if (!m_Minimized) {
@@ -81,7 +81,7 @@ namespace Spike {
 
 			EXECUTE_ON_RENDER_THREAD([=]() {
 
-				GGfxDevice->DrawSwapchain(width, height, true);
+				GFrameRenderer->RenderSwapchain(width, height);
 				});
 
 			// sync render thread
@@ -122,23 +122,6 @@ namespace Spike {
 
 			ENGINE_WARN("Restored Window");
 			return true;
-			});
-
-		handler.Handle<SDLEvent>([this](const SDLEvent& e) {
-
-			SDL_Event nativeEvent = e.GetEvent();
-
-			if (m_UsingImGui) {
-
-				// process imgui events on render thread
-				// TODO: probably move this to a dedicated ImGui layer or smth
-				EXECUTE_ON_RENDER_THREAD([nativeEvent]() {
-
-					ImGui_ImplSDL2_ProcessEvent(&nativeEvent);
-					});
-			}
-
-			return false;
 			});
 
 		if (!event.IsHandled()) {

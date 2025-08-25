@@ -21,3 +21,4 @@ include "Source/ThirdParty/fastgltf/Build.lua"
 -- Core
 include "Source/EngineCore/Build.lua"
 include "Source/SpikeEditor/Build.lua"
+include "Source/Tools/ShaderCompiler/Build.lua"

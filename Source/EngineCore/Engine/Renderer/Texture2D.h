@@ -2,65 +2,82 @@
 
 #include <Engine/Asset/Asset.h>
 #include <Engine/Renderer/TextureBase.h>
-using namespace Spike;
 
 namespace Spike {
 
-	class Texture2DResource : public TextureResource {
+	// utility function
+	uint32_t GetNumTextureMips(uint32_t width, uint32_t height);
+
+	struct Texture2DDesc {
+
+		uint32_t Width;
+		uint32_t Height;
+		uint32_t NumMips = 1;
+		ETextureFormat Format;
+		ETextureUsageFlags UsageFlags;
+
+		void* PixelData = nullptr;
+		bool NeedCPUData = false;
+
+		SamplerDesc SamplerDesc;
+
+		bool operator==(const Texture2DDesc& other) const {
+
+			return (Width == other.Width
+				&& Height == other.Height
+				&& NumMips == other.NumMips
+				&& Format == other.Format
+				&& UsageFlags == other.UsageFlags
+				&& NeedCPUData == other.NeedCPUData
+				&& SamplerDesc == other.SamplerDesc);
+		}
+	};
+
+	class RHITexture2D : public RHITexture {
 	public:
+		RHITexture2D(const Texture2DDesc& desc);
+		virtual ~RHITexture2D() override {}
 
-		Texture2DResource(uint32_t width, uint32_t height, ETextureFormat format, ETextureUsageFlags usageFlags, bool mipmap, void* pixelData, bool needCPUData)
-			: TextureResource(format, usageFlags), m_Width(width), m_Height(height), m_Mipmaped(mipmap), m_PixelData(pixelData), m_NeedCPUData(needCPUData) {}
+		virtual void InitRHI() override;
+		virtual void ReleaseRHI() override;
+		virtual void ReleaseRHIImmediate() override;
 
-		virtual ~Texture2DResource() override {}
+		virtual ETextureFormat GetFormat() const override { return m_Desc.Format; }
+		virtual ETextureUsageFlags GetUsageFlags() const override { return m_Desc.UsageFlags; }
+		virtual Vec3Uint GetSizeXYZ() const override { return Vec3(m_Desc.Width, m_Desc.Height, 1); }
+		virtual uint32_t GetNumMips() const override { return m_Desc.NumMips; }
+		virtual ETextureType GetTextureType() const override { return ETextureType::E2D; }
 
-		virtual void InitGPUData() override;
-		virtual void ReleaseGPUData() override;
-
-		uint32_t GetWidth() const { return m_Width; }
-		uint32_t GetHeight() const { return m_Height; }
-
-		bool IsMipmaped() const { return m_Mipmaped; }
+		const Texture2DDesc& GetDesc() { return m_Desc; }
 
 		void DeletePixelData();
 
 	private:
 
-		uint32_t m_Width;
-		uint32_t m_Height;
-
-		bool m_Mipmaped;
-
-		// contains pixel data. can be null if not used
-		void* m_PixelData;
-		bool m_NeedCPUData;
+		Texture2DDesc m_Desc;
 	};
-}
-
-namespace SpikeEngine {
 
 	class Texture2D : public Asset {
 	public:
-
-		Texture2D(uint32_t width, uint32_t height, ETextureFormat format, ETextureUsageFlags usageFlags, bool mipmap, void* pixelData, bool needCPUData);
+		Texture2D(const Texture2DDesc& desc);
 		virtual ~Texture2D() override;
 
-		static Ref<Texture2D> Create(const char* filePath, ETextureFormat format = EFormatRGBA8U);
-		static Ref<Texture2D> Create(uint32_t width, uint32_t height, ETextureFormat format, ETextureUsageFlags usageFlags, bool mipmap = false, void* pixelData = nullptr, bool needCPUData = false);
+		static Ref<Texture2D> Create(const char* filePath, const SamplerDesc& samplerDesc, ETextureFormat format = ETextureFormat::ERGBA8U);
+		static Ref<Texture2D> Create(const Texture2DDesc& desc);
 
-		Texture2DResource* GetResource() { return m_RenderResource; }
+		RHITexture2D* GetResource() { return m_RHIResource; }
 		void ReleaseResource();
-		void CreateResource(uint32_t width, uint32_t height, ETextureFormat format, ETextureUsageFlags usageFlags, bool mipmap = false, void* pixelData = nullptr, bool needCPUData = false);
+		void CreateResource(const Texture2DDesc& desc);
 
-		uint32_t GetWidth() const { return m_RenderResource->GetWidth(); }
-		uint32_t GetHeight() const { return m_RenderResource->GetHeight(); }
+		Vec3Uint GetSizeXYZ() const { return m_RHIResource->GetSizeXYZ(); }
+		ETextureFormat GetFormat() const { return m_RHIResource->GetFormat(); }
+		uint32_t GetNumMips() const { return m_RHIResource->GetNumMips(); }
+		bool IsMipmapped() const { return m_RHIResource->IsMipmaped(); }
 
-		ETextureFormat GetFormat() const { return m_RenderResource->GetFormat(); }
-
-		ASSET_CLASS_TYPE(Texture2DAsset)
+		//ASSET_CLASS_TYPE(Texture2DAsset)
 
 	private:
 
-		Texture2DResource* m_RenderResource;
+		RHITexture2D* m_RHIResource;
 	};
 }

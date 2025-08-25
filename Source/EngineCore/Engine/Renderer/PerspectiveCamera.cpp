@@ -1,16 +1,15 @@
 #include <Engine/Renderer/PerspectiveCamera.h>
-#include <Engine/Core/Log.h>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-namespace SpikeEngine {
+namespace Spike {
 
-	glm::mat4 GetInfinitePerspectiveMatrix( float fov, float aspect, float nearProj)
-	{
+	Mat4x4 GetInfinitePerspectiveMatrix( float fov, float aspect, float nearProj) {
+
 		float f = 1.0f / tanf(fov / 2.0f);
-		return glm::mat4(
+		return Mat4x4(
 			f / aspect, 0.0f, 0.0f, 0.0f,
 			0.0f, -f, 0.0f, 0.0f,
 			0.0f, 0.0f, 0.0f, -1.0f,
@@ -18,18 +17,18 @@ namespace SpikeEngine {
 	}
 
 
-	glm::mat4 PerspectiveCamera::GetProjectionMatrix(float aspect) const {
+	Mat4x4 PerspectiveCamera::GetProjectionMatrix(float aspect) const {
 
 		//return glm::perspective(glm::radians(m_FOV), aspect, m_Near, m_Far);
 
 		return GetInfinitePerspectiveMatrix(glm::radians(m_FOV), aspect, m_Far);
 	}
 
-	glm::mat4 PerspectiveCamera::GetRotationMatrix() const {
+	Mat4x4 PerspectiveCamera::GetRotationMatrix() const {
 
-		glm::quat pitchRotation = glm::angleAxis(m_Rotation.x, glm::vec3{ 1.f, 0.f, 0.f });
-		glm::quat yawRotation = glm::angleAxis(m_Rotation.y, glm::vec3{ 0.f, -1.f, 0.f });
-		glm::quat rollRotation = glm::angleAxis(m_Rotation.z, glm::vec3{ 0.f, 0.f, 1.f });
+		Quaternion pitchRotation = glm::angleAxis(m_Rotation.x, Vec3{ 1.f, 0.f, 0.f });
+		Quaternion yawRotation = glm::angleAxis(m_Rotation.y, Vec3{ 0.f, -1.f, 0.f });
+		Quaternion rollRotation = glm::angleAxis(m_Rotation.z, Vec3{ 0.f, 0.f, 1.f });
 
 		return glm::toMat4(yawRotation * pitchRotation * rollRotation);
 
@@ -43,8 +42,8 @@ namespace SpikeEngine {
 
 	glm::mat4 PerspectiveCamera::GetViewMatrix() const {
 
-	    glm::mat4 cameraTranslation = glm::translate(glm::mat4(1.f), m_Position);
-		glm::mat4 cameraRotation = GetRotationMatrix();
+		Mat4x4 cameraTranslation = glm::translate(Mat4x4(1.f), m_Position);
+		Mat4x4 cameraRotation = GetRotationMatrix();
 
 		return glm::inverse(cameraTranslation * cameraRotation);
 

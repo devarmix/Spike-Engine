@@ -1,6 +1,8 @@
 #include <Engine/Renderer/Mesh.h>
 #include <Engine/Renderer/GfxDevice.h>
+#include <Engine/Core/Application.h>
 #include <Engine/Core/Log.h>
+#include <Engine/Renderer/FrameRenderer.h>
 
 #include <fastgltf/glm_element_traits.hpp>
 #include <fastgltf/parser.hpp>
@@ -8,42 +10,79 @@
 
 namespace Spike {
 
-	void MeshResource::InitGPUData() {
+	RHIMesh::RHIMesh(const MeshDesc& desc) : m_Desc(desc) {
 
-		m_GPUData = GGfxDevice->CreateMeshGPUData(m_Vertices, m_Indices);
+		BufferDesc bufferDesc{};
+		bufferDesc.UsageFlags = EBufferUsageFlags::EStorage | EBufferUsageFlags::ECopyDst;
+		bufferDesc.MemUsage = EBufferMemUsage::EGPUOnly;
+		bufferDesc.Size = sizeof(Vertex) * desc.Vertices.size();
 
-		if (!m_NeedCPUData) {
+		m_VertexBuffer = new RHIBuffer(bufferDesc);
+		bufferDesc.Size = sizeof(uint32_t) * desc.Indices.size();
+		m_IndexBuffer = new RHIBuffer(bufferDesc);
+	}
 
-			m_Vertices.clear();
-			m_Indices.clear();
+	void RHIMesh::InitRHI() {
+
+		m_VertexBuffer->InitRHI();
+		m_IndexBuffer->InitRHI();
+
+		const size_t vertexBufferSize = sizeof(Vertex) * m_Desc.Vertices.size();
+		const size_t indexBufferSize = sizeof(uint32_t) * m_Desc.Indices.size();
+
+		BufferDesc stagingDesc{};
+		stagingDesc.Size = vertexBufferSize + indexBufferSize;
+		stagingDesc.UsageFlags = EBufferUsageFlags::ECopySrc;
+		stagingDesc.MemUsage = EBufferMemUsage::ECPUOnly;
+
+		RHIBuffer* staging = new RHIBuffer(stagingDesc);
+		staging->InitRHI();
+
+		memcpy(staging->GetMappedData(), m_Desc.Vertices.data(), vertexBufferSize);
+		memcpy((char*)staging->GetMappedData() + vertexBufferSize, m_Desc.Indices.data(), indexBufferSize);
+
+		GRHIDevice->ImmediateSubmit([&, this](RHICommandBuffer* cmd) {
+
+			GRHIDevice->CopyBuffer(cmd, staging, m_VertexBuffer, 0, 0, vertexBufferSize);
+			GRHIDevice->CopyBuffer(cmd, staging, m_IndexBuffer, vertexBufferSize, 0, indexBufferSize);
+			});
+
+		staging->ReleaseRHI();
+		delete staging;
+
+		if (!m_Desc.NeedCPUData) {
+
+			m_Desc.Vertices.clear();
+			m_Desc.Indices.clear();
 		}
 	}
 
-	void MeshResource::ReleaseGPUData() {
+	void RHIMesh::ReleaseRHI() {
 
-		GGfxDevice->DestroyMeshGPUData(m_GPUData);
+		m_VertexBuffer->ReleaseRHI();
+		delete m_VertexBuffer;
+
+		m_IndexBuffer->ReleaseRHI();
+		delete m_IndexBuffer;
 	}
-}
 
-namespace SpikeEngine {
+	Mesh::Mesh(const MeshDesc& desc) {
 
-	Mesh::Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const std::vector<SubMesh>& subMeshes, bool needCPUData) : SubMeshes(subMeshes) {
-
-		CreateResource(vertices, indices, needCPUData);
+		CreateResource(desc);
 	}
 
 	Mesh::~Mesh() {
 
 		ReleaseResource();
-		ASSET_CORE_DESTROY();
+		//ASSET_CORE_DESTROY();
 	}
 
-	Ref<Mesh> Mesh::Create(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const std::vector<SubMesh>& subMeshes, bool needCPUData) {
+	Ref<Mesh> Mesh::Create(const MeshDesc& desc) {
 
-		return CreateRef<Mesh>(vertices, indices, subMeshes, needCPUData);
+		return CreateRef<Mesh>(desc);
 	}
 
-	std::vector<Ref<Mesh>> Mesh::Create(std::filesystem::path filePath) {
+	std::vector<Ref<Mesh>> Mesh::Create(const std::filesystem::path& filePath) {
 
 		ENGINE_WARN("Loading GLTF: " + filePath.string());
 
@@ -67,84 +106,78 @@ namespace SpikeEngine {
 
 		std::vector<Ref<Mesh>> meshes;
 
-		std::vector<uint32_t> indices;
-		std::vector<Vertex> vertices;
-		std::vector<SubMesh> subMeshes;
-
 		for (fastgltf::Mesh& mesh : gltf.meshes) {
 
-			subMeshes.clear();
-
-			indices.clear();
-			vertices.clear();
+			MeshDesc meshDesc{};
+			std::vector<SubMesh> subMeshes;
 
 			for (auto&& p : mesh.primitives) {
 
 				SubMesh newSubMesh;
-				newSubMesh.FirstIndex = (uint32_t)indices.size();
+				newSubMesh.FirstIndex = (uint32_t)meshDesc.Indices.size();
 				newSubMesh.IndexCount = (uint32_t)gltf.accessors[p.indicesAccessor.value()].count;
 
-				size_t initial_vtx = vertices.size();
+				size_t initial_vtx = meshDesc.Vertices.size();
 
 				// load indicies
 				{
 					fastgltf::Accessor& indexAccessor = gltf.accessors[p.indicesAccessor.value()];
-					indices.reserve(indices.size() + indexAccessor.count);
+					meshDesc.Indices.reserve(meshDesc.Indices.size() + indexAccessor.count);
 
 					fastgltf::iterateAccessor<std::uint32_t>(gltf, indexAccessor, [&](std::uint32_t idx) {
-						indices.push_back(uint32_t(idx + initial_vtx));
+						meshDesc.Indices.push_back(uint32_t(idx + initial_vtx));
 						});
 				}
 
 				// load vertex positions
 				{
 					fastgltf::Accessor& posAccessor = gltf.accessors[p.findAttribute("POSITION")->second];
-					vertices.resize(vertices.size() + posAccessor.count);
+					meshDesc.Vertices.resize(meshDesc.Vertices.size() + posAccessor.count);
 
-					fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, posAccessor, [&](glm::vec3 v, size_t index) {
+					fastgltf::iterateAccessorWithIndex<Vec3>(gltf, posAccessor, [&](Vec3 v, size_t index) {
 
 						Vertex newVtx;
 						newVtx.Position = {v.x, v.y, v.z, 0};
 						newVtx.Normal = { 1, 0, 0, 0 };
-						newVtx.Color = glm::vec4{ 1.f };
+						newVtx.Color = Vec4(1.f);
 						newVtx.Tangent = { 0, 0, 0, 0 };
-						vertices[initial_vtx + index] = newVtx;
+						meshDesc.Vertices[initial_vtx + index] = newVtx;
 						});
 				}
 
 				// load vertex normals
 				auto normals = p.findAttribute("NORMAL");
 				if (normals != p.attributes.end()) {
-					fastgltf::iterateAccessorWithIndex<glm::vec3>(gltf, gltf.accessors[(*normals).second], [&](glm::vec3 v, size_t index) {
-						vertices[initial_vtx + index].Normal = {v.x, v.y, v.z, 0};
+					fastgltf::iterateAccessorWithIndex<Vec3>(gltf, gltf.accessors[(*normals).second], [&](Vec3 v, size_t index) {
+						meshDesc.Vertices[initial_vtx + index].Normal = {v.x, v.y, v.z, 0};
 						});
 				}
 
 				// load UVs
 				auto uv = p.findAttribute("TEXCOORD_0");
 				if (uv != p.attributes.end()) {
-					fastgltf::iterateAccessorWithIndex<glm::vec2>(gltf, gltf.accessors[(*uv).second], [&](glm::vec2 v, size_t index) {
+					fastgltf::iterateAccessorWithIndex<Vec2>(gltf, gltf.accessors[(*uv).second], [&](Vec2 v, size_t index) {
 
-						vertices[initial_vtx + index].Position.w = v.x;
-						vertices[initial_vtx + index].Normal.w = v.y;
+						meshDesc.Vertices[initial_vtx + index].Position.w = v.x;
+						meshDesc.Vertices[initial_vtx + index].Normal.w = v.y;
 						});
 				}
 
 				// load vertex colors
 				auto colors = p.findAttribute("COLOR_0");
 				if (colors != p.attributes.end()) {
-					fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, gltf.accessors[(*colors).second], [&](glm::vec4 v, size_t index) {
+					fastgltf::iterateAccessorWithIndex<Vec4>(gltf, gltf.accessors[(*colors).second], [&](Vec4 v, size_t index) {
 
-						vertices[initial_vtx + index].Color = v;
+						meshDesc.Vertices[initial_vtx + index].Color = v;
 						});
 				}
 
 				// load vertex tangents
 				auto tangents = p.findAttribute("TANGENT");
 				if (tangents != p.attributes.end()) {
-					fastgltf::iterateAccessorWithIndex<glm::vec4>(gltf, gltf.accessors[(*tangents).second], [&](glm::vec4 v, size_t index) {
+					fastgltf::iterateAccessorWithIndex<Vec4>(gltf, gltf.accessors[(*tangents).second], [&](Vec4 v, size_t index) {
 
-						vertices[initial_vtx + index].Tangent = v;
+						meshDesc.Vertices[initial_vtx + index].Tangent = v;
 						});
 				}
 				else
@@ -152,22 +185,22 @@ namespace SpikeEngine {
 
 				// calculate bounds for sub-mesh
 				{
-					glm::vec3 minpos = vertices[initial_vtx].Position;
-					glm::vec3 maxpos = vertices[initial_vtx].Position;
+					Vec3 minpos = meshDesc.Vertices[initial_vtx].Position;
+					Vec3 maxpos = meshDesc.Vertices[initial_vtx].Position;
 
-					for (size_t i = initial_vtx; i < vertices.size(); i++) {
+					for (size_t i = initial_vtx; i < meshDesc.Vertices.size(); i++) {
 
-						glm::vec3 pos = vertices[i].Position;
+						Vec3 pos = meshDesc.Vertices[i].Position;
 
 						minpos = glm::min(minpos, pos);
 						maxpos = glm::max(maxpos, pos);
 					}
 
-					glm::vec3 origin = (maxpos + minpos) / 2.f;
-					glm::vec3 extents = (maxpos - minpos) / 2.f;
+					Vec3 origin = (maxpos + minpos) / 2.f;
+					Vec3 extents = (maxpos - minpos) / 2.f;
 
-					newSubMesh.BoundsOrigin = Vector3(origin.x, origin.y, origin.z);
-					newSubMesh.BoundsExtents = Vector3(extents.x, extents.y, extents.z);
+					newSubMesh.BoundsOrigin = Vec3(origin.x, origin.y, origin.z);
+					newSubMesh.BoundsExtents = Vec3(extents.x, extents.y, extents.z);
 					newSubMesh.BoundsRadius = glm::length(extents);
 					//newSubMesh.BoundsRadius = 1.f;
 				}
@@ -178,9 +211,12 @@ namespace SpikeEngine {
 			//newMesh->GenerateTangents(indices, vertices);
 			//newMesh->UploadGPUData(indices, vertices);
 
-			meshes.emplace_back(Mesh::Create(vertices, indices, subMeshes));
+			Ref<Mesh> newMesh = Mesh::Create(meshDesc);
+			newMesh->SubMeshes = std::move(subMeshes);
 
-			ENGINE_INFO("Loaded mesh with: {0} submeshes.", subMeshes.size());
+			meshes.emplace_back(newMesh);
+
+			ENGINE_INFO("Loaded mesh with: {0} submeshes.", newMesh->SubMeshes.size());
 		}
 
 		return meshes;
@@ -188,13 +224,13 @@ namespace SpikeEngine {
 
 	void Mesh::ReleaseResource() {
 
-		SafeRenderResourceRelease(m_RenderResource);
-		m_RenderResource = nullptr;
+		SafeRHIResourceRelease(m_RHIResource);
+		m_RHIResource = nullptr;
 	}
 
-	void Mesh::CreateResource(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, bool needCPUData) {
+	void Mesh::CreateResource(const MeshDesc& desc) {
 
-		m_RenderResource = new MeshResource(vertices, indices, needCPUData);
-		SafeRenderResourceInit(m_RenderResource);
+		m_RHIResource = new RHIMesh(desc);
+		SafeRHIResourceInit(m_RHIResource);
 	}
 }

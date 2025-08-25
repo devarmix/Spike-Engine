@@ -27,7 +27,8 @@ project "SpikeEditor"
 		"%{IncludeDir.FAST_GLTF}",
 		"%{IncludeDir.ENGINE_CORE}",
 		"%{IncludeDir.ENTT}",
-
+		"%{IncludeDir.SHADER_COMPILER}",
+		"%{IncludeDir.SHADERS_GENERATED}",
 		""
 	}
 
@@ -44,6 +45,11 @@ project "SpikeEditor"
 		{
 			"ENGINE_PLATFORM_WINDOWS",
 			"GLM_FORCE_DEPTH_ZERO_TO_ONE"
+		}
+
+		prebuildcommands 
+		{
+			("%{wks.location}/Binaries/" .. outputDir .. "/ShaderCompiler/ShaderCompiler.exe")
 		}
 
 		postbuildcommands 

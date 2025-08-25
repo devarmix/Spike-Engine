@@ -1,4 +1,5 @@
 #include <Editor/Renderer/EditorCamera.h>
+#include <Engine/Utils/MathUtils.h>
 #include <Engine/Core/Log.h>
 
 #include <Engine/Core/Application.h>
@@ -12,35 +13,35 @@ namespace SpikeEditor {
 	void EditorCamera::OnUpdate(float deltaTime) {
 
 		// if not controlling camera, reset velocity
-		if (!m_IsControlled) m_TargetVelocity = Vector3();
+		if (!m_IsControlled) m_TargetVelocity = Vec3(0.f);
 		//if (m_CurrentVelocity == Vector3() && !m_IsControlled) return;
 
-		m_CurrentVelocity = Vector3::MoveTowards(m_CurrentVelocity, m_TargetVelocity, m_AccelerationSpeed * deltaTime);
-		Vector3 v = m_CurrentVelocity * deltaTime * 7.f * m_Speed * m_SpeedMultiplier * m_SpeedScrollMultiplier;
+		m_CurrentVelocity = MathUtils::MoveTowardsVec3(m_CurrentVelocity, m_TargetVelocity, m_AccelerationSpeed * deltaTime);
+		Vec3 v = m_CurrentVelocity * deltaTime * 7.f * m_Speed * m_SpeedMultiplier * m_SpeedScrollMultiplier;
 
-		glm::mat4 cameraRotation = GetRotationMatrix();
-		m_Position += glm::vec3(cameraRotation * glm::vec4(v.x, v.y, v.z, 0.f));
+		Mat4x4 cameraRotation = GetRotationMatrix();
+		m_Position += Vec3(cameraRotation * Vec4(v.x, v.y, v.z, 0.f));
 	}
 
-	void EditorCamera::OnEvent(const Spike::GenericEvent& event) {
+	void EditorCamera::OnEvent(const GenericEvent& event) {
 		 
-		Spike::EventHandler handler(event);
-		handler.Handle<Spike::MouseButtonPressEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonPress));
-		handler.Handle<Spike::MouseButtonReleaseEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonRelease));
-		handler.Handle<Spike::MouseScrollEvent>(BIND_FUNCTION(EditorCamera::OnMouseScroll));
+		EventHandler handler(event);
+		handler.Handle<MouseButtonPressEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonPress));
+		handler.Handle<MouseButtonReleaseEvent>(BIND_FUNCTION(EditorCamera::OnMouseButtonRelease));
+		handler.Handle<MouseScrollEvent>(BIND_FUNCTION(EditorCamera::OnMouseScroll));
 
 		// poll movement events, only when controlling camera
 		if (m_IsControlled) {
 
-			handler.Handle<Spike::KeyPressEvent>(BIND_FUNCTION(EditorCamera::OnKeyPress));
-			handler.Handle<Spike::KeyReleaseEvent>(BIND_FUNCTION(EditorCamera::OnKeyRelease));
-			handler.Handle<Spike::MouseMotionEvent>(BIND_FUNCTION(EditorCamera::OnMouseMotion));
+			handler.Handle<KeyPressEvent>(BIND_FUNCTION(EditorCamera::OnKeyPress));
+			handler.Handle<KeyReleaseEvent>(BIND_FUNCTION(EditorCamera::OnKeyRelease));
+			handler.Handle<MouseMotionEvent>(BIND_FUNCTION(EditorCamera::OnMouseMotion));
 		}
 	}
 
-	bool EditorCamera::OnKeyPress(const Spike::KeyPressEvent& event) {
+	bool EditorCamera::OnKeyPress(const KeyPressEvent& event) {
 
-		Spike::KeyPressEvent e = event;
+		KeyPressEvent e = event;
 
 		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
@@ -55,9 +56,9 @@ namespace SpikeEditor {
 		return false;
 	}
 
-	bool EditorCamera::OnKeyRelease(const Spike::KeyReleaseEvent& event) {
+	bool EditorCamera::OnKeyRelease(const KeyReleaseEvent& event) {
 
-		Spike::KeyReleaseEvent e = event;
+		KeyReleaseEvent e = event;
 
 		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
@@ -72,9 +73,9 @@ namespace SpikeEditor {
 		return false;
 	}
 
-	bool EditorCamera::OnMouseMotion(const Spike::MouseMotionEvent& event) {
+	bool EditorCamera::OnMouseMotion(const MouseMotionEvent& event) {
 
-		Spike::MouseMotionEvent e = event;
+		MouseMotionEvent e = event;
 
 		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
@@ -94,9 +95,9 @@ namespace SpikeEditor {
 		return false;
 	}
 
-	bool EditorCamera::OnMouseButtonPress(const Spike::MouseButtonPressEvent& event) {
+	bool EditorCamera::OnMouseButtonPress(const MouseButtonPressEvent& event) {
 
-		Spike::MouseButtonPressEvent e = event;
+		MouseButtonPressEvent e = event;
 
 		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
@@ -113,9 +114,9 @@ namespace SpikeEditor {
 		return false;
 	}
 
-	bool EditorCamera::OnMouseButtonRelease(const Spike::MouseButtonReleaseEvent& event) {
+	bool EditorCamera::OnMouseButtonRelease(const MouseButtonReleaseEvent& event) {
 
-		Spike::MouseButtonReleaseEvent e = event;
+		MouseButtonReleaseEvent e = event;
 
 		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
@@ -132,9 +133,9 @@ namespace SpikeEditor {
 		return false;
 	}
 
-	bool EditorCamera::OnMouseScroll(const Spike::MouseScrollEvent& event) {
+	bool EditorCamera::OnMouseScroll(const MouseScrollEvent& event) {
 
-		Spike::MouseScrollEvent e = event;
+		MouseScrollEvent e = event;
 
 		EXECUTE_ON_RENDER_THREAD(([=, this]() {
 
@@ -142,7 +143,7 @@ namespace SpikeEditor {
 
 				// change scroll speed multiplier
 				m_SpeedScrollMultiplier += e.GetScrollY() * m_ScrollSpeedDeltaFactor;
-				m_SpeedScrollMultiplier = Mathf::Clamp(m_SpeedScrollMultiplier, 0.01f, m_MaxSpeedScrollMultiplier);
+				m_SpeedScrollMultiplier = MathUtils::ClampF(m_SpeedScrollMultiplier, 0.01f, m_MaxSpeedScrollMultiplier);
 
 			}
 			else if (m_ViewportHovered) {
@@ -160,11 +161,11 @@ namespace SpikeEditor {
 
 	void EditorCamera::SetSpeed(float value) {
 
-		m_Speed = Mathf::Clamp(value, 1.f, m_MaxSpeed);
+		m_Speed = MathUtils::ClampF(value, 1.f, m_MaxSpeed);
 	}
 
 	void EditorCamera::SetSpeedMultiplier(float value) {
 
-		m_SpeedMultiplier = Mathf::Clamp(value, 1.f, m_MaxSpeedMultiplier);
+		m_SpeedMultiplier = MathUtils::ClampF(value, 1.f, m_MaxSpeedMultiplier);
 	}
 }

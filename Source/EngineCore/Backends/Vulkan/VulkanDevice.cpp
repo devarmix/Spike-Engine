@@ -1,0 +1,129 @@
+#include <Backends/Vulkan/VulkanDevice.h>
+
+#include <VkBootstrap.h>
+#include <SDL_vulkan.h>
+
+namespace Spike {
+
+	VulkanDevice::VulkanDevice() : 
+		Instance(nullptr),
+	    DebugMessenger(nullptr),
+		Device(nullptr),
+		PhysicalDevice(nullptr),
+		Surface(nullptr),
+		Allocator(nullptr),
+	    Queues{.GraphicsQueue = nullptr, .GraphicsQueueFamily = 0} {}
+
+
+	void VulkanDevice::Init(Window* window, bool useValidationLayers) {
+
+		vkb::InstanceBuilder builder;
+
+		// make vulkan instance, with basic textures
+		auto inst_ret = builder.set_app_name(window->GetName().c_str())
+			.request_validation_layers(useValidationLayers)
+			.use_default_debug_messenger()
+			.require_api_version(1, 3, 0)
+			.build();
+
+		vkb::Instance vkb_inst = inst_ret.value();
+
+		// grab the instance
+		Instance = vkb_inst.instance;
+		DebugMessenger = vkb_inst.debug_messenger;
+
+		SDL_Vulkan_CreateSurface((SDL_Window*)window->GetNativeWindow(), Instance, &Surface);
+
+		// vulkan 1.3 features
+		VkPhysicalDeviceVulkan13Features features13{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES };
+		features13.dynamicRendering = true;
+		features13.synchronization2 = true;
+
+		// vulkan 1.2 features
+		VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+		features12.descriptorIndexing = true;
+
+		features12.shaderSampledImageArrayNonUniformIndexing = true;
+		features12.shaderStorageBufferArrayNonUniformIndexing = true;
+		features12.shaderStorageImageArrayNonUniformIndexing = true;
+
+		features12.runtimeDescriptorArray = true;
+		features12.descriptorBindingVariableDescriptorCount = true;
+		features12.descriptorBindingPartiallyBound = true;
+
+		features12.descriptorBindingSampledImageUpdateAfterBind = true;
+		features12.descriptorBindingStorageImageUpdateAfterBind = true;
+		features12.descriptorBindingStorageBufferUpdateAfterBind = true;
+
+		features12.samplerFilterMinmax = true;
+		features12.drawIndirectCount = true;
+
+		VkPhysicalDeviceFeatures features{};
+		features.samplerAnisotropy = true;
+
+		// select the gpu, which supports vulkan 1.3 and can write to the SDL surface
+		vkb::PhysicalDeviceSelector selector{ vkb_inst };
+		vkb::PhysicalDevice physicalDevice = selector
+			.set_minimum_version(1, 3)
+			.set_required_features_13(features13)
+			.set_required_features_12(features12)
+			.set_required_features(features)
+			.set_surface(Surface)
+			.select()
+			.value();
+
+		// create the final vulkan device
+		vkb::DeviceBuilder deviceBuilder{ physicalDevice };
+
+		vkb::Device vkbDevice = deviceBuilder.build().value();
+
+		// get the VkDevice handle to be used in the rest of the application
+		Device = vkbDevice.device;
+		PhysicalDevice = physicalDevice.physical_device;
+
+		// get graphics queues
+		Queues.GraphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
+		Queues.GraphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
+
+		// initialize the memory allocator
+		VmaAllocatorCreateInfo allocatorInfo = {};
+		allocatorInfo.physicalDevice = PhysicalDevice;
+		allocatorInfo.device = Device;
+		allocatorInfo.instance = Instance;
+		allocatorInfo.flags = 0;
+		vmaCreateAllocator(&allocatorInfo, &Allocator);
+	}
+
+	void VulkanDevice::Destroy() {
+
+		if (Allocator) {
+
+			vmaDestroyAllocator(Allocator);
+			Allocator = nullptr;
+		}
+
+		if (Surface) {
+
+			vkDestroySurfaceKHR(Instance, Surface, nullptr);
+			Surface = nullptr;
+		}
+
+		if (Device) {
+
+			vkDestroyDevice(Device, nullptr);
+			Device = nullptr;
+		}
+
+		if (DebugMessenger) {
+
+			vkb::destroy_debug_utils_messenger(Instance, DebugMessenger);
+			DebugMessenger = nullptr;
+		}
+
+		if (Instance) {
+
+			vkDestroyInstance(Instance, nullptr);
+			Instance = nullptr;
+		}
+	}
+}

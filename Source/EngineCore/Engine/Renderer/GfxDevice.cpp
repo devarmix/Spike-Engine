@@ -1,9 +1,9 @@
 #include <Engine/Renderer/GfxDevice.h>
-#include <Platforms/Vulkan/VulkanGfxDevice.h>
+#include <Backends/Vulkan/VulkanGfxDevice.h>
 
 #include <Engine/Core/Application.h>
 
-Spike::GfxDevice* Spike::GGfxDevice = nullptr;
+Spike::RHIDevice* Spike::GRHIDevice = nullptr;
 
 uint32_t Spike::RoundUpToPowerOfTwo(float value) {
 
@@ -16,44 +16,28 @@ uint32_t Spike::RoundUpToPowerOfTwo(float value) {
 	return (uint32_t)glm::pow(2.0f, glm::trunc(valueBase + 1.0f));
 }
 
+uint32_t Spike::GetComputeGroupCount(uint32_t threadCount, uint32_t groupSize) {
+
+	return (threadCount + groupSize - 1) / groupSize;
+}
+
 namespace Spike {
-	
-	void GBufferResource::InitGPUData() {
 
-		ETextureUsageFlags textureFlags{};
-		textureFlags |= EUsageFlagColorAttachment;
-		textureFlags |= EUsageFlagSampled;
+	void RHICommandBuffer::InitRHI() {
 
-		m_AlbedoMapData = GGfxDevice->CreateTexture2DGPUData(m_Width, m_Height, EFormatRGBA16F, textureFlags, false, nullptr);
-		m_MaterialMapData = GGfxDevice->CreateTexture2DGPUData(m_Width, m_Height, EFormatRGBA8U, textureFlags, false, nullptr);
-		m_NormalMapData = GGfxDevice->CreateTexture2DGPUData(m_Width, m_Height, EFormatRGBA16F, textureFlags, false, nullptr);
-		m_DepthMapData = GGfxDevice->CreateDepthMapGPUData(m_Width, m_Height, m_DepthPyramidSize);
-		m_BloomMapData = GGfxDevice->CreateBloomMapGPUData(m_Width, m_Height);
-
-		ETextureUsageFlags ssaoFlags{};
-		ssaoFlags |= EUsageFlagSampled;
-		ssaoFlags |= EUsageFlagStorage;
-
-		m_SSAOMapData = GGfxDevice->CreateTexture2DGPUData(m_Width, m_Height, EFormatR32F, ssaoFlags, false, nullptr);
-		m_SSAOBlurMapData = GGfxDevice->CreateTexture2DGPUData(m_Width, m_Height, EFormatR32F, ssaoFlags, false, nullptr);
+		m_RHIData = GRHIDevice->CreateCommandBufferRHI();
 	}
 
-	void GBufferResource::ReleaseGPUData() {
+	void RHICommandBuffer::ReleaseRHI() {
 
-		GGfxDevice->DestroyTexture2DGPUData(m_AlbedoMapData);
-		GGfxDevice->DestroyTexture2DGPUData(m_MaterialMapData);
-		GGfxDevice->DestroyTexture2DGPUData(m_NormalMapData);
-		GGfxDevice->DestroyDepthMapGPUData(m_DepthMapData);
-		GGfxDevice->DestroyBloomMapGPUData(m_BloomMapData);
-		GGfxDevice->DestroyTexture2DGPUData(m_SSAOMapData);
-		GGfxDevice->DestroyTexture2DGPUData(m_SSAOBlurMapData);
+		GRHIDevice->DestroyCommandBufferRHI(m_RHIData);
 	}
 
-	void GfxDevice::Create(Window* window, bool useImGui) {
+	void RHIDevice::Create(Window* window, bool useImGui) {
 
 		EXECUTE_ON_RENDER_THREAD([=]() {
 
-			GGfxDevice = new VulkanGfxDevice(window, useImGui);
+			GRHIDevice = new VulkanRHIDevice(window, useImGui);
 			});
 
 		// init default data

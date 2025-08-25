@@ -4,7 +4,7 @@
 
 namespace Spike {
 
-	struct WindowCreateInfo {
+	struct WindowDesc {
 
 		std::string Name;
 
@@ -14,7 +14,7 @@ namespace Spike {
 
 	class Window {
 	public:
-		static Window* Create(const WindowCreateInfo& info);
+		static Window* Create(const WindowDesc& desc);
 		virtual ~Window() = default;
 
 		virtual uint32_t GetWidth() const = 0;

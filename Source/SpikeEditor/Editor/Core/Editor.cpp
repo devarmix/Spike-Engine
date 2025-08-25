@@ -2,41 +2,39 @@
 
 // main file
 #include <Engine/Core/Main.h>
-
 #include <Engine/SpikeEngine.h>
-using namespace SpikeEngine;
 
 
 // --Entry Point--
 Spike::Application* Spike::CreateApplication() {
 
-	WindowCreateInfo winInfo{
+	WindowDesc winDesc{
 
 		.Name = "Spike Editor",
 		.Width = 1920,
 		.Height = 1080
 	};
 
-	ApplicationCreateInfo appInfo{
+	ApplicationDesc appDesc{
 
 		.Name = "Spike Editor",
 		.UsingImGui = true,
-		.WinInfo = winInfo
+		.WindowDesc = winDesc
 	};
 
-	return new SpikeEditor::SpikeEditor(appInfo);
+	return new SpikeEditor::SpikeEditor(appDesc);
 }
 
 SpikeEditor::SpikeEditor* SpikeEditor::GEditor = nullptr;
 
 namespace SpikeEditor {
 
-	SpikeEditor::SpikeEditor(const Spike::ApplicationCreateInfo& info) : Application(info) {
+	SpikeEditor::SpikeEditor(const Spike::ApplicationDesc& desc) : Application(desc) {
 
 		GEditor = this;
 
 		m_EditorLayer = new EditorLayer();
-		PushOverlay(m_EditorLayer);
+		PushLayer(m_EditorLayer);
 	}
 
 	SpikeEditor::~SpikeEditor() { Destroy(); }

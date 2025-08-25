@@ -5,22 +5,22 @@
 #include <Engine/Events/ApplicationEvents.h>
 #include <Engine/Core/LayerStack.h>
 #include <Engine/Layers/SceneLayer.h>
+#include <Engine/Layers/RenderLayer.h>
 #include <Engine/Core/Timestep.h>
 #include <Engine/Core/Core.h>
 
 namespace Spike {
 
-	struct ApplicationCreateInfo {
+	struct ApplicationDesc {
 
 		std::string Name;
 		bool UsingImGui;
-		WindowCreateInfo WinInfo;
+		WindowDesc WindowDesc;
 	};
 
 	class Application {
 	public:
-
-		Application(const ApplicationCreateInfo& info);
+		Application(const ApplicationDesc& info);
 		virtual ~Application() = default;
 
 		// Layers
@@ -36,8 +36,10 @@ namespace Spike {
 		void OnEvent(const GenericEvent& event);
 
 		Window* GetMainWindow() { return m_Window; }
+		RenderLayer* GetRenderLayer() { return m_RenderLayer; }
 		RenderThread& GetRenderThread() { return m_RenderThread; }
 
+		bool IsUsingImGui() const { return m_UsingImGui; }
 		void Destroy();
 
 	private:
@@ -58,6 +60,7 @@ namespace Spike {
 		bool m_UsingImGui = false;
 
 		SceneLayer* m_SceneLayer;
+		RenderLayer* m_RenderLayer;
 
 		Time m_Time;
 	};

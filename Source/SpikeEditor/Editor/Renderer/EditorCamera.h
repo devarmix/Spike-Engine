@@ -3,9 +3,8 @@
 #include <Engine/SpikeEngine.h>
 #include <Engine/Events/Event.h>
 #include <Engine/Renderer/PerspectiveCamera.h>
-using namespace SpikeEngine;
-
 #include <Engine/Events/ApplicationEvents.h>
+using namespace Spike;
 
 namespace SpikeEditor {
 
@@ -15,7 +14,7 @@ namespace SpikeEditor {
 		~EditorCamera();
 
 		void OnUpdate(float deltaTime);
-		void OnEvent(const Spike::GenericEvent& event);
+		void OnEvent(const GenericEvent& event);
 
 		void SetViewportHovered(bool value) { m_ViewportHovered = value; }
 
@@ -27,18 +26,18 @@ namespace SpikeEditor {
 
 	private:
 
-		bool OnKeyPress(const Spike::KeyPressEvent& event);
-		bool OnKeyRelease(const Spike::KeyReleaseEvent& event);
+		bool OnKeyPress(const KeyPressEvent& event);
+		bool OnKeyRelease(const KeyReleaseEvent& event);
 
-		bool OnMouseMotion(const Spike::MouseMotionEvent& event);
-		bool OnMouseButtonPress(const Spike::MouseButtonPressEvent& event);
-		bool OnMouseButtonRelease(const Spike::MouseButtonReleaseEvent& event);
-		bool OnMouseScroll(const Spike::MouseScrollEvent& event);
+		bool OnMouseMotion(const MouseMotionEvent& event);
+		bool OnMouseButtonPress(const MouseButtonPressEvent& event);
+		bool OnMouseButtonRelease(const MouseButtonReleaseEvent& event);
+		bool OnMouseScroll(const MouseScrollEvent& event);
 
 	private:
 
-		Vector3 m_TargetVelocity;
-		Vector3 m_CurrentVelocity;
+		Vec3 m_TargetVelocity{};
+		Vec3 m_CurrentVelocity{};
 
 		float m_AccelerationSpeed = 5.f;
 		float m_ScrollSpeed = 0.4f;

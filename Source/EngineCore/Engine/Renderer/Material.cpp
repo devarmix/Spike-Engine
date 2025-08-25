@@ -2,254 +2,128 @@
 #include <Engine/Renderer/GfxDevice.h>
 #include <Engine/Core/Log.h>
 #include <Engine/Core/Application.h>
+#include <Engine/Renderer/FrameRenderer.h>
 
 namespace Spike {
 
-	void MaterialResource::InitGPUData() {
+	void RHIMaterial::InitRHI() {
 
-		m_GPUData = GGfxDevice->CreateMaterialGPUData(m_SurfaceType);
+		// TODO - FIX ME PLEASE, 
+		// the buffer is updated when its still might be in use by gpu and can cause crash 
+		m_DataIndex = GShaderManager->GetMaterialDataIndex();
+		m_Shader = GShaderManager->GetShaderFromCache(m_ShaderDesc);
 	}
 
-	void MaterialResource::ReleaseGPUData() {
+	void RHIMaterial::ReleaseRHIImmediate() {
 
-		GGfxDevice->DestroyMaterialGPUData(m_GPUData);
+		GShaderManager->ReleaseMaterialDataIndex(m_DataIndex);
 	}
-}
 
-namespace SpikeEngine {
+	void RHIMaterial::ReleaseRHI() {
 
-	Material::Material(EMaterialSurfaceType surfaceType) {
-
-		CreateResource(surfaceType);
+		GFrameRenderer->PushToExecQueue([dataIndex = m_DataIndex]() {
+			GShaderManager->ReleaseMaterialDataIndex(dataIndex);
+			});
 	}
+
+	Material::Material(EMaterialSurfaceType surfaceType, const ShaderDesc& shaderDesc) {
+
+		CreateResource(surfaceType, shaderDesc);
+		m_Textures.resize(16);
+	}
+
 
 	Material::~Material() {
 
 		ReleaseResource();
-		ASSET_CORE_DESTROY();
+		m_Textures.clear();
 	}
 
-	Ref<Material> Material::Create(EMaterialSurfaceType surfaceType) {
+	Ref<Material> Material::Create(EMaterialSurfaceType surfaceType, const ShaderDesc& shaderDesc) {
 
-		return CreateRef<Material>(surfaceType);
+		return CreateRef<Material>(surfaceType, shaderDesc);
 	}
 
-	void Material::SetScalarParameter(const std::string& name, float value) {
+	void Material::SetScalar(uint8_t resource, float value) {
 
-		auto it = m_ScalarParameters.find(name);
-		if (it != m_ScalarParameters.end()) {
+		uint32_t dataIndex = m_RHIResource->GetDataIndex();
 
-			m_ScalarParameters[name].Value = value;
-			uint8_t valIndex = m_ScalarParameters[name].DataBindIndex;
+		EXECUTE_ON_RENDER_THREAD(([=]() {
 
-			EXECUTE_ON_RENDER_THREAD([=]() {
-				
-				GGfxDevice->SetMaterialScalarParameter(m_RenderResource, valIndex, value);
+			GFrameRenderer->PushToExecQueue([=]() {
+				GShaderManager->GetMaterialData(dataIndex).ScalarData[resource] = value;
+				GShaderManager->UpdateMaterialData(dataIndex);
 				});
-		}
-		else {
-
-			ENGINE_ERROR("Scalar parameter with the name: {0} does not exist!", name);
-		}
+			}));
 	}
 
-	void Material::SetColorParameter(const std::string& name, Vector4 value) {
+	void Material::SetUint(uint8_t resource, uint32_t value) {
 
-		auto it = m_ColorParameters.find(name);
-		if (it != m_ColorParameters.end()) {
+		uint32_t dataIndex = m_RHIResource->GetDataIndex();
 
-			m_ColorParameters[name].Value = value;
-			uint8_t valIndex = m_ColorParameters[name].DataBindIndex;
-			
-			EXECUTE_ON_RENDER_THREAD([=]() {
-				
-				GGfxDevice->SetMaterialColorParameter(m_RenderResource, valIndex, value);
+		EXECUTE_ON_RENDER_THREAD(([=]() {
+
+			GFrameRenderer->PushToExecQueue([=]() {
+				GShaderManager->GetMaterialData(dataIndex).UintData[resource] = value;
+				GShaderManager->UpdateMaterialData(dataIndex);
 				});
-		}
-		else {
-
-			ENGINE_ERROR("Color parameter with the name: {0} does not exist!", name);
-		}
+			}));
 	}
 
-	void Material::SetTextureParameter(const std::string& name, Ref<Texture2D> value) {
+	void Material::SetVec2(uint8_t resource, const Vec2& value) {
 
-		auto it = m_TextureParameters.find(name);
-		if (it != m_TextureParameters.end()) {
+		uint32_t dataIndex = m_RHIResource->GetDataIndex();
 
-			m_TextureParameters[name].Value = value;
-			uint8_t valIndex = m_TextureParameters[name].DataBindIndex;
+		EXECUTE_ON_RENDER_THREAD(([=]() {
 
-			Texture2DResource* texture = value->GetResource();
-
-			EXECUTE_ON_RENDER_THREAD([=]() {
-
-				GGfxDevice->SetMaterialTextureParameter(m_RenderResource, valIndex, texture);
+			GFrameRenderer->PushToExecQueue([=]() {
+				GShaderManager->GetMaterialData(dataIndex).Float2Data[resource] = value;
+				GShaderManager->UpdateMaterialData(dataIndex);
 				});
-		}
-		else {
-
-			ENGINE_ERROR("Texture parameter with the name: {0} does not exist!", name);
-		}
+			}));
 	}
 
-	float Material::GetScalarParameter(const std::string& name) {
+	void Material::SetVec4(uint8_t resource, const Vec4& value) {
 
-		auto it = m_ScalarParameters.find(name);
-		if (it != m_ScalarParameters.end()) {
+		uint32_t dataIndex = m_RHIResource->GetDataIndex();
 
-			return m_ScalarParameters[name].Value;
-		}
-		else {
+		EXECUTE_ON_RENDER_THREAD(([=]() {
 
-			ENGINE_ERROR("Scalar parameter with the name : {0} does not exist!", name);
-			return 0;
-		}
+			GFrameRenderer->PushToExecQueue([=]() {
+				GShaderManager->GetMaterialData(dataIndex).Float4Data[resource] = value;
+				GShaderManager->UpdateMaterialData(dataIndex);
+				});
+			}));
 	}
 
-	Vector4 Material::GetColorParameter(const std::string& name) {
+	void Material::SetTextureSRV(uint8_t resource, Ref<Texture2D> value) {
 
-		auto it = m_ColorParameters.find(name);
-		if (it != m_ColorParameters.end()) {
+		m_Textures[resource] = value;
+		RHITextureView* view = value->GetResource()->GetTextureView();
 
-			return m_ColorParameters[name].Value;
-		}
-		else {
+		EXECUTE_ON_RENDER_THREAD(([=]() {
 
-			ENGINE_ERROR("Color parameter with the name : {0} does not exist!", name);
-			return Vector4::Zero();
-		}
-	}
+			uint32_t dataIndex = m_RHIResource->GetDataIndex();
+			uint32_t texIndex = view->GetSRVIndex();
+			uint32_t samplerIndex = view->GetSourceTexture()->GetSampler()->GetShaderIndex();
 
-	Ref<Texture2D> Material::GetTextureParameter(const std::string& name) {
-
-		auto it = m_TextureParameters.find(name);
-		if (it != m_TextureParameters.end()) {
-
-			return m_TextureParameters[name].Value;
-		}
-		else {
-
-			ENGINE_ERROR("Texture parameter with the name : {0} does not exist!", name);
-			return nullptr;
-		}
+			GFrameRenderer->PushToExecQueue([=]() {
+				GShaderManager->GetMaterialData(dataIndex).TextureData[resource] = texIndex;
+				GShaderManager->GetMaterialData(dataIndex).SamplerData[resource] = samplerIndex;
+				GShaderManager->UpdateMaterialData(dataIndex);
+				});
+			}));
 	}
 
 	void Material::ReleaseResource() {
 
-		SafeRenderResourceRelease(m_RenderResource);
-		m_RenderResource = nullptr;
+		SafeRHIResourceRelease(m_RHIResource);
+		m_RHIResource = nullptr;
 	}
 
-	void Material::CreateResource(EMaterialSurfaceType surfaceType) {
+	void Material::CreateResource(EMaterialSurfaceType surfaceType, const ShaderDesc& shaderDesc) {
 
-		m_RenderResource = new MaterialResource(surfaceType);
-		SafeRenderResourceInit(m_RenderResource);
-	}
-
-	void Material::AddScalarParameter(const std::string& name, uint8_t valIndex, float value) {
-
-		auto it = m_ScalarParameters.find(name);
-		if (it == m_ScalarParameters.end()) {
-
-			ScalarParameter newParam{ .Value = value, .DataBindIndex = valIndex };
-			m_ScalarParameters[name] = newParam;
-
-			EXECUTE_ON_RENDER_THREAD(([=, this]() {
-
-				GGfxDevice->SetMaterialScalarParameter(m_RenderResource, valIndex, value);
-				}));
-		}
-		else {
-
-			ENGINE_ERROR("Scalar parameter with the name: {0} already exists!", name);
-		}
-	}
-
-	void Material::AddColorParameter(const std::string& name, uint8_t valIndex, Vector4 value) {
-
-		auto it = m_ColorParameters.find(name);
-		if (it == m_ColorParameters.end()) {
-
-			ColorParameter newParam{ .Value = value, .DataBindIndex = valIndex };
-			m_ColorParameters[name] = newParam;
-
-			EXECUTE_ON_RENDER_THREAD(([=, this]() {
-
-				GGfxDevice->SetMaterialColorParameter(m_RenderResource, valIndex, value);
-				}));
-		}
-		else {
-
-			ENGINE_ERROR("Color parameter with the name: {0} already exists!", name);
-		}
-	}
-
-	void Material::AddTextureParameter(const std::string& name, uint8_t valIndex, Ref<Texture2D> value) {
-
-		auto it = m_TextureParameters.find(name);
-		if (it == m_TextureParameters.end()) {
-
-			TextureParameter newParam{ .Value = value, .DataBindIndex = valIndex };
-			m_TextureParameters[name] = newParam;
-
-			Texture2DResource* texture = value->GetResource();
-
-			EXECUTE_ON_RENDER_THREAD(([=, this]() {
-
-				GGfxDevice->AddMaterialTextureParameter(m_RenderResource, valIndex);
-				GGfxDevice->SetMaterialTextureParameter(m_RenderResource, valIndex, texture);
-				}));
-		}
-		else {
-
-			ENGINE_ERROR("Texture parameter with the name: {0} already exists!", name);
-		}
-	}
-
-	void Material::RemoveScalarParameter(const std::string& name) {
-
-		auto it = m_ScalarParameters.find(name);
-		if (it != m_ScalarParameters.end()) {
-
-			m_ScalarParameters.erase(name);
-		}
-		else {
-
-			ENGINE_ERROR("Scalar parameter with the name : {0} does not exist!", name);
-		}
-	}
-
-	void Material::RemoveColorParameter(const std::string& name) {
-
-		auto it = m_ColorParameters.find(name);
-		if (it != m_ColorParameters.end()) {
-
-			m_ColorParameters.erase(name);
-		}
-		else {
-
-			ENGINE_ERROR("Color parameter with the name : {0} does not exist!", name);
-		}
-	}
-
-	void Material::RemoveTextureParameter(const std::string& name) {
-
-		auto it = m_TextureParameters.find(name);
-		if (it != m_TextureParameters.end()) {
-
-			uint8_t valIndex = m_TextureParameters[name].DataBindIndex;
-
-			EXECUTE_ON_RENDER_THREAD(([=, this]() {
-
-				GGfxDevice->RemoveMaterialTextureParameter(m_RenderResource, valIndex);
-				}));
-
-			m_TextureParameters.erase(name);
-		}
-		else {
-
-			ENGINE_ERROR("Texture parameter with the name : {0} does not exist!", name);
-		}
+		m_RHIResource = new RHIMaterial(surfaceType, shaderDesc);
+		SafeRHIResourceInit(m_RHIResource);
 	}
 }

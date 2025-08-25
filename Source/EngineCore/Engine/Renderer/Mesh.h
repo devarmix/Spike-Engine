@@ -4,8 +4,7 @@
 #include <Engine/Asset/Asset.h>
 
 #include <Engine/Renderer/Material.h>
-#include <Engine/Renderer/RenderResource.h>
-#include <Engine/Math/Vector3.h>
+#include <Engine/Renderer/RHIResource.h>
 #include <filesystem>
 #include <glm/glm.hpp>
 using namespace Spike;
@@ -14,71 +13,73 @@ namespace Spike {
 
 	struct Vertex {
 
-		glm::vec4 Position;           // w - UV_x
-		glm::vec4 Normal;             // w - UV_y
-		glm::vec4 Color;
-		glm::vec4 Tangent;            // w - handedness
+		Vec4 Position;           // w - UV_x
+		Vec4 Normal;             // w - UV_y
+		Vec4 Color;
+		Vec4 Tangent;            // w - handedness
 	};
-
-	class MeshResource : public RenderResource {
-	public:
-
-		MeshResource(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, bool needCPUData) 
-			: m_Vertices(vertices), m_Indices(indices), m_NeedCPUData(needCPUData), m_GPUData(nullptr) {}
-
-		virtual ~MeshResource() override { m_Vertices.clear(); m_Indices.clear(); }
-
-		ResourceGPUData* GetGPUData() { return m_GPUData; }
-
-		virtual void InitGPUData() override;
-		virtual void ReleaseGPUData() override;
-
-	private:
-
-		ResourceGPUData* m_GPUData;
-
-		std::vector<Vertex> m_Vertices;
-		std::vector<uint32_t> m_Indices;
-
-		bool m_NeedCPUData;
-	};
-}
-
-namespace SpikeEngine {
 
 	struct SubMesh {
 
 		uint32_t FirstIndex;
 		uint32_t IndexCount;
 
-		Vector3 BoundsOrigin;
-		Vector3 BoundsExtents;
+		Vec3 BoundsOrigin;
+		Vec3 BoundsExtents;
 		float BoundsRadius;
 
 		Ref<Material> Material;
 	};
 
-	class Mesh : public Asset {
+	struct MeshDesc {
+
+		std::vector<Vertex> Vertices;
+		std::vector<uint32_t> Indices;
+		bool NeedCPUData = false;
+	};
+
+	class RHIMesh : public RHIResource {
 	public:
+		RHIMesh(const MeshDesc& desc);
+		virtual ~RHIMesh() override {}
 
-		Mesh(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const std::vector<SubMesh>& subMeshes, bool needCPUData);
-		virtual ~Mesh() override;
+		virtual void InitRHI() override;
+		virtual void ReleaseRHI() override;
 
-		static Ref<Mesh> Create(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, const std::vector<SubMesh>& subMeshes, bool needCPUData = false);
-		static std::vector<Ref<Mesh>> Create(std::filesystem::path filePath);
+		RHIBuffer* GetVertexBuffer() { return m_VertexBuffer; }
+		RHIBuffer* GetIndexBuffer() { return m_IndexBuffer; }
 
-		MeshResource* GetResource() { return m_RenderResource; }
-		void ReleaseResource();
-		void CreateResource(const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices, bool needCPUData = false);
-
-		ASSET_CLASS_TYPE(MeshAsset)
-
-	public:
-
-		std::vector<SubMesh> SubMeshes;
+		const std::vector<Vertex>& GetVertices() const { return m_Desc.Vertices; }
+		const std::vector<uint32_t>& GetIndices() const { return m_Desc.Indices; }
+		const MeshDesc& GetDesc() const { return m_Desc; }
 
 	private:
 
-		MeshResource* m_RenderResource;
+		MeshDesc m_Desc;
+
+		RHIBuffer* m_VertexBuffer;
+		RHIBuffer* m_IndexBuffer;
+	};
+
+	class Mesh : public Asset {
+	public:
+		Mesh(const MeshDesc& desc);
+		virtual ~Mesh() override;
+
+		static Ref<Mesh> Create(const MeshDesc& desc);
+		static std::vector<Ref<Mesh>> Create(const std::filesystem::path& filePath);
+		
+		RHIMesh* GetResource() { return m_RHIResource; }
+		void ReleaseResource();
+		void CreateResource(const MeshDesc& desc);
+
+		const std::vector<Vertex>& GetVertices() const { return m_RHIResource->GetVertices(); }
+		const std::vector<uint32_t>& GetIndices() const { return m_RHIResource->GetIndices(); }
+
+	public:
+		std::vector<SubMesh> SubMeshes;
+
+	private:
+		RHIMesh* m_RHIResource;
 	};
 }

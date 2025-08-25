@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Engine/Core/Layer.h>
-#include <Engine/Renderer/GfxDevice.h>
+#include <Engine/Renderer/FrameRenderer.h>
 using namespace Spike;
 
 #include <Editor/Renderer/EditorCamera.h>
@@ -28,9 +28,10 @@ namespace SpikeEditor {
 
 		EditorCamera m_EditorCamera;
 
-		Ref<Texture2D> m_SceneViewport;
-		GBufferResource* m_GBuffer = nullptr;
+		SceneRenderProxy m_Scene;
+		std::vector<SceneRenderFeature*> m_Features;
 
+		Ref<Texture2D> m_SceneViewport;
 		Ref<CubeTexture> m_IrradianceTexture;
 		Ref<CubeTexture> m_EnvironmentTexture;
 		Ref<CubeTexture> m_SkyboxTexture;

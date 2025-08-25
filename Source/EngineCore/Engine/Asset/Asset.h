@@ -7,16 +7,14 @@ namespace Spike {
 
 	enum AssetType : uint8_t {
 
-		None = 0,
+		EAssetNone = 0,
 
-		Texture2DAsset,
-		CubeTextureAsset,
-		MaterialAsset,
-		MeshAsset
+		EAssetTexture2D,
+		EAssetCubeTexture,
+		EAssetMaterial,
+		EAssetMaterialInstance,
+		EAssetMesh
 	};
-
-	std::string GetStringFromAssetType(AssetType type);
-	AssetType GetAssetTypeFromString(std::string s);
 
 #define ASSET_CORE_DESTROY()
 
@@ -28,7 +26,7 @@ namespace Spike {
 	public:
 
 		virtual ~Asset() = default;
-		virtual AssetType GetType() const = 0;
+		//virtual AssetType GetType() const = 0;
 
 	public:
 

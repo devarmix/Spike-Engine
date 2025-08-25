@@ -8,5 +8,6 @@
 #include <Engine/Core/Log.h>
 #include <Engine/Core/Window.h>
 #include <Engine/Core/Stats.h>
+#include <Engine/Utils/MathUtils.h>
 
 #include <Engine/Events/Event.h>

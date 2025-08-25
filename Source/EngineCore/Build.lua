@@ -22,11 +22,12 @@ project "EngineCore"
 		"%{IncludeDir.IMGUI}",
         "%{IncludeDir.SDL}",
         "%{IncludeDir.VMA}",
-        "%{IncludeDir.VKBootstrap}",
+        "%{IncludeDir.VK_BOOTSTRAP}",
 		"%{IncludeDir.VULKAN_SDK}",
 		"%{IncludeDir.FAST_GLTF}",
 		"%{IncludeDir.ENTT}",
-
+		"%{IncludeDir.SHADER_COMPILER}",
+		"%{IncludeDir.SHADERS_GENERATED}",
 		""
 	}
 

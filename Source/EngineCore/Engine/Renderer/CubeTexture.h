@@ -4,65 +4,85 @@
 #include <Engine/Asset/Asset.h>
 #include <Engine/Renderer/TextureBase.h>
 #include <Engine/Renderer/Texture2D.h>
-using namespace Spike;
 
 namespace Spike {
 
-	enum ECubeTextureFilterMode {
+	enum class ECubeTextureFilterMode : uint8_t {
 
-		EFilterNone = 0,
-		EFilterIrradiance,
-		EFilterRadiance
+		ENone = 0,
+		EIrradiance,
+		ERadiance
 	};
 
-	class CubeTextureResource : public TextureResource {
+	class RHICubeTexture;
+
+	struct CubeTextureDesc {
+
+		uint32_t Size;
+		uint32_t NumMips = 1;
+
+		ETextureFormat Format;
+		ETextureUsageFlags UsageFlags;
+		RHITexture* SamplerTexture;
+		ECubeTextureFilterMode FilterMode = ECubeTextureFilterMode::ENone;
+
+		SamplerDesc SamplerDesc;
+
+		bool operator==(const CubeTextureDesc& other) const {
+
+			return (Size == other.Size
+				&& NumMips == other.NumMips
+				&& Format == other.Format
+				&& UsageFlags == other.UsageFlags
+				&& SamplerDesc == other.SamplerDesc);
+		}
+	};
+
+	class RHICubeTexture : public RHITexture {
 	public:
+		RHICubeTexture(const CubeTextureDesc& desc);
+		virtual ~RHICubeTexture() override {}
 
-		CubeTextureResource(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, TextureResource* samplerTexture, ECubeTextureFilterMode filterMode)
-			: TextureResource(format, usageFlags), m_Size(size), m_FilterMode(filterMode), m_SamplerTexture(samplerTexture) {}
+		virtual void InitRHI() override;
+		virtual void ReleaseRHI() override;
+		virtual void ReleaseRHIImmediate() override;
 
-		virtual ~CubeTextureResource() override {}
+		virtual ETextureFormat GetFormat() const override { return m_Desc.Format; }
+		virtual ETextureUsageFlags GetUsageFlags() const override { return m_Desc.UsageFlags; }
+		virtual Vec3Uint GetSizeXYZ() const override { return Vec3(m_Desc.Size, m_Desc.Size, 1); }
+		virtual uint32_t GetNumMips() const override { return m_Desc.NumMips; }
+		virtual ETextureType GetTextureType() const override { return ETextureType::ECube; }
 
-		virtual void InitGPUData() override;
-		virtual void ReleaseGPUData() override;
-
-		uint32_t GetSize() const { return m_Size; }
-		ECubeTextureFilterMode GetFilterMode() const { return m_FilterMode; }
+		ECubeTextureFilterMode GetFilterMode() const { return m_Desc.FilterMode; }
+		const CubeTextureDesc& GetDesc() { return m_Desc; }
 
 	private:
 
-		uint32_t m_Size;
-		ECubeTextureFilterMode m_FilterMode;
-
-		TextureResource* m_SamplerTexture;
+		CubeTextureDesc m_Desc;
 	};
-}
-
-namespace SpikeEngine {
 
 	class CubeTexture : public Asset {
 	public:
-
-		CubeTexture(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, TextureResource* samplerTexture, ECubeTextureFilterMode filterMode);
+		CubeTexture(const CubeTextureDesc& desc);
 		virtual ~CubeTexture() override;
 
-		static Ref<CubeTexture> Create(const char* filePath, uint32_t size, ETextureFormat format = EFormatRGBA32F);
-		static Ref<CubeTexture> Create(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, Ref<Texture2D> samplerTexture);
-		static Ref<CubeTexture> CreateFiltered(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, Ref<CubeTexture> samplerTexture, ECubeTextureFilterMode filterMode);
+		static Ref<CubeTexture> Create(const char* filePath, uint32_t size, const SamplerDesc& samplerDesc, ETextureFormat format = ETextureFormat::ERGBA32F);
+		static Ref<CubeTexture> Create(const CubeTextureDesc& desc);
 
-		CubeTextureResource* GetResource() { return m_RenderResource; }
+		RHICubeTexture* GetResource() { return m_RHIResource; }
 		void ReleaseResource();
-		void CreateResource(uint32_t size, ETextureFormat format, ETextureUsageFlags usageFlags, TextureResource* samplerTexture, ECubeTextureFilterMode filterMode = EFilterNone);
+		void CreateResource(const CubeTextureDesc& desc);
 
-		uint32_t GetSize() const { return m_RenderResource->GetSize(); }
+		Vec3Uint GetSizeXYZ() const { return m_RHIResource->GetSizeXYZ(); }
+		ETextureFormat GetFormat() const { return m_RHIResource->GetFormat(); }
+		ECubeTextureFilterMode GetFilterMode() const { return m_RHIResource->GetFilterMode(); }
+		uint32_t GetNumMips() const { return m_RHIResource->GetNumMips(); }
+		bool IsMipmapped() const { return m_RHIResource->IsMipmaped(); }
 
-		ETextureFormat GetFormat() const { return m_RenderResource->GetFormat(); }
-		ECubeTextureFilterMode GetFilterMode() const { return m_RenderResource->GetFilterMode(); }
-
-		ASSET_CLASS_TYPE(CubeTextureAsset)
+		//ASSET_CLASS_TYPE(CubeTextureAsset)
 
 	private:
 
-		CubeTextureResource* m_RenderResource;
+		RHICubeTexture* m_RHIResource;
 	};
 }

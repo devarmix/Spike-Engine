@@ -12,8 +12,10 @@ namespace Spike {
 
 	void LayerStack::CleanAll() {
 
-		for (Layer* layer : m_Layers)
+		for (Layer* layer : m_Layers) {
+			layer->OnDetach();
 			delete layer;
+		}
 
 		m_Layers.clear();
 	}

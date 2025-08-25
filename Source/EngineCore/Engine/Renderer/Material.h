@@ -1,109 +1,64 @@
 #pragma once
 
 #include <Engine/Core/Core.h>
-#include <Engine/Math/Vector4.h>
 #include <Engine/Renderer/Texture2D.h>
+#include <Engine/Renderer/Buffer.h>
 #include <Engine/Asset/Asset.h>
-#include <Engine/Renderer/RenderResource.h>
-using namespace Spike;
-
-#include <map>
+#include <Engine/Renderer/Shader.h>
 
 namespace Spike {
 
-	enum EMaterialSurfaceType : uint8_t {
+	enum class EMaterialSurfaceType : uint8_t {
 
-		ESurfaceTypeOpaque,
-		ESurfaceTypeTransparent
+		ENone = 0,
+		EOpaque,
+		ETransparent
 	};
 
-	class MaterialResource : public RenderResource {
+	class RHIMaterial : public RHIResource {
 	public:
+		RHIMaterial(EMaterialSurfaceType surfaceType, const ShaderDesc& shaderDesc) : m_SurfaceType(surfaceType), m_DataIndex(0), m_Shader(nullptr), m_ShaderDesc(shaderDesc) {}
+		virtual ~RHIMaterial() override {}
 
-		MaterialResource(EMaterialSurfaceType surfaceType)
-			: m_SurfaceType(surfaceType), m_GPUData(nullptr) {}
-
-		virtual ~MaterialResource() override {}
-
-		ResourceGPUData* GetGPUData() { return m_GPUData; }
-
-		virtual void InitGPUData() override;
-		virtual void ReleaseGPUData() override;
+		virtual void InitRHI() override;
+		virtual void ReleaseRHI() override;
+		virtual void ReleaseRHIImmediate() override;
 
 		EMaterialSurfaceType GetSurfaceType() const { return m_SurfaceType; }
+		uint32_t GetDataIndex() const { return m_DataIndex; }
+		RHIShader* GetShader() { return m_Shader; }
 
 	private:
 
-		ResourceGPUData* m_GPUData;
-
 		EMaterialSurfaceType m_SurfaceType;
+		uint32_t m_DataIndex;
+
+		RHIShader* m_Shader;
+		ShaderDesc m_ShaderDesc;
 	};
-}
-
-namespace SpikeEngine {
-
-	struct ScalarParameter {
-
-		float Value;
-
-		uint8_t DataBindIndex;
-	};
-
-	struct ColorParameter {
-
-		Vector4 Value;
-
-		uint8_t DataBindIndex;
-	};
-
-	struct TextureParameter {
-
-		Ref<Texture2D> Value;
-
-		uint8_t DataBindIndex;
-	};
-
 
 	class Material : public Asset {
 	public:
-
-		Material(EMaterialSurfaceType surfaceType);
+		Material(EMaterialSurfaceType surfaceType, const ShaderDesc& shaderDesc);
 		virtual ~Material() override;
 
-		static Ref<Material> Create(EMaterialSurfaceType surfaceType);
+		static Ref<Material> Create(EMaterialSurfaceType surfaceType, const ShaderDesc& shaderDesc);
 
-		void SetScalarParameter(const std::string& name, float value);
-		void SetColorParameter(const std::string& name, Vector4 value);
-		void SetTextureParameter(const std::string& name, Ref<Texture2D> value);
+		void SetScalar(uint8_t resource, float value);
+		void SetUint(uint8_t resource, uint32_t value);
+		void SetVec2(uint8_t resource, const Vec2& value);
+		void SetVec4(uint8_t resource, const Vec4& value);
+		void SetTextureSRV(uint8_t resource, Ref<Texture2D> value);
 
-		float GetScalarParameter(const std::string& name);
-		Vector4 GetColorParameter(const std::string& name);
-		Ref<Texture2D> GetTextureParameter(const std::string& name);
+		EMaterialSurfaceType GetSurfaceType() const { return m_RHIResource->GetSurfaceType(); }
 
-		EMaterialSurfaceType GetSurfaceType() const { return m_RenderResource->GetSurfaceType(); }
-
-		MaterialResource* GetResource() { return m_RenderResource; }
+		RHIMaterial* GetResource() { return m_RHIResource; }
 		void ReleaseResource();
-		void CreateResource(EMaterialSurfaceType surfaceType);
-
-		ASSET_CLASS_TYPE(MaterialAsset)
-
-	public:
-
-		void AddScalarParameter(const std::string& name, uint8_t valIndex, float value);
-		void AddColorParameter(const std::string& name, uint8_t valIndex, Vector4 value);
-		void AddTextureParameter(const std::string& name, uint8_t valIndex, Ref<Texture2D> value);
-
-		void RemoveScalarParameter(const std::string& name);
-		void RemoveColorParameter(const std::string& name);
-		void RemoveTextureParameter(const std::string& name);
-
-		std::map<std::string, ScalarParameter> m_ScalarParameters;
-		std::map<std::string, ColorParameter> m_ColorParameters;
-		std::map<std::string, TextureParameter> m_TextureParameters;
+		void CreateResource(EMaterialSurfaceType surfaceType, const ShaderDesc& shaderDesc);
 
 	private:
 
-		MaterialResource* m_RenderResource;
+		RHIMaterial* m_RHIResource;
+		std::vector<Ref<Texture2D>> m_Textures;
 	};
 }

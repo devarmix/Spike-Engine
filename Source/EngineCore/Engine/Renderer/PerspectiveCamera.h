@@ -1,18 +1,17 @@
 #pragma once
 
-#include <glm/glm.hpp>
 #include <Engine/Core/Core.h>
 
-namespace SpikeEngine {
+namespace Spike {
 
 	class PerspectiveCamera {
 	public:
 
-		glm::mat4 GetViewMatrix() const;
-		glm::mat4 GetRotationMatrix() const;
-		glm::mat4 GetProjectionMatrix(float aspect) const;
+		Mat4x4 GetViewMatrix() const;
+		Mat4x4 GetRotationMatrix() const;
+		Mat4x4 GetProjectionMatrix(float aspect) const;
 
-		glm::vec3 GetPosition() const { return m_Position; }
+		Vec3 GetPosition() const { return m_Position; }
 
 		void SetCameraFOV(float fov) { m_FOV = fov; }
 
@@ -28,7 +27,7 @@ namespace SpikeEngine {
 		float m_Near = 10000.f;
 		float m_Far = 0.01f;
 
-		glm::vec3 m_Position = { 0, 0, 0 };
-		glm::vec3 m_Rotation = { 0, 0, 0 };
+		Vec3 m_Position = { 0, 0, 0 };
+		Vec3 m_Rotation = { 0, 0, 0 };
 	};
 }
