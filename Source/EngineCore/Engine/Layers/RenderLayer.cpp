@@ -21,7 +21,7 @@ namespace Spike {
 		EXECUTE_ON_RENDER_THREAD([]() {
 
 			GShaderManager = new ShaderManager();
-			GShaderManager->InitMaterialDataBuffer();
+			GShaderManager->InitMatDataBuffer();
 
 			GSamplerCache = new SamplerCache();
 			GFrameRenderer = new FrameRenderer();

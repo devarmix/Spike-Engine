@@ -19,7 +19,8 @@ project "ShaderCompiler"
         "%{IncludeDir.SPDLOG}",
 		"%{IncludeDir.DXC}",
 		"",
-		"Include"
+		"Include",
+		"%{IncludeDir.SPIRV_REFLECT}"
 	}
 
 	links

@@ -3,6 +3,11 @@
 
 #include <wrl/client.h>
 #include <dxcapi.h>
+#include <spirv_reflect.h>
+
+#define EXIT_WITH_ERROR(...) \
+COMPILER_ERROR(__VA_ARGS__); \
+exit(-1);
 
 // utility
 void HashCombine(size_t& hash1, size_t hash2) {
@@ -34,9 +39,7 @@ std::string ShaderCompiler::LoadTextFile(const std::string& path) {
 
 	std::string out;
 	if (!LoadTextFile(path, out)) {
-
-		COMPILER_ERROR("Failed to open: {}", path);
-		exit(-1);
+		EXIT_WITH_ERROR("Failed to open: {}", path);
 	}
 
 	return out;
@@ -59,8 +62,7 @@ size_t ShaderCompiler::ComputeShaderHash(const std::string& path, const std::str
 		{
 			auto it = std::find(allFilenames.begin(), allFilenames.end(), name);
 			if (it != allFilenames.end()) {
-				COMPILER_ERROR("Found circular dependency: {} includes itself!", name);
-				exit(-1);
+				EXIT_WITH_ERROR("Found circular dependency: {} includes itself!", name);
 			}
 			allFilenames.push_back(name);
 		}
@@ -106,8 +108,7 @@ void ShaderCompiler::CompileShaders(const std::string& sourcePath, const std::st
 		}
 
 		if (compTargets.size() == 0) {
-			COMPILER_ERROR("Shader: {} has no entry points!", filename);
-			exit(-1);
+			EXIT_WITH_ERROR("Shader: {} has no entry points!", filename);
 		}
 
 		{
@@ -139,11 +140,9 @@ void ShaderCompiler::CompileShaders(const std::string& sourcePath, const std::st
 				BinaryShader shader{};
 				shader.Hash = hash;
 
-				std::vector<Microsoft::WRL::ComPtr<IDxcBlob>> shaderBlobs;
 				for (auto& target : compTargets) {
 
 					Microsoft::WRL::ComPtr<IDxcBlob> shaderBlob = compiler.Compile(target, sourceCode, sourcePath, fullLocalPath);
-					shaderBlobs.push_back(shaderBlob);
 
 					size_t sizeOfBlob = shaderBlob->GetBufferSize();
 					switch (target)
@@ -161,90 +160,14 @@ void ShaderCompiler::CompileShaders(const std::string& sourcePath, const std::st
 						memcpy(shader.ComputeRange.data(), shaderBlob->GetBufferPointer(), sizeOfBlob);
 						break;
 					default:
-						COMPILER_ERROR("Unexpected error!This should not happen! Unspecified compilation target");
-						exit(-1);
-						break;
+						EXIT_WITH_ERROR("Unexpected error! This should not happen! Unspecified compilation target");
+							break;
 					}
 				}
 
 				// serialize shader metadata
 				{
-					std::filesystem::create_directories(genPath);
-
-					std::string genHeaderName = "Generated" + shaderName + ".h";
-					std::ofstream genHeader(GetFilePath(genPath, genHeaderName), std::ios::out | std::ios::trunc);
-					//genHeader << "Hello" << "\n";
-
-					// parse shader resources
-					{
-						std::string::const_iterator resBegin;
-						std::string::const_iterator resEnd;
-						{
-							std::regex pattern(R"(BEGIN_DECL_SHADER_RESOURCES)");
-							std::smatch match;
-
-							if (std::regex_search(sourceCode, match, pattern)) {
-								resBegin = match[0].second;
-							}
-							else {
-								resBegin = sourceCode.end();
-							}
-						}
-						if (resBegin != sourceCode.end()) {
-
-							{
-								std::regex pattern(R"(END_DECL_SHADER_RESOURCES)");
-								std::smatch match;
-
-								if (std::regex_search(sourceCode, match, pattern)) {
-									resEnd = match[0].first;
-								}
-								else {
-									resEnd = sourceCode.end();
-								}
-							}
-							if (resEnd != sourceCode.end()) {
-								genHeader << "constexpr struct " << shaderName << "ResourcesStruct " << "{\n";
-
-								std::map<std::string, size_t> typeSizes = {
-									{"DECL_SHADER_SCALAR", sizeof(float)},
-									{"DECL_SHADER_UINT", sizeof(uint32_t)},
-									{"DECL_SHADER_FLOAT2", sizeof(float) * 2},
-									{"DECL_SHADER_FLOAT4", sizeof(float) * 4},
-									{"DECL_SHADER_MATRIX2x2", sizeof(float) * 4},
-									{"DECL_SHADER_MATRIX4x4", sizeof(float) * 16},
-									{"DECL_SHADER_TEXTURE_SRV", sizeof(uint32_t) * 2},
-									{"DECL_SHADER_TEXTURE_UAV", sizeof(uint32_t)},
-									{"DECL_SHADER_BUFFER_SRV", sizeof(uint32_t)},
-									{"DECL_SHADER_BUFFER_UAV", sizeof(uint32_t)}
-								};
-
-								{
-									std::regex pattern(R"((DECL_SHADER_SCALAR|DECL_SHADER_UINT|DECL_SHADER_FLOAT2|DECL_SHADER_FLOAT4|DECL_SHADER_MATRIX2x2|DECL_SHADER_MATRIX4x4|DECL_SHADER_TEXTURE_SRV|DECL_SHADER_TEXTURE_UAV|DECL_SHADER_BUFFER_SRV|DECL_SHADER_BUFFER_UAV)\s*\(\s*(\w+)\s*\))");
-									auto begin = std::sregex_iterator(resBegin, resEnd, pattern);
-									for (auto& i = begin; i != std::sregex_iterator(); i++) {
-										genHeader << "    uint8_t " << (*i)[2].str() << " = " << std::to_string(shader.ShaderData.SizeOfResources) << ";\n";
-										shader.ShaderData.SizeOfResources += (uint8_t)typeSizes[(*i)[1].str()];
-									}
-								}
-								{
-									std::regex pattern(R"(DECL_SHADER_RESOURCES_STRUCT_PADDING\s*\(\s*(\d+)\s*\))");
-									auto begin = std::sregex_iterator(resBegin, resEnd, pattern);
-
-									for (auto& i = begin; i != std::sregex_iterator(); i++) {
-										shader.ShaderData.SizeOfResources += uint8_t(std::stoi((*i)[1].str()) * sizeof(float));
-									}
-								}
-								if (shader.ShaderData.SizeOfResources % 16 != 0) {
-									COMPILER_ERROR("Shader: {0} resources size is not multiple of 16, size: {1}", filename, shader.ShaderData.SizeOfResources);
-									exit(-1);
-								}
-
-								//genHeader << "    ESizeOfAll = " << std::to_string(sizeOfResources) << "\n";
-								genHeader << "} " << shaderName << "Resources;\n";
-							}
-						}
-					}
+					std::string genHeaderStr{};
 
 					// parse material resources
 					{
@@ -275,7 +198,9 @@ void ShaderCompiler::CompileShaders(const std::string& sourcePath, const std::st
 								}
 							}
 							if (resEnd != sourceCode.end()) {
-								genHeader << "constexpr struct " << shaderName << "MaterialResourcesStruct " << "{\n";
+
+								shader.ShaderData.IsMaterialShader = true;
+								genHeaderStr += "constexpr struct " + shaderName + "MaterialResourcesStruct " + "{\n";
 
 								std::map<std::string, std::vector<std::string>*> paramStorages = {
 
@@ -292,26 +217,180 @@ void ShaderCompiler::CompileShaders(const std::string& sourcePath, const std::st
 									for (auto& i = begin; i != std::sregex_iterator(); i++) {
 
 										paramStorages[(*i)[1].str()]->push_back((*i)[2].str());
-										genHeader << "    uint8_t " << (*i)[2].str() << " = " << std::stoi((*i)[3].str()) << ";\n";
+										genHeaderStr += "    uint8_t " + (*i)[2].str() + " = " + (*i)[3].str() + ";\n";
 									}
 								}
 
-								genHeader << "} " << shaderName << "MaterialResources;\n";
+								genHeaderStr += "} " + shaderName + "MaterialResources;\n";
 							}
 						}
 					}
 
-					// parse additional data
-					{
-						std::regex pattern(R"(USE_SCENE_RENDERING_DATA|USE_MATERIAL_RENDERING_DATA)");
-						std::smatch match;
+					// parse shader resources
+					if (!shader.ShaderData.IsMaterialShader) {
 
-						if (std::regex_search(sourceCode, match, pattern)) {
-							shader.ShaderData.UsesSceneData = 1;
+						auto findBindings = [&](const std::vector<char>& spirvData) {
+
+							SpvReflectShaderModule module{};
+							SpvReflectResult result = spvReflectCreateShaderModule(spirvData.size(), spirvData.data(), &module);
+							if (result != SPV_REFLECT_RESULT_SUCCESS) {
+								EXIT_WITH_ERROR("Unexpected error! This should not happen! Failed to create spirv reflect module");
+							}
+
+							{
+								uint32_t bindingCount = 0;
+								spvReflectEnumerateDescriptorBindings(&module, &bindingCount, nullptr);
+
+								std::vector<SpvReflectDescriptorBinding*> bindings;
+								bindings.resize(bindingCount);
+								spvReflectEnumerateDescriptorBindings(&module, &bindingCount, bindings.data());
+
+								for (const auto spvB : bindings) {
+
+									BinaryShader::ShaderMetadata::ShaderBinding b{};
+									b.Binding = spvB->binding;
+									b.Count = spvB->count;
+									b.Set = spvB->set;
+
+									switch (spvB->descriptor_type)
+									{
+									case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+										b.Type = EShaderResourceType::ETextureSRV;
+										break;
+									case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+										b.Type = EShaderResourceType::ETextureUAV;
+										break;
+									case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
+										b.Type = EShaderResourceType::ESampler;
+										break;
+									case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+										b.Type = EShaderResourceType::EConstantBuffer;
+										break;
+									case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+										b.Type = spvB->resource_type & SPV_REFLECT_RESOURCE_FLAG_UAV ? EShaderResourceType::EBufferUAV : EShaderResourceType::EBufferSRV;
+										break;
+									default:
+										b.Type = EShaderResourceType::ENone;
+										break;
+									}
+
+									auto it = std::find_if(shader.ShaderData.Bindings.begin(), shader.ShaderData.Bindings.end(), [&](const auto& other) {
+										return (b.Binding == other.Binding
+											&& b.Count == other.Count
+											&& b.Set == other.Set
+											&& b.Type == other.Type);
+										});
+
+									if (it == shader.ShaderData.Bindings.end()) {
+										shader.ShaderData.Bindings.push_back(b);
+									}
+								}
+								{
+									if (shader.ShaderData.PushDataSize == 0) {
+
+										uint32_t pushDataCount = 0;
+										spvReflectEnumeratePushConstantBlocks(&module, &pushDataCount, nullptr);
+
+										if (pushDataCount > 0) {
+											genHeaderStr += "struct alignas(16) " + shaderName + "PushData {\n";
+
+											std::vector<SpvReflectBlockVariable*> pushData;
+											pushData.resize(pushDataCount);
+											spvReflectEnumeratePushConstantBlocks(&module, &pushDataCount, pushData.data());
+
+											SpvReflectBlockVariable* pushBlock = pushData[0];
+											for (uint32_t i = 0; i < pushBlock->member_count; i++) {
+
+												const SpvReflectTypeDescription* tDesc = pushBlock->members[i].type_description;
+												shader.ShaderData.PushDataSize += pushBlock->members[i].size;
+
+												// TODO: support matrices where column count != row count like Mat4x3 etc... Also support Vec3 type
+												genHeaderStr += "    ";
+												if (tDesc->type_flags & SPV_REFLECT_TYPE_FLAG_MATRIX) {
+
+													if (tDesc->traits.numeric.matrix.column_count == 2) {
+														genHeaderStr += "Mat2x2 ";
+													}
+													else if (tDesc->traits.numeric.matrix.column_count == 3) {
+														genHeaderStr += "Mat3x3 ";
+													}
+													else if (tDesc->traits.numeric.matrix.column_count == 4) {
+														genHeaderStr += "Mat4x4 ";
+													}
+												}
+												else if (tDesc->type_flags & SPV_REFLECT_TYPE_FLAG_VECTOR) {
+
+													if (tDesc->traits.numeric.vector.component_count == 2) {
+														genHeaderStr += "Vec2 ";
+													}
+													else if (tDesc->traits.numeric.vector.component_count == 4) {
+														genHeaderStr += "Vec4 ";
+													}
+												}
+												else if (tDesc->type_flags & SPV_REFLECT_TYPE_FLAG_INT) {
+
+													if (tDesc->traits.numeric.scalar.signedness != 0) {
+														genHeaderStr += "int ";
+													}
+													else {
+														genHeaderStr += "uint32_t ";
+													}
+												}
+												else if (tDesc->type_flags & SPV_REFLECT_TYPE_FLAG_FLOAT) {
+													genHeaderStr += "float ";
+												}
+												else {
+													EXIT_WITH_ERROR("Unknown or unsupported variable type in push data block! Variable index: {}", i);
+												}
+
+												genHeaderStr += pushBlock->members[i].name;
+												if (tDesc->type_flags & SPV_REFLECT_TYPE_FLAG_ARRAY) {
+
+													for (uint32_t i = 0; i < tDesc->traits.array.dims_count; i++) {
+														genHeaderStr += "[";
+														genHeaderStr += std::to_string(tDesc->traits.array.dims[i]);
+														genHeaderStr += "]";
+													}
+												}
+
+												genHeaderStr += ";\n";
+											}
+											genHeaderStr += "};\n";
+										}
+									}
+								}
+							}
+							};
+
+						for (auto t : compTargets) {
+
+							switch (t)
+							{
+							case ShaderCompiler::EShaderCompilationTarget::EVertex:
+								findBindings(shader.VertexRange);
+								break;
+							case ShaderCompiler::EShaderCompilationTarget::EPixel:
+								findBindings(shader.PixelRange);
+								break;
+							case ShaderCompiler::EShaderCompilationTarget::ECompute:
+								findBindings(shader.ComputeRange);
+								break;
+							default:
+								EXIT_WITH_ERROR("Unexpected error! This should not happen! Unspecified compilation target")
+								break;
+							}
 						}
 					}
 
-					genHeader.close();
+					if (genHeaderStr.size() > 0) {
+
+						std::filesystem::create_directories(genPath);
+						std::string genHeaderName = shaderName + ".h";
+						std::ofstream genHeader(GetFilePath(genPath, genHeaderName), std::ios::out | std::ios::trunc);
+
+						genHeader << genHeaderStr;
+						genHeader.close();
+					}
 				}
 
 				shader.Serialize(wFile);
@@ -331,26 +410,22 @@ namespace ShaderCompiler {
 
 		hres = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(Utils.ReleaseAndGetAddressOf()));
 		if (FAILED(hres)) {
-			COMPILER_ERROR("Unexpected error! This should not happen! Failed to create dxc utils instance");
-			exit(-1);
+			EXIT_WITH_ERROR("Unexpected error! This should not happen! Failed to create dxc utils instance")
 		}
 
 		hres = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&Compiler));
 		if (FAILED(hres)) {
-			COMPILER_ERROR("Unexpected error! This should not happen! Failed to create dxc compiler instance");
-			exit(-1);
+			EXIT_WITH_ERROR("Unexpected error! This should not happen! Failed to create dxc compiler instance")
 		}
 
 		hres = DxcCreateInstance(CLSID_DxcLibrary, IID_PPV_ARGS(&Library));
 		if (FAILED(hres)) {
-			COMPILER_ERROR("Unexpected error! This should not happen! Failed to create dxc library instance");
-			exit(-1);
+			EXIT_WITH_ERROR("Unexpected error! This should not happen! Failed to create dxc library instance")
 		}
 
 		hres = Library->CreateIncludeHandler(&IncludeHandler);
 		if (FAILED(hres)) {
-			COMPILER_ERROR("Unexpected error! This should not happen! Failed to create dxc include handler instance");
-			exit(-1);
+			EXIT_WITH_ERROR("Unexpected error! This should not happen! Failed to create dxc include handler instance")
 		}
 	}
 
@@ -380,8 +455,7 @@ namespace ShaderCompiler {
 			targetEntryPoint = L"CSMain";
 			break;
 		default:
-			COMPILER_ERROR("Unexpected error! This should not happen! Unspecified compilation target");
-			exit(-1);
+			EXIT_WITH_ERROR("Unexpected error! This should not happen! Unspecified compilation target")
 			break;
 		}
 
@@ -415,8 +489,7 @@ namespace ShaderCompiler {
 			Microsoft::WRL::ComPtr<IDxcBlobEncoding> errorBlob;
 			hres = result->GetErrorBuffer(&errorBlob);
 			if (SUCCEEDED(hres) && errorBlob) {
-				COMPILER_ERROR("Compilation failed: {}", (const char*)errorBlob->GetBufferPointer());
-				exit(-1);
+				EXIT_WITH_ERROR("Compilation failed: {}", (const char*)errorBlob->GetBufferPointer())
 			}
 		}
 

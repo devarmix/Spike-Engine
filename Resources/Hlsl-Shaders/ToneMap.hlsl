@@ -1,13 +1,16 @@
 #include "ShaderCommon.hlsli"
 
-BEGIN_DECL_SHADER_RESOURCES(Resources)
-    DECL_SHADER_TEXTURE_SRV(InTexture)
-    DECL_SHADER_TEXTURE_UAV(OutTexture)
-    DECL_SHADER_SCALAR(Exposure)
-    DECL_SHADER_FLOAT2(TexSize)
+[[vk::binding(0, 0)]] Texture2D<float4> InTexture;
+[[vk::binding(1, 0)]] SamplerState TexSampler;
+[[vk::binding(2, 0)]] RWTexture2D<float4> OutTexture;
 
-    DECL_SHADER_RESOURCES_STRUCT_PADDING(2)
-END_DECL_SHADER_RESOURCES(Resources)
+struct ToneMapConstants {
+
+    float2 TexSize;
+    float Exposure;
+    float Padding0;
+}; [[vk::push_constant]] ToneMapConstants Resources;
+
 
 float3 Uncharted2Tonemap(float3 x) {
 
@@ -40,10 +43,7 @@ void CSMain(uint3 threadID : SV_DispatchThreadID) {
         float2 texCoord = float2(float(threadID.x) / Resources.TexSize.x, float(threadID.y) / Resources.TexSize.y);
         texCoord += (1.0f / Resources.TexSize) * 0.5f;
 
-        TEXTURE_2D_SRV(inTex, Resources.InTexture)
-        TEXTURE_2D_UAV_FLOAT4(output, Resources.OutTexture)
-
-        float3 sampledColor = inTex.SampleLevel(texCoord, 0.0).rgb;
-        output.Store(threadID.xy, float4(ToneMap(sampledColor), 1.0f));
+        float3 sampledColor = InTexture.SampleLevel(TexSampler, texCoord, 0.0).rgb;
+        OutTexture[threadID.xy] = float4(ToneMap(sampledColor), 1.0f);
     }
 }

@@ -46,14 +46,16 @@ namespace Spike {
 		uint32_t FirstIndex;
 		uint32_t IndexCount;
 
-		uint32_t IndexBuffer;
-		uint32_t VertexBuffer;
+		uint64_t IndexBufferAddress;
+		uint64_t VertexBufferAddress;
 
 		uint32_t MaterialBufferIndex;
 		uint32_t DrawBatchID;
 
 		int LastVisibilityIndex;
 		int CurrentVisibilityIndex;
+
+		float Padding0[2];
 	};
 
 	struct alignas(16) SceneLightGPUData {
@@ -84,14 +86,11 @@ namespace Spike {
 		float NearProj;
 		float FarProj;
 
-		uint32_t LightsOffset;
-		uint32_t ObjectsOffset;
-		uint32_t DrawCountOffset;
 		uint32_t LightsCount;
 		uint32_t ObjectsCount;
 
-		float Padding0[3];
-		Vec4 Padding1[2];
+		float Padding0[2];
+		Vec4 Padding1[3];
 	};
 
 	struct RenderContext {
@@ -122,7 +121,7 @@ namespace Spike {
 	public:
 		virtual ~SceneRenderFeature() = default;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) = 0;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) = 0;
 	};
 
 	constexpr uint32_t MAX_SCENE_DRAWS_PER_FRAME = 8;

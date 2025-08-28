@@ -1,11 +1,8 @@
-#define USE_SCENE_RENDERING_DATA
 #include "ShaderCommon.hlsli"
 
-BEGIN_DECL_SHADER_RESOURCES(Resources)
-    DECL_SHADER_TEXTURE_SRV(SkyboxMap)
-
-    DECL_SHADER_RESOURCES_STRUCT_PADDING(2)
-END_DECL_SHADER_RESOURCES(Resources)
+[[vk::binding(0, 0)]] TextureCube<float4> SkyboxMap;
+[[vk::binding(1, 0)]] SamplerState TexSampler;
+[[vk::binding(2, 0)]] ConstantBuffer<SceneGPUData> SceneDataBuffer;
 
 struct VSOutput {
 
@@ -26,8 +23,6 @@ VSOutput VSMain(uint vertexID : SV_VertexID) {
 
 float4 PSMain(VSOutput input) : SV_TARGET0 {
 
-    CUBE_TEXTURE_SRV(skyboxTex, Resources.SkyboxMap)
-
-    float3 color = skyboxTex.SampleLevel(normalize(input.ViewDir), 0.0).rgb;
+    float3 color = SkyboxMap.SampleLevel(TexSampler, normalize(input.ViewDir), 0.0).rgb;
     return float4(color, 1.0f);
 }

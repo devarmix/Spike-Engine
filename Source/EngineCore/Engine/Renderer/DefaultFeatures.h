@@ -9,7 +9,7 @@ namespace Spike {
 		GBufferFeature();
 		virtual ~GBufferFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
 
 	private:
 
@@ -22,7 +22,7 @@ namespace Spike {
 		DeferredLightingFeature();
 		virtual ~DeferredLightingFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
 
 	private:
 
@@ -34,7 +34,7 @@ namespace Spike {
 		SkyboxFeature();
 		virtual ~SkyboxFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
 
 	private:
 
@@ -46,12 +46,15 @@ namespace Spike {
 		SSAOFeature();
 		virtual ~SSAOFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
 
 	private:
 
-		RHIShader* m_SSAOShader;
+		RHIShader* m_GenShader;
+		RHIShader* m_CompositeShader;
+
 		RHITexture2D* m_NoiseTexture;
+		RHIBuffer* m_KernelBuffer;
 	};
 
 	class BloomFeature : public SceneRenderFeature {
@@ -59,11 +62,12 @@ namespace Spike {
 		BloomFeature();
 		virtual ~BloomFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
 
 	private:
 
-		RHIShader* m_BloomShader;
+		RHIShader* m_DownSampleShader;
+		RHIShader* m_UpSampleShader;
 	};
 
 	class ToneMapFeature : public SceneRenderFeature {
@@ -71,7 +75,7 @@ namespace Spike {
 		ToneMapFeature();
 		virtual ~ToneMapFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
 
 	private:
 

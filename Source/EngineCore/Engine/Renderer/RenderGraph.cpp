@@ -66,6 +66,22 @@ namespace Spike {
 				buffIndex++;
 			}
 		}
+
+		uint32_t setIndex = 0;
+		while (setIndex < m_SetPool.size()) {
+
+			if (m_SetPool[setIndex].LastUsedFrame + m_FramesBeforeDelete < GFrameRenderer->GetFrameCount()) {
+
+				m_SetPool[setIndex].Resource->ReleaseRHI();
+				delete m_SetPool[setIndex].Resource;
+
+				swapDelete(m_SetPool, setIndex);
+			}
+			else {
+
+				setIndex++;
+			}
+		}
 	}
 
 	void RDGResourcePool::FreeAll() {
@@ -88,9 +104,16 @@ namespace Spike {
 			delete buff.Resource;
 		}
 
+		for (auto& set : m_SetPool) {
+
+			set.Resource->ReleaseRHIImmediate();
+			delete set.Resource;
+		}
+
 		m_TexturePool.clear();
 		m_TextureViewPool.clear();
 		m_BufferPool.clear();
+		m_SetPool.clear();
 	}
 
 	RHITexture2D* RDGResourcePool::GetOrCreateTexture2D(const Texture2DDesc& desc) {
@@ -142,7 +165,7 @@ namespace Spike {
 	RHIBuffer* RDGResourcePool::GetOrCreateBuffer(const BufferDesc& desc) {
 
 		auto it = std::find_if(m_BufferPool.begin(), m_BufferPool.end(), [&desc](const auto& e) {
-			return e.Resource->GetDesc() == desc && e.LastUsedFrame < GFrameRenderer->GetFrameCount() - 1;
+			return e.Resource->GetDesc() == desc && e.LastUsedFrame + 1 < GFrameRenderer->GetFrameCount();
 			});
 
 		if (it != m_BufferPool.end()) {
@@ -157,6 +180,29 @@ namespace Spike {
 
 			RDGPooledBuffer newPooled{ .LastUsedFrame = GFrameRenderer->GetFrameCount(), .Resource = res };
 			m_BufferPool.push_back(newPooled);
+
+			return res;
+		}
+	}
+
+	RHIBindingSet* RDGResourcePool::GetOrCreateBindingSet(RHIBindingSetLayout* layout) {
+
+		auto it = std::find_if(m_SetPool.begin(), m_SetPool.end(), [layout](const auto& e) {
+			return e.Resource->GetLayout() == layout && e.LastUsedFrame + 1 < GFrameRenderer->GetFrameCount();
+			});
+
+		if (it != m_SetPool.end()) {
+
+			it->LastUsedFrame = GFrameRenderer->GetFrameCount();
+			return it->Resource;
+		}
+		else {
+
+			RHIBindingSet* res = new RHIBindingSet(layout);
+			res->InitRHI();
+
+			RDGPooledBindingSet newPooled{ .LastUsedFrame = GFrameRenderer->GetFrameCount(), .Resource = res };
+			m_SetPool.push_back(newPooled);
 
 			return res;
 		}

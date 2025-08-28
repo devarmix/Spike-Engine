@@ -65,8 +65,20 @@ namespace ShaderCompiler {
 		SerializeStringVector(MaterialData.PVec2, stream);
 		SerializeStringVector(MaterialData.PVec4, stream);
 		SerializeStringVector(MaterialData.PTexture, stream);
-		stream.write((char*)&ShaderData.SizeOfResources, sizeof(uint8_t));
-		stream.write((char*)&ShaderData.UsesSceneData, sizeof(uint8_t));
+		{
+			size_t size = ShaderData.Bindings.size();
+			stream.write((char*)&size, sizeof(size_t));
+
+			for (auto& b : ShaderData.Bindings) {
+
+				stream.write((char*)&b.Type, sizeof(uint8_t));
+				stream.write((char*)&b.Binding, sizeof(uint32_t));
+				stream.write((char*)&b.Set, sizeof(uint32_t));
+				stream.write((char*)&b.Count, sizeof(uint32_t));
+			}
+		}
+		stream.write((char*)&ShaderData.PushDataSize, sizeof(uint32_t));
+		stream.write((char*)&ShaderData.IsMaterialShader, sizeof(bool));
 		SerializeByteVector(VertexRange, stream);
 		SerializeByteVector(PixelRange, stream);
 		SerializeByteVector(ComputeRange, stream);
@@ -80,8 +92,23 @@ namespace ShaderCompiler {
 		DeserializeStringVector(MaterialData.PVec2, stream);
 		DeserializeStringVector(MaterialData.PVec4, stream);
 		DeserializeStringVector(MaterialData.PTexture, stream);
-		stream.read((char*)&ShaderData.SizeOfResources, sizeof(uint8_t));
-		stream.read((char*)&ShaderData.UsesSceneData, sizeof(uint8_t));
+		{
+			size_t size = 0;
+			stream.read((char*)&size, sizeof(size_t));
+
+			ShaderData.Bindings.resize(size);
+			for (int i = 0; i < size; i++) {
+
+				ShaderMetadata::ShaderBinding& b = ShaderData.Bindings[i];
+
+				stream.read((char*)&b.Type, sizeof(uint8_t));
+				stream.read((char*)&b.Binding, sizeof(uint32_t));
+				stream.read((char*)&b.Set, sizeof(uint32_t));
+				stream.read((char*)&b.Count, sizeof(uint32_t));
+			}
+		}
+		stream.read((char*)&ShaderData.PushDataSize, sizeof(uint32_t));
+		stream.read((char*)&ShaderData.IsMaterialShader, sizeof(bool));
 		DeserializeByteVector(VertexRange, stream);
 		DeserializeByteVector(PixelRange, stream);
 		DeserializeByteVector(ComputeRange, stream);

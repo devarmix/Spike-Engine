@@ -80,7 +80,7 @@ namespace Spike {
 
 	class RHITextureView : public RHIResource {
 	public:
-		RHITextureView(const TextureViewDesc& desc) : m_Desc(desc), m_RHIData(nullptr), m_SRVIndex(UINT32_MAX), m_UAVIndex(UINT32_MAX), m_UAVReadOnlyIndex(UINT32_MAX) {}
+		RHITextureView(const TextureViewDesc& desc) : m_Desc(desc), m_RHIData(nullptr), m_MaterialIndex(UINT32_MAX) {}
 		virtual ~RHITextureView() override {}
 
 		virtual void InitRHI() override;
@@ -96,18 +96,14 @@ namespace Spike {
 		RHITexture* GetSourceTexture() { return m_Desc.SourceTexture; }
 
 		const TextureViewDesc& GetDesc() const { return m_Desc; }
-		uint32_t GetSRVIndex() const { return m_SRVIndex; }
-		uint32_t GetUAVIndex() const { return m_UAVIndex; }
-		uint32_t GetUAVReadOnlyIndex() const { return m_UAVReadOnlyIndex; }
+		uint32_t GetMaterialIndex();
 
 	private:
 
 		RHIData* m_RHIData;
 		TextureViewDesc m_Desc;
 
-		uint32_t m_SRVIndex;
-		uint32_t m_UAVIndex;
-		uint32_t m_UAVReadOnlyIndex;
+		uint32_t m_MaterialIndex;
 	};
 
 	enum class ESamplerFilter : uint8_t {
@@ -185,7 +181,7 @@ namespace Spike {
 
 	class RHISampler : public RHIResource {
 	public:
-		RHISampler(const SamplerDesc& desc) : m_Desc(desc), m_RHIData(nullptr), m_ShaderIndex(UINT32_MAX) {}
+		RHISampler(const SamplerDesc& desc) : m_Desc(desc), m_RHIData(nullptr), m_MaterialIndex(UINT32_MAX) {}
 		virtual ~RHISampler() override {}
 
 		virtual void InitRHI() override;
@@ -194,14 +190,14 @@ namespace Spike {
 		const SamplerDesc& GetDesc() const { return m_Desc; }
 		RHIData* GetRHIData() { return m_RHIData; }
 
-		uint32_t GetShaderIndex() const { return m_ShaderIndex; }
+		uint32_t GetMaterialIndex();
 
 	private:
 
 		SamplerDesc m_Desc;
 		RHIData* m_RHIData;
 
-		uint32_t m_ShaderIndex;
+		uint32_t m_MaterialIndex;
 	};
 
 	class SamplerCache {

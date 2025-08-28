@@ -42,24 +42,18 @@ namespace Spike {
 		// vulkan 1.2 features
 		VkPhysicalDeviceVulkan12Features features12{ .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
 		features12.descriptorIndexing = true;
-
 		features12.shaderSampledImageArrayNonUniformIndexing = true;
-		features12.shaderStorageBufferArrayNonUniformIndexing = true;
-		features12.shaderStorageImageArrayNonUniformIndexing = true;
-
 		features12.runtimeDescriptorArray = true;
 		features12.descriptorBindingVariableDescriptorCount = true;
 		features12.descriptorBindingPartiallyBound = true;
-
 		features12.descriptorBindingSampledImageUpdateAfterBind = true;
-		features12.descriptorBindingStorageImageUpdateAfterBind = true;
-		features12.descriptorBindingStorageBufferUpdateAfterBind = true;
-
 		features12.samplerFilterMinmax = true;
 		features12.drawIndirectCount = true;
+		features12.bufferDeviceAddress = true;
 
 		VkPhysicalDeviceFeatures features{};
 		features.samplerAnisotropy = true;
+		features.shaderInt64 = true;
 
 		// select the gpu, which supports vulkan 1.3 and can write to the SDL surface
 		vkb::PhysicalDeviceSelector selector{ vkb_inst };
@@ -90,7 +84,7 @@ namespace Spike {
 		allocatorInfo.physicalDevice = PhysicalDevice;
 		allocatorInfo.device = Device;
 		allocatorInfo.instance = Instance;
-		allocatorInfo.flags = 0;
+		allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 		vmaCreateAllocator(&allocatorInfo, &Allocator);
 	}
 

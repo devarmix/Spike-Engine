@@ -13,7 +13,7 @@ namespace Spike {
 	RHIMesh::RHIMesh(const MeshDesc& desc) : m_Desc(desc) {
 
 		BufferDesc bufferDesc{};
-		bufferDesc.UsageFlags = EBufferUsageFlags::EStorage | EBufferUsageFlags::ECopyDst;
+		bufferDesc.UsageFlags = EBufferUsageFlags::EStorage | EBufferUsageFlags::ECopyDst | EBufferUsageFlags::EAddressable;
 		bufferDesc.MemUsage = EBufferMemUsage::EGPUOnly;
 		bufferDesc.Size = sizeof(Vertex) * desc.Vertices.size();
 
@@ -199,9 +199,11 @@ namespace Spike {
 					Vec3 origin = (maxpos + minpos) / 2.f;
 					Vec3 extents = (maxpos - minpos) / 2.f;
 
-					newSubMesh.BoundsOrigin = Vec3(origin.x, origin.y, origin.z);
-					newSubMesh.BoundsExtents = Vec3(extents.x, extents.y, extents.z);
+					newSubMesh.BoundsOrigin = origin;
+					newSubMesh.BoundsExtents = extents;
 					newSubMesh.BoundsRadius = glm::length(extents);
+
+					//ENGINE_INFO("{}", newSubMesh.BoundsRadius);
 					//newSubMesh.BoundsRadius = 1.f;
 				}
 

@@ -8,21 +8,19 @@ namespace Spike {
 
 	void RHIMaterial::InitRHI() {
 
-		// TODO - FIX ME PLEASE, 
-		// the buffer is updated when its still might be in use by gpu and can cause crash 
-		m_DataIndex = GShaderManager->GetMaterialDataIndex();
+		m_DataIndex = GShaderManager->GetMatDataIndex();
 		m_Shader = GShaderManager->GetShaderFromCache(m_ShaderDesc);
 	}
 
 	void RHIMaterial::ReleaseRHIImmediate() {
 
-		GShaderManager->ReleaseMaterialDataIndex(m_DataIndex);
+		GShaderManager->ReleaseMatDataIndex(m_DataIndex);
 	}
 
 	void RHIMaterial::ReleaseRHI() {
 
 		GFrameRenderer->PushToExecQueue([dataIndex = m_DataIndex]() {
-			GShaderManager->ReleaseMaterialDataIndex(dataIndex);
+			GShaderManager->ReleaseMatDataIndex(dataIndex);
 			});
 	}
 
@@ -52,7 +50,7 @@ namespace Spike {
 
 			GFrameRenderer->PushToExecQueue([=]() {
 				GShaderManager->GetMaterialData(dataIndex).ScalarData[resource] = value;
-				GShaderManager->UpdateMaterialData(dataIndex);
+				GShaderManager->UpdateMatData(dataIndex);
 				});
 			}));
 	}
@@ -65,7 +63,7 @@ namespace Spike {
 
 			GFrameRenderer->PushToExecQueue([=]() {
 				GShaderManager->GetMaterialData(dataIndex).UintData[resource] = value;
-				GShaderManager->UpdateMaterialData(dataIndex);
+				GShaderManager->UpdateMatData(dataIndex);
 				});
 			}));
 	}
@@ -78,7 +76,7 @@ namespace Spike {
 
 			GFrameRenderer->PushToExecQueue([=]() {
 				GShaderManager->GetMaterialData(dataIndex).Float2Data[resource] = value;
-				GShaderManager->UpdateMaterialData(dataIndex);
+				GShaderManager->UpdateMatData(dataIndex);
 				});
 			}));
 	}
@@ -91,7 +89,7 @@ namespace Spike {
 
 			GFrameRenderer->PushToExecQueue([=]() {
 				GShaderManager->GetMaterialData(dataIndex).Float4Data[resource] = value;
-				GShaderManager->UpdateMaterialData(dataIndex);
+				GShaderManager->UpdateMatData(dataIndex);
 				});
 			}));
 	}
@@ -104,13 +102,13 @@ namespace Spike {
 		EXECUTE_ON_RENDER_THREAD(([=]() {
 
 			uint32_t dataIndex = m_RHIResource->GetDataIndex();
-			uint32_t texIndex = view->GetSRVIndex();
-			uint32_t samplerIndex = view->GetSourceTexture()->GetSampler()->GetShaderIndex();
+			uint32_t texIndex = view->GetMaterialIndex();
+			uint32_t samplerIndex = view->GetSourceTexture()->GetSampler()->GetMaterialIndex();
 
 			GFrameRenderer->PushToExecQueue([=]() {
 				GShaderManager->GetMaterialData(dataIndex).TextureData[resource] = texIndex;
 				GShaderManager->GetMaterialData(dataIndex).SamplerData[resource] = samplerIndex;
-				GShaderManager->UpdateMaterialData(dataIndex);
+				GShaderManager->UpdateMatData(dataIndex);
 				});
 			}));
 	}

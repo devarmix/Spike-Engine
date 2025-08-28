@@ -45,6 +45,7 @@ namespace Spike {
 		virtual void* MapBufferMem(RHIBuffer* buffer) override;
 		virtual void BarrierBuffer(RHICommandBuffer* cmd, RHIBuffer* buffer, size_t size, size_t offset, EGPUAccessFlags lastAccess, EGPUAccessFlags newAccess) override;
 		virtual void FillBuffer(RHICommandBuffer* cmd, RHIBuffer* buffer, size_t size, size_t offset, uint32_t value, EGPUAccessFlags lastAccess, EGPUAccessFlags newAccess) override;
+		virtual uint64_t GetBufferGPUAddress(RHIBuffer* buffer) override;
 
 		virtual RHIData* CreateBindingSetLayoutRHI(const BindingSetLayoutDesc& desc) override;
 		virtual void DestroyBindingSetLayoutRHI(RHIData* data) override;
@@ -52,9 +53,9 @@ namespace Spike {
 		virtual RHIData* CreateBindingSetRHI(RHIBindingSetLayout* layout) override;
 		virtual void DestroyBindingSetRHI(RHIData* data) override;
 
-		virtual RHIData* CreateShaderRHI(const ShaderDesc& desc, const ShaderCompiler::BinaryShader& binaryShader) override;
+		virtual RHIData* CreateShaderRHI(const ShaderDesc& desc, const ShaderCompiler::BinaryShader& binaryShader, const std::vector<RHIBindingSetLayout*>& layouts) override;
 		virtual void DestroyShaderRHI(RHIData* data) override;
-		virtual void BindShader(RHICommandBuffer* cmd, RHIShader* shader, RHIBindingSet* sceneDataSet) override;
+		virtual void BindShader(RHICommandBuffer* cmd, RHIShader* shader, std::vector<RHIBindingSet*> shaderSets = {}, void* pushData = nullptr) override;
 
 		virtual RHIData* CreateSamplerRHI(const SamplerDesc& desc) override;
 		virtual void DestroySamplerRHI(RHIData* data) override;
@@ -90,7 +91,7 @@ namespace Spike {
 		bool m_UsingImGui;
 
 		VkDescriptorPool m_BindlessPool;
-		VkDescriptorPool m_SceneSetPool;
+		VkDescriptorPool m_GlobalSetPool;
 
 		RHICommandBuffer* m_ImmCmd;
 		VkFence m_ImmFence;

@@ -1,4 +1,4 @@
-#define USE_MATERIAL_RENDERING_DATA
+#define MATERIAL_SHADER
 #include "ShaderCommon.hlsli"
 
 BEGIN_DECL_MATERIAL_RESOURCES()
@@ -8,12 +8,6 @@ BEGIN_DECL_MATERIAL_RESOURCES()
     DECL_MATERIAL_TEXTURE_2D_SRV(RoughnessMap, 3)
     DECL_MATERIAL_TEXTURE_2D_SRV(AOMap, 4)
 END_DECL_MATERIAL_RESOURCES()
-
-BEGIN_DECL_SHADER_RESOURCES(ShaderResources)
-    DECL_SHADER_BUFFER_SRV(SceneObjectsBuffer)
-
-    DECL_SHADER_RESOURCES_STRUCT_PADDING(3)
-END_DECL_SHADER_RESOURCES(ShaderResources)
 
 struct VSInput {
 
@@ -34,14 +28,10 @@ struct VSOutput {
 
 VSOutput VSMain(VSInput input) {
 
-    BUFFER_SRV(objectsBuffer, ShaderResources.SceneObjectsBuffer)
-    SceneObjectGPUData objectData = objectsBuffer.LoadAtIndex<SceneObjectGPUData>(input.InstanceID);
+    SceneObjectGPUData objectData = ObjectsBuffer[input.InstanceID];
 
-    BUFFER_SRV(IndexBuffer, objectData.IndexBuffer)
-    uint vIndex = IndexBuffer.LoadAtIndex<uint>(input.VertexIndex + objectData.FirstIndex);
-
-    BUFFER_SRV(VertexBuffer, objectData.VertexBuffer)
-    Vertex v = VertexBuffer.LoadAtIndex<Vertex>(vIndex);
+    uint vIndex = vk::RawBufferLoad<uint>(objectData.IndexBufferAddress + ((input.VertexIndex + objectData.FirstIndex) * sizeof(uint)), 4);
+    Vertex v = vk::RawBufferLoad<Vertex>(objectData.VertexBufferAddress + (vIndex * sizeof(Vertex)), 16);
 
     VSOutput output;
 
@@ -72,18 +62,12 @@ struct PSOutput {
 
 PSOutput PSMain(VSOutput input) {
 
-    MATERIAL_TEXTURE_2D_SRV(input.MaterialDataIndex, albedoTex, AlbedoMap)
-    MATERIAL_TEXTURE_2D_SRV(input.MaterialDataIndex, normalTex, NormalMap)
-    MATERIAL_TEXTURE_2D_SRV(input.MaterialDataIndex, aoTex, AOMap)
-    MATERIAL_TEXTURE_2D_SRV(input.MaterialDataIndex, metallicTex, MettalicMap)
-    MATERIAL_TEXTURE_2D_SRV(input.MaterialDataIndex, roughnessTex, RoughnessMap)
+    float4 albedo = SampleMaterialTexture(input.MaterialDataIndex, AlbedoMap, input.TexCoord);
+    float3 normalSample = SampleMaterialTexture(input.MaterialDataIndex, NormalMap, input.TexCoord).rgb;
 
-    float4 albedo = albedoTex.Sample(input.TexCoord);
-    float3 normalSample = normalTex.Sample(input.TexCoord).rgb;
-
-    float ao = aoTex.Sample(input.TexCoord).r;
-    float metallic = metallicTex.Sample(input.TexCoord).r;
-    float roughness = roughnessTex.Sample(input.TexCoord).r;
+    float ao = SampleMaterialTexture(input.MaterialDataIndex, AOMap, input.TexCoord).r;
+    float metallic = SampleMaterialTexture(input.MaterialDataIndex, MettalicMap, input.TexCoord).r;
+    float roughness = SampleMaterialTexture(input.MaterialDataIndex, RoughnessMap, input.TexCoord).r;
 
     if (albedo.a < 0.8f) {
         discard;
@@ -97,6 +81,5 @@ PSOutput PSMain(VSOutput input) {
     output.AlbedoColor = albedo;
     output.NormalColor = float4(N, 1.0);
     output.MaterialColor = float4(roughness, metallic, ao, 1.0);
-
     return output;
 }

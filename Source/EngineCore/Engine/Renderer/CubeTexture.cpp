@@ -1,7 +1,8 @@
 #include <Engine/Renderer/CubeTexture.h>
 #include <Engine/Renderer/GfxDevice.h>
 #include <Engine/Core/Log.h>
-#include <Generated/GeneratedCubeMapFiltering.h>
+#include <Generated/CubeMapFiltering.h>
+#include <Generated/CubeMapGen.h>
 #include <Engine/Renderer/FrameRenderer.h>
 
 #include <stb_image.h>
@@ -37,7 +38,9 @@ namespace Spike {
 		{
 			ShaderDesc shaderDesc{};
 			shaderDesc.Type = EShaderType::ECompute;
-			shaderDesc.Name = "CubeMapFiltering";
+
+			bool isNoneFilter = (m_Desc.FilterMode == ECubeTextureFilterMode::ENone);
+			shaderDesc.Name = isNoneFilter ? "CubeMapGen" : "CubeMapFiltering";
 
 			RHIShader* shader = GShaderManager->GetShaderFromCache(shaderDesc);
 
@@ -56,25 +59,42 @@ namespace Spike {
 				GRHIDevice->BarrierCubeTexture(cmd, this, EGPUAccessFlags::ENone, EGPUAccessFlags::ECopyDst);
 				GRHIDevice->BarrierTexture2D(cmd, offscreen, EGPUAccessFlags::ENone, EGPUAccessFlags::EUAVCompute);
 
-				shader->SetTextureSRV(CubeMapFilteringResources.SampledTexture, m_Desc.SamplerTexture->GetTextureView());
-				shader->SetTextureUAV(CubeMapFilteringResources.OutTexture, offscreen->GetTextureView());
-				shader->SetUint(CubeMapFilteringResources.FilterType, (uint8_t)m_Desc.FilterMode);
+				RHIBindingSet* cubeSet = new RHIBindingSet(shader->GetLayouts()[0]);
+				cubeSet->InitRHI();
+				{
+					cubeSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureUAV, offscreen->GetTextureView(), EGPUAccessFlags::EUAVCompute);
+					cubeSet->AddTextureWrite(1, 0, EShaderResourceType::ETextureSRV, m_Desc.SamplerTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+					cubeSet->AddSamplerWrite(2, 0, EShaderResourceType::ESampler, m_Desc.SamplerTexture->GetSampler());
+				}
 
 				for (int f = 0; f < 6; f++) {
 
 					for (uint32_t m = 0; m < m_Desc.NumMips; m++) {
 
-						shader->SetUint(CubeMapFilteringResources.CubeFaceIndex, f);
-
-						if (m_Desc.FilterMode == ECubeTextureFilterMode::ERadiance) {
-							shader->SetFloat(CubeMapFilteringResources.Roughness, (float)m / (float)(m_Desc.NumMips - 1));
-						}
-
 						uint32_t mipSize = m_Desc.Size >> m;
 						if (mipSize < 1) mipSize = 1;
-						shader->SetUint(CubeMapFilteringResources.OutSize, mipSize);
 
-						GRHIDevice->BindShader(cmd, shader);
+						if (isNoneFilter) {
+
+							CubeMapGenPushData pushData{};
+							pushData.FaceIndex = f;
+							pushData.OutSize = mipSize;
+
+							GRHIDevice->BindShader(cmd, shader, {cubeSet}, &pushData);
+						}
+						else {
+
+							CubeMapFilteringPushData pushData{};
+							pushData.FaceIndex = f;
+							pushData.FilterType = (uint8_t)m_Desc.FilterMode;
+							pushData.OutSize = mipSize;
+
+							if (m_Desc.FilterMode == ECubeTextureFilterMode::ERadiance) {
+								pushData.Roughness = (float)m / (float)(m_Desc.NumMips - 1);
+							}
+
+							GRHIDevice->BindShader(cmd, shader, { cubeSet }, &pushData);
+						}
 
 						uint32_t groupCount = GetComputeGroupCount(mipSize, 8);
 						GRHIDevice->DispatchCompute(cmd, groupCount, groupCount, 1);

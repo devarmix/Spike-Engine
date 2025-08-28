@@ -1,7 +1,9 @@
 #include <Editor/Layers/EditorLayer.h>
 #include <Engine/Core/Application.h>
-#include <Generated/GeneratedDeferredPBR.h>
+#include <Generated/DeferredPBR.h>
 #include <Engine/Renderer/DefaultFeatures.h>
+
+#include <Engine/Core/Stats.h>
 
 namespace SpikeEditor {
 
@@ -94,6 +96,11 @@ namespace SpikeEditor {
 			ImGui::Image(viewID, { (float)outTexResource->GetSizeXYZ().x, (float)outTexResource->GetSizeXYZ().y });
 
 			ImGui::End();
+
+			ImGui::Begin("Stats");
+			ImGui::Text("FPS: %.1f", Stats::Data.Fps);
+			ImGui::Text("Frame Time: %.1f", Stats::Data.Frametime);
+			ImGui::End();
 			}));
 	}
 
@@ -136,7 +143,7 @@ namespace SpikeEditor {
 			m_EnvironmentTexture = CubeTexture::Create(desc);
 		}
 
-		m_LoadedMeshes = Mesh::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/models/plane2.glb");
+		m_LoadedMeshes = Mesh::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/models/cube.glb");
 
 		SamplerDesc mapsSamplerDesc{};
 		mapsSamplerDesc.Filter = ESamplerFilter::ETrilinear;
@@ -200,7 +207,7 @@ namespace SpikeEditor {
 
 					light.Intensity = 30;
 					light.Color = { 0.9f, 0.2f, 1.0f, 1.0f };
-					light.Position = { -3.f, 0.f, -5.f, 0.f };
+					light.Position = { 3.f, 0.f, -5.f, 0.f };
 					light.Type = 1;
 
 					m_Scene.Lights.push_back(light);
@@ -209,14 +216,14 @@ namespace SpikeEditor {
 					SceneLightGPUData light{};
 
 					light.Intensity = 12;
-					light.Color = { 0.3f, 0.9f, 1.0f, 1.0f };
+					light.Color = { 0.5f, 0.9f, 1.0f, 1.0f };
 					light.Position = { 5.f, 4.f, 4.f, 0.0f };
 					light.Type = 1;
 
 					m_Scene.Lights.push_back(light);
 				}
 
-				uint32_t sideSize = 5;
+				uint32_t sideSize = 25; 
 				uint32_t objectStep = 3;
 				m_Scene.Objects.reserve(sideSize * sideSize * sideSize);
 
@@ -230,20 +237,20 @@ namespace SpikeEditor {
 
 							{
 								SceneObjectGPUData object{};
-								object.BoundsOrigin = Vec4(sMesh.BoundsOrigin, 1.f);
+								object.BoundsOrigin = Vec4(sMesh.BoundsOrigin, sMesh.BoundsRadius);
 								object.BoundsExtents = Vec4(sMesh.BoundsExtents, 1.f);
 								object.GlobalTransform = glm::translate(Mat4x4(1.f), Vec3(a * objectStep, b * objectStep, c * objectStep));
 								object.InverseTransform = glm::inverse(object.GlobalTransform);
 								object.FirstIndex = sMesh.FirstIndex;
 								object.IndexCount = sMesh.IndexCount;
-								object.IndexBuffer = rhiMesh->GetIndexBuffer()->GetSRVIndex();
-								object.VertexBuffer = rhiMesh->GetVertexBuffer()->GetSRVIndex();
+								object.IndexBufferAddress = rhiMesh->GetIndexBuffer()->GetGPUAddress();
+								object.VertexBufferAddress = rhiMesh->GetVertexBuffer()->GetGPUAddress();
 								object.MaterialBufferIndex = rhiMat->GetDataIndex();
 								object.DrawBatchID = 0;
 								object.LastVisibilityIndex = visibilityIndex;
 								object.CurrentVisibilityIndex = visibilityIndex;
 
-								m_Scene.Objects.push_back(object);
+								m_Scene.Objects.push_back(object); 
 							}
 
 							visibilityIndex++;

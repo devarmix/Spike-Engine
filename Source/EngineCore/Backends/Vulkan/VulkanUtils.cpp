@@ -244,6 +244,7 @@ VkBufferUsageFlags Spike::VulkanUtils::BufferUsageToVulkan(EBufferUsageFlags fla
 	if (EnumHasAllFlags(flags, EBufferUsageFlags::ECopyDst)) outFlags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	if (EnumHasAllFlags(flags, EBufferUsageFlags::ECopySrc)) outFlags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	if (EnumHasAllFlags(flags, EBufferUsageFlags::EIndirect)) outFlags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+	if (EnumHasAllFlags(flags, EBufferUsageFlags::EAddressable)) outFlags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
 	return outFlags;
 }

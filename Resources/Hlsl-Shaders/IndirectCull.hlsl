@@ -1,21 +1,4 @@
-#define USE_SCENE_RENDERING_DATA
 #include "ShaderCommon.hlsli"
-
-BEGIN_DECL_SHADER_RESOURCES(Resources)
-    DECL_SHADER_BUFFER_UAV(DrawCommandsBuffer)
-    DECL_SHADER_BUFFER_UAV(DrawCountsBuffer)
-    DECL_SHADER_BUFFER_SRV(BatchOffsetsBuffer)
-    DECL_SHADER_BUFFER_SRV(LastVisibilityBuffer)
-    DECL_SHADER_BUFFER_SRV(SceneObjectsBuffer)
-    DECL_SHADER_BUFFER_UAV(CurrentVisibilityBuffer)
-    DECL_SHADER_TEXTURE_SRV(DepthPyramid)
-    DECL_SHADER_UINT(IsPrepass)
-    DECL_SHADER_UINT(PyramidSize)
-	DECL_SHADER_SCALAR(CullZNear)
-
-    DECL_SHADER_RESOURCES_STRUCT_PADDING(1)
-END_DECL_SHADER_RESOURCES(Resources)
-
 
 struct DrawIndirectCommand {
 
@@ -24,6 +7,24 @@ struct DrawIndirectCommand {
 	uint FirstVertex; 
 	uint FirstInstance; 
 };
+
+[[vk::binding(0, 0)]] RWStructuredBuffer<DrawIndirectCommand> DrawCommandsBuffer;
+[[vk::binding(1, 0)]] RWByteAddressBuffer DrawCountsBuffer;
+[[vk::binding(2, 0)]] StructuredBuffer<uint> BatchOffsetsBuffer;
+[[vk::binding(3, 0)]] StructuredBuffer<uint> LastVisibilityBuffer;
+[[vk::binding(4, 0)]] RWStructuredBuffer<uint> CurrentVisibilityBuffer;
+[[vk::binding(5, 0)]] Texture2D<float> DepthPyramid;
+[[vk::binding(6, 0)]] SamplerState PyramidSampler;
+[[vk::binding(7, 0)]] StructuredBuffer<SceneObjectGPUData> ObjectsBuffer;
+[[vk::binding(8, 0)]] ConstantBuffer<SceneGPUData> SceneDataBuffer;
+
+struct CullConstants {
+
+	uint IsPrepass;
+	uint PyramidSize;
+	float CullZNear;
+	float Padding0;
+}; [[vk::push_constant]] CullConstants Resources;
 
 // 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere
 // https://jcgt.org/published/0002/02/05/
@@ -53,16 +54,13 @@ bool TryCalculateSphereBounds(float3 center, float radius, float zNear, float P0
 
 bool IsVisible(uint objectID, bool prepass) {
 
-    BUFFER_SRV(objectsBuffer, Resources.SceneObjectsBuffer)
-    SceneObjectGPUData objectData = objectsBuffer.LoadAtIndex<SceneObjectGPUData>(SceneDataBuffer.ObjectsOffset + objectID);
+	SceneObjectGPUData objectData = ObjectsBuffer[objectID];
 
 	float3 boundsCenter = objectData.BoundsOrigin.xyz;
 	boundsCenter = mul(objectData.GlobalTransform, float4(boundsCenter, 1.f)).xyz;
 	float boundsRadius = objectData.BoundsOrigin.w;
 
-    BUFFER_SRV(lastVisibilityBuffer, Resources.LastVisibilityBuffer)
-
-    uint lastVisibility = lastVisibilityBuffer.LoadAtIndex<uint>(objectData.LastVisibilityIndex);
+    uint lastVisibility = LastVisibilityBuffer[objectData.LastVisibilityIndex];
 	bool visible = prepass ? lastVisibility == 1 : true;
 
 	if (visible) {
@@ -95,9 +93,7 @@ bool IsVisible(uint objectID, bool prepass) {
 			    float boundsHeight = (AABB.w - AABB.y) * float(Resources.PyramidSize);
 			    float mipIndex = floor(log2(max(boundsWidth, boundsHeight)));
 
-                TEXTURE_2D_SRV(pyramid, Resources.DepthPyramid)
-
-			    float occluderDepth = pyramid.SampleLevel(0.5f * (AABB.xy + AABB.zw), mipIndex).x;
+			    float occluderDepth = DepthPyramid.SampleLevel(PyramidSampler, 0.5f * (AABB.xy + AABB.zw), mipIndex).x;
 			    float nearestBoundsDepth = zNear / (-centerViewSpace.z - boundsRadius);
 
 			    bool bOcclusionCulled = occluderDepth >= nearestBoundsDepth;
@@ -117,25 +113,19 @@ void CSMain(uint3 threadID : SV_DispatchThreadID) {
         bool prepass = Resources.IsPrepass == 1;
         bool visible = IsVisible(threadID.x, prepass);
 
-        uint localDataIndex = SceneDataBuffer.ObjectsOffset + threadID.x;
-        BUFFER_SRV(objectsBuffer, Resources.SceneObjectsBuffer)
-        SceneObjectGPUData objectData = objectsBuffer.LoadAtIndex<SceneObjectGPUData>(localDataIndex);
+        uint localDataIndex = threadID.x;
+        SceneObjectGPUData objectData = ObjectsBuffer[localDataIndex];
 
-        BUFFER_SRV(lastVisibilityBuffer, Resources.LastVisibilityBuffer)
-        uint lastVisibility = lastVisibilityBuffer.LoadAtIndex<uint>(objectData.LastVisibilityIndex);
+        uint lastVisibility = LastVisibilityBuffer[objectData.LastVisibilityIndex];
         bool drawMesh = prepass ? visible : visible && lastVisibility == 0;
 
         if (drawMesh) {
 
-            BUFFER_SRV(batchOffsetsBuffer, Resources.BatchOffsetsBuffer)
-            BUFFER_UAV(drawCountsBuffer, Resources.DrawCountsBuffer)
-            BUFFER_UAV(drawCommandsbuffer, Resources.DrawCommandsBuffer)
-
-            uint batchOffset = batchOffsetsBuffer.LoadAtIndex<uint>(SceneDataBuffer.MaterialsOffset + objectData.DrawBatchID);
+            uint batchOffset = BatchOffsetsBuffer[objectData.DrawBatchID];
 
             uint localIndex;
-            drawCountsBuffer.InterlockedAddAtIndex(SceneDataBuffer.MaterialsOffset + batchOffset, 1, localIndex);
-            uint localDrawCommandIndex = SceneDataBuffer.ObjectsOffset + batchOffset + localIndex;
+			DrawCountsBuffer.InterlockedAdd(objectData.DrawBatchID * 4, 1, localIndex);
+            uint localDrawCommandIndex = localIndex + batchOffset;
 
             DrawIndirectCommand command;
             command.VertexCount = objectData.IndexCount;
@@ -143,13 +133,11 @@ void CSMain(uint3 threadID : SV_DispatchThreadID) {
             command.FirstVertex = 0;
             command.FirstInstance = localDataIndex;
 
-            drawCommandsbuffer.StoreAtIndex<DrawIndirectCommand>(localDrawCommandIndex, command);
+            DrawCommandsBuffer[localDrawCommandIndex] = command;
         }
 
         if (!prepass) {
-
-            BUFFER_UAV(currentVisibilityBuffer, Resources.CurrentVisibilityBuffer)
-            currentVisibilityBuffer.StoreAtIndex<uint>(objectData.CurrentVisibilityIndex, visible ? 1 : 0);
+            CurrentVisibilityBuffer[objectData.CurrentVisibilityIndex] = visible ? 1 : 0;
         }
     }
 }

@@ -1,14 +1,13 @@
 #include <Engine/Renderer/DefaultFeatures.h>
 #include <Engine/Core/Log.h>
-
-#include <Generated/GeneratedIndirectCull.h>
-#include <Generated/GeneratedDeferredPBR.h>
-#include <Generated/GeneratedDepthPyramid.h>
-#include <Generated/GeneratedDeferredLighting.h>
-#include <Generated/GeneratedSSAO.h>
-#include <Generated/GeneratedBloom.h>
-#include <Generated/GeneratedToneMap.h>
-#include <Generated/GeneratedSkybox.h>
+#include <Generated/IndirectCull.h>
+#include <Generated/DepthPyramid.h>
+#include <Generated/DeferredLighting.h>
+#include <Generated/SSAOGen.h>
+#include <Generated/SSAOComposite.h>
+#include <Generated/BloomDownSample.h>
+#include <Generated/BloomUpSample.h>
+#include <Generated/ToneMap.h>
 
 #include <random>
 
@@ -37,7 +36,7 @@ namespace Spike {
 
 	GBufferFeature::~GBufferFeature() {}
 
-	void GBufferFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) {
+	void GBufferFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
 
 		FrameData& frameData = GFrameRenderer->GetFrameData();
 		FrameData& prevFrameData = GFrameRenderer->GetPrevFrameData();
@@ -83,7 +82,7 @@ namespace Spike {
 
 		SamplerDesc hzbSamplerDesc{};
 		hzbSamplerDesc.Filter = ESamplerFilter::EBilinear;
-		hzbSamplerDesc.AddressU = ESamplerAddress::EClamp;
+		hzbSamplerDesc.AddressU = ESamplerAddress::EClamp; 
 		hzbSamplerDesc.AddressV = ESamplerAddress::EClamp;
 		hzbSamplerDesc.AddressW = ESamplerAddress::EClamp;
 		hzbSamplerDesc.MinLOD = 0.0f;
@@ -118,14 +117,6 @@ namespace Spike {
 				RHIBuffer* ubo = graphBuilder->GetBufferResource(sceneUBO);
 				{
 					ENGINE_INFO("{0}, {1}, {2}", scene->CameraData.Position.x, scene->CameraData.Position.y, scene->CameraData.Position.z);
-
-					// Camera settings
-					glm::vec3 camPos = glm::vec3(0.0f, 0.0f, -3.0f);
-					glm::vec3 camTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-					glm::vec3 camUp = glm::vec3(0.0f, 1.0f, 0.0f);
-
-					// View matrix
-					glm::mat4 view = glm::lookAt(camPos, camTarget, camUp);
 
 					SceneGPUData* sceneData = (SceneGPUData*)ubo->GetMappedData();
 					sceneData[0].View = scene->CameraData.View;
@@ -165,13 +156,8 @@ namespace Spike {
 					sceneData[0].P11 = sceneData[0].Proj[1][1];
 					sceneData[0].NearProj = scene->CameraData.NearProj;
 					sceneData[0].FarProj = scene->CameraData.FarProj;
-					sceneData[0].LightsOffset = frameData.LightsOffset;
-					sceneData[0].ObjectsOffset = frameData.ObjectsOffset;
-					sceneData[0].DrawCountOffset = frameData.DrawCountOffset;
 					sceneData[0].LightsCount = (uint32_t)scene->Lights.size();
 					sceneData[0].ObjectsCount = (uint32_t)scene->Objects.size();
-
-					sceneDataSet->AddResourceWrite({ .Slot = 0, .ArrayElement = 0, .Type = EShaderResourceType::EConstantBuffer, .Buffer = ubo, .BufferRange = sizeof(SceneGPUData), .BufferOffset = 0 });
 				}
 
 				memcpy((SceneObjectGPUData*)frameData.SceneObjectsBuffer->GetMappedData() + frameData.ObjectsOffset, 
@@ -216,24 +202,37 @@ namespace Spike {
 				RHITexture2D* material = graphBuilder->GetTextureResource(materialTex);
 				RHITexture2D* depth = graphBuilder->GetTextureResource(depthTex);
 
+				RHIBindingSet* cullSet = GRDGPool->GetOrCreateBindingSet(m_CullShader->GetLayouts()[0]);
+				{
+					cullSet->AddBufferWrite(0, 0, EShaderResourceType::EBufferUAV, frameData.DrawCommandsBuffer,
+						sizeof(DrawIndirectCommand) * scene->Objects.size(), sizeof(DrawIndirectCommand) * frameData.ObjectsOffset);
+					cullSet->AddBufferWrite(1, 0, EShaderResourceType::EBufferUAV, frameData.DrawCountsBuffer,
+						sizeof(uint32_t) * scene->Batches.size(), sizeof(uint32_t) * frameData.DrawCountOffset);
+					cullSet->AddBufferWrite(2, 0, EShaderResourceType::EBufferSRV, frameData.BatchOffsetsBuffer,
+						sizeof(uint32_t) * scene->Batches.size(), sizeof(uint32_t) * frameData.DrawCountOffset);
+					cullSet->AddBufferWrite(3, 0, EShaderResourceType::EBufferSRV, prevFrameData.VisibilityBuffer,
+						prevFrameData.VisibilityBuffer->GetSize(), 0);
+					cullSet->AddBufferWrite(4, 0, EShaderResourceType::EBufferUAV, frameData.VisibilityBuffer,
+						sizeof(uint32_t) * scene->Objects.size(), sizeof(uint32_t) * frameData.ObjectsOffset);
+					cullSet->AddTextureWrite(5, 0, EShaderResourceType::ETextureSRV, hzb->GetTextureView(), EGPUAccessFlags::ESRVCompute);
+					cullSet->AddSamplerWrite(6, 0, EShaderResourceType::ESampler, hzb->GetSampler());
+					cullSet->AddBufferWrite(7, 0, EShaderResourceType::EBufferSRV, frameData.SceneObjectsBuffer,
+						sizeof(SceneObjectGPUData) * scene->Objects.size(), sizeof(SceneObjectGPUData) * frameData.ObjectsOffset);
+					cullSet->AddBufferWrite(8, 0, EShaderResourceType::EConstantBuffer, ubo, ubo->GetSize(), 0);
+				}
+
 				auto cullGeometry = [=, this](bool prepass) {
 
-					m_CullShader->SetBufferUAV(IndirectCullResources.DrawCommandsBuffer, frameData.DrawCommandsBuffer);
-					m_CullShader->SetBufferUAV(IndirectCullResources.DrawCountsBuffer, frameData.DrawCountsBuffer);
-					m_CullShader->SetBufferSRV(IndirectCullResources.BatchOffsetsBuffer, frameData.BatchOffsetsBuffer);
-					m_CullShader->SetBufferSRV(IndirectCullResources.LastVisibilityBuffer, prevFrameData.VisibilityBuffer);
-					m_CullShader->SetBufferSRV(IndirectCullResources.SceneObjectsBuffer, frameData.SceneObjectsBuffer);
-					m_CullShader->SetBufferUAV(IndirectCullResources.CurrentVisibilityBuffer, frameData.VisibilityBuffer);
-					m_CullShader->SetUint(IndirectCullResources.IsPrepass, prepass ? 1 : 0);
+					IndirectCullPushData pushData{};
+					pushData.IsPrepass = prepass ? 1 : 0; 
 
 					if (!prepass) {
 
-						m_CullShader->SetTextureSRV(IndirectCullResources.DepthPyramid, hzb->GetTextureView());
-						m_CullShader->SetUint(IndirectCullResources.PyramidSize, hzbSize);
-						m_CullShader->SetFloat(IndirectCullResources.CullZNear, scene->CameraData.Proj[3][2]);
+						pushData.PyramidSize = hzbSize;
+						pushData.CullZNear = scene->CameraData.Proj[3][2]; 
 					}
 
-					GRHIDevice->BindShader(cmd, m_CullShader, sceneDataSet);
+					GRHIDevice->BindShader(cmd, m_CullShader, {cullSet}, &pushData);
 
 					uint32_t groupSize = uint32_t((scene->Objects.size() / 256) + 1);
 					GRHIDevice->DispatchCompute(cmd, groupSize, 1, 1);
@@ -243,6 +242,13 @@ namespace Spike {
 					graphBuilder->BarrierRDGBuffer(cmd, frameData.DrawCountsBuffer, sizeof(uint32_t) * scene->Batches.size(),
 						sizeof(uint32_t) * frameData.DrawCountOffset, EGPUAccessFlags::EIndirectArgs);
 					};
+
+				RHIBindingSet* meshDrawSet = GRDGPool->GetOrCreateBindingSet(GShaderManager->GetMeshDrawLayout());
+				{
+					meshDrawSet->AddBufferWrite(0, 0, EShaderResourceType::EConstantBuffer, ubo, sizeof(SceneGPUData), 0);
+					meshDrawSet->AddBufferWrite(1, 0, EShaderResourceType::EBufferSRV, frameData.SceneObjectsBuffer,
+						sizeof(SceneObjectGPUData)* scene->Objects.size(), sizeof(SceneObjectGPUData)* frameData.ObjectsOffset);
+				}
 
 				auto drawGeometry = [=](bool prepass) {
 
@@ -261,9 +267,7 @@ namespace Spike {
 					for (int i = 0; i < scene->Batches.size(); i++) {
 
 						DrawBatch currBatch = scene->Batches[i];
-
-						currBatch.Shader->SetBufferSRV(DeferredPBRResources.SceneObjectsBuffer, frameData.SceneObjectsBuffer);
-						GRHIDevice->BindShader(cmd, currBatch.Shader, sceneDataSet);
+						GRHIDevice->BindShader(cmd, currBatch.Shader, {meshDrawSet, GShaderManager->GetMaterialSet()});
 
 						uint32_t stride = sizeof(DrawIndirectCommand);
 						uint64_t commandOffset = frameData.ObjectsOffset + batchOffsets[i];
@@ -278,6 +282,8 @@ namespace Spike {
 
 				// first cull pass
 				{
+					graphBuilder->BarrierRDGTexture2D(cmd, hzb, EGPUAccessFlags::ESRVCompute);
+
 					cullGeometry(true);
 
 					graphBuilder->BarrierRDGTexture2D(cmd, albedo, EGPUAccessFlags::EColorTarget);
@@ -295,18 +301,22 @@ namespace Spike {
 
 					for (uint32_t i = 0; i < hzb->GetNumMips(); i++) {
 
-						m_HzbShader->SetTextureUAV(DepthPyramidResources.OutImage, hzbViews[i]);
+						RHIBindingSet* hzbSet = GRDGPool->GetOrCreateBindingSet(m_HzbShader->GetLayouts()[0]);
+
+						hzbSet->AddTextureWrite(2, 0, EShaderResourceType::ETextureUAV, hzbViews[i], EGPUAccessFlags::EUAVCompute);
 						if (i == 0) {
-							m_HzbShader->SetTextureSRV(DepthPyramidResources.InImage, depth->GetTextureView());
+							hzbSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, depth->GetTextureView(), EGPUAccessFlags::ESRVCompute);
 						}
 						else {
-							m_HzbShader->SetTextureUAVReadOnly(DepthPyramidResources.InImage, hzbViews[i - 1]);
-						} 
+							hzbSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, hzbViews[i - 1], EGPUAccessFlags::EUAVCompute);
+						}
+						hzbSet->AddSamplerWrite(1, 0, EShaderResourceType::ESampler, hzb->GetSampler());
 
+						DepthPyramidPushData pushData{};
 						uint32_t levelSize = hzbSize >> i;
-						m_HzbShader->SetUint(DepthPyramidResources.MipSize, levelSize);
+						pushData.MipSize = levelSize;
 
-						GRHIDevice->BindShader(cmd, m_HzbShader);
+						GRHIDevice->BindShader(cmd, m_HzbShader, {hzbSet}, &pushData);
 
 						uint32_t groupCount = GetComputeGroupCount(levelSize, 32);
 						GRHIDevice->DispatchCompute(cmd, groupCount, groupCount, 1);
@@ -351,7 +361,7 @@ namespace Spike {
 
 	DeferredLightingFeature::~DeferredLightingFeature() {}
 
-	void DeferredLightingFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) {
+	void DeferredLightingFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
 
 		FrameData& frameData = GFrameRenderer->GetFrameData();
 
@@ -359,13 +369,14 @@ namespace Spike {
 		RDGHandle normalTex = graphBuilder->FindRDGTexture2D("GBuffer-Normal");
 		RDGHandle materialTex = graphBuilder->FindRDGTexture2D("GBuffer-Material");
 		RDGHandle depthTex = graphBuilder->FindRDGTexture2D("GBuffer-Depth");
+		RDGHandle sceneUBO = graphBuilder->FindRDGBuffer("Scene-UBO");
 
 		graphBuilder->RegisterExternalTexture2D(context.OutTexture);
 		graphBuilder->RegisterExternalBuffer(frameData.LightsBuffer);
 
 		graphBuilder->AddPass(
 			{albedoTex, normalTex, materialTex, depthTex},
-			{},
+			{sceneUBO},
 			ERendererStage::ELightsRender,
 			[=, this](RHICommandBuffer* cmd) {
 
@@ -377,18 +388,26 @@ namespace Spike {
 				RHITexture2D* material = graphBuilder->GetTextureResource(materialTex);
 				RHITexture2D* depth = graphBuilder->GetTextureResource(depthTex);
 				RHITexture2D* brdf = GFrameRenderer->GetBRDFLut();
+				RHIBuffer* ubo = graphBuilder->GetBufferResource(sceneUBO);
 
 				graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::EColorTarget);
 
-				m_LightingShader->SetTextureSRV(DeferredLightingResources.AlbedoMap, albedo->GetTextureView());
-				m_LightingShader->SetTextureSRV(DeferredLightingResources.NormalMap, normal->GetTextureView());
-			    m_LightingShader->SetTextureSRV(DeferredLightingResources.MaterialMap, material->GetTextureView());
-				m_LightingShader->SetTextureSRV(DeferredLightingResources.DepthMap, depth->GetTextureView());
-				m_LightingShader->SetTextureSRV(DeferredLightingResources.EnvMap, context.EnvironmentTexture->GetTextureView());
-				m_LightingShader->SetTextureSRV(DeferredLightingResources.IrrMap, context.IrradianceTexture->GetTextureView());
-				m_LightingShader->SetTextureSRV(DeferredLightingResources.BRDFMap, brdf->GetTextureView());
-				m_LightingShader->SetBufferSRV(DeferredLightingResources.LightsBuffer, frameData.LightsBuffer);
-				m_LightingShader->SetUint(DeferredLightingResources.EnvMapNumMips, context.EnvironmentTexture->GetNumMips());
+				RHIBindingSet* lightingSet = GRDGPool->GetOrCreateBindingSet(m_LightingShader->GetLayouts()[0]);
+				{
+					lightingSet->AddBufferWrite(0, 0, EShaderResourceType::EConstantBuffer, ubo, ubo->GetSize(), 0);
+					lightingSet->AddTextureWrite(1, 0, EShaderResourceType::ETextureSRV, albedo->GetTextureView(), EGPUAccessFlags::ESRV);
+					lightingSet->AddTextureWrite(2, 0, EShaderResourceType::ETextureSRV, normal->GetTextureView(), EGPUAccessFlags::ESRV);
+					lightingSet->AddTextureWrite(3, 0, EShaderResourceType::ETextureSRV, material->GetTextureView(), EGPUAccessFlags::ESRV);
+					lightingSet->AddTextureWrite(4, 0, EShaderResourceType::ETextureSRV, depth->GetTextureView(), EGPUAccessFlags::ESRV);
+					lightingSet->AddTextureWrite(5, 0, EShaderResourceType::ETextureSRV, context.EnvironmentTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+					lightingSet->AddTextureWrite(6, 0, EShaderResourceType::ETextureSRV, context.IrradianceTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+					lightingSet->AddTextureWrite(7, 0, EShaderResourceType::ETextureSRV, brdf->GetTextureView(), EGPUAccessFlags::ESRV);
+					lightingSet->AddSamplerWrite(8, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
+					lightingSet->AddBufferWrite(9, 0, EShaderResourceType::EBufferSRV, frameData.LightsBuffer, sizeof(SceneLightGPUData) * scene->Lights.size(), frameData.LightsOffset);
+				}
+
+				DeferredLightingPushData pushData{};
+				pushData.EnvMapNumMips = context.EnvironmentTexture->GetNumMips();
 
 				Vec4 colorClear = { 0.0f, 0.0f, 0.0f, 1.0f };
 
@@ -400,7 +419,7 @@ namespace Spike {
 				info.DrawSize = { context.OutTexture->GetSizeXYZ().x, context.OutTexture->GetSizeXYZ().y };
 
 				GRHIDevice->BeginRendering(cmd, info);
-				GRHIDevice->BindShader(cmd, m_LightingShader, sceneDataSet);
+				GRHIDevice->BindShader(cmd, m_LightingShader, {lightingSet}, &pushData);
 				GRHIDevice->Draw(cmd, 3, 1, 0, 0);
 				GRHIDevice->EndRendering(cmd);
 
@@ -409,12 +428,12 @@ namespace Spike {
 	}
 
 
-
 	SkyboxFeature::SkyboxFeature() {
 
 		ShaderDesc desc{};
 		desc.Type = EShaderType::EGraphics;
 		desc.Name = "Skybox";
+		desc.ColorTargetFormats = { ETextureFormat::ERGBA16F };
 		desc.EnableDepthTest = true;
 
 		m_SkyboxShader = GShaderManager->GetShaderFromCache(desc);
@@ -422,21 +441,29 @@ namespace Spike {
 
 	SkyboxFeature::~SkyboxFeature() {}
 
-	void SkyboxFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) {
+	void SkyboxFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
 
 		RDGHandle depthTex = graphBuilder->FindRDGTexture2D("GBuffer-Depth");
+		RDGHandle sceneUBO = graphBuilder->FindRDGBuffer("Scene-UBO");
 		
 		graphBuilder->AddPass(
 			{ depthTex },
-			{},
+			{ sceneUBO },
 			ERendererStage::EAfterLightsRender,
 			[=, this](RHICommandBuffer* cmd) {
 
 				RHITexture2D* depth = graphBuilder->GetTextureResource(depthTex);
+				RHIBuffer* ubo = graphBuilder->GetBufferResource(sceneUBO);
+
 				graphBuilder->BarrierRDGTexture2D(cmd, depth, EGPUAccessFlags::EDepthTarget);
 				graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::EColorTarget);
 
-				m_SkyboxShader->SetTextureSRV(SkyboxResources.SkyboxMap, context.EnvironmentTexture->GetTextureView());
+				RHIBindingSet* skyboxSet = GRDGPool->GetOrCreateBindingSet(m_SkyboxShader->GetLayouts()[0]);
+				{
+					skyboxSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, context.EnvironmentTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+					skyboxSet->AddSamplerWrite(1, 0, EShaderResourceType::ESampler, context.EnvironmentTexture->GetSampler());
+					skyboxSet->AddBufferWrite(2, 0, EShaderResourceType::EConstantBuffer, ubo, ubo->GetSize(), 0);
+				}
 
 				RHIDevice::RenderInfo info{};
 				info.ColorTargets = { context.OutTexture->GetTextureView() };
@@ -445,12 +472,13 @@ namespace Spike {
 				info.DepthClear = nullptr;
 				info.DrawSize = { context.OutTexture->GetSizeXYZ().x, context.OutTexture->GetSizeXYZ().y };
 
-				GRHIDevice->BindShader(cmd, m_SkyboxShader, sceneDataSet);
+				GRHIDevice->BindShader(cmd, m_SkyboxShader, {skyboxSet});
 				GRHIDevice->BeginRendering(cmd, info);
 				GRHIDevice->Draw(cmd, 3, 1, 0, 0);
 				GRHIDevice->EndRendering(cmd);
 
 				graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::ESRV);
+				graphBuilder->BarrierRDGTexture2D(cmd, depth, EGPUAccessFlags::ESRV);
 			});
 	}
 
@@ -460,9 +488,16 @@ namespace Spike {
 		{
 			ShaderDesc desc{};
 			desc.Type = EShaderType::ECompute;
-			desc.Name = "SSAO";
+			desc.Name = "SSAOGen";
 
-			m_SSAOShader = GShaderManager->GetShaderFromCache(desc);
+			m_GenShader = GShaderManager->GetShaderFromCache(desc);
+		}
+		{
+			ShaderDesc desc{};
+			desc.Type = EShaderType::ECompute;
+			desc.Name = "SSAOComposite";
+
+			m_CompositeShader = GShaderManager->GetShaderFromCache(desc);
 		}
 		{
 			std::uniform_real_distribution<float> randomFloats(0.0f, 1.0f);
@@ -494,15 +529,44 @@ namespace Spike {
 			m_NoiseTexture = new RHITexture2D(desc);
 			m_NoiseTexture->InitRHI();
 		}
+		{
+			std::uniform_real_distribution<float> randomFloats(0.0, 1.0); 
+			std::default_random_engine generator;
+			std::vector<Vec4> ssaoKernel;
+
+			for (uint32_t i = 0; i < 64; ++i)
+			{
+				Vec3 sample(
+					randomFloats(generator) * 2.0 - 1.0,
+					randomFloats(generator) * 2.0 - 1.0,
+					randomFloats(generator));
+				sample = glm::normalize(sample);
+				sample *= randomFloats(generator);
+				ssaoKernel.push_back(Vec4(sample, 1.0f));
+			}
+
+			BufferDesc desc{};
+			desc.Size = sizeof(Vec3) * ssaoKernel.size();
+			desc.UsageFlags = EBufferUsageFlags::EConstant;
+			desc.MemUsage = EBufferMemUsage::ECPUToGPU;
+
+			m_KernelBuffer = new RHIBuffer(desc);
+			m_KernelBuffer->InitRHI();
+
+			memcpy(m_KernelBuffer->GetMappedData(), ssaoKernel.data(), desc.Size);
+		}
 	}
 
 	SSAOFeature::~SSAOFeature() {
 
 		m_NoiseTexture->ReleaseRHI();
 		delete m_NoiseTexture;
+
+		m_KernelBuffer->ReleaseRHI();
+		delete m_KernelBuffer;
 	}
 
-	void SSAOFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) {
+	void SSAOFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
 
 		FrameData& frameData = GFrameRenderer->GetFrameData();
 
@@ -528,10 +592,11 @@ namespace Spike {
 		desc.UsageFlags = ETextureUsageFlags::EStorage | ETextureUsageFlags::ECopySrc;
 		desc.Format = ETextureFormat::ERGBA16F;
 		RDGHandle ssaoCompositeTex = graphBuilder->CreateRDGTexture2D("SSAO-Composite", desc);
+		RDGHandle sceneUBO = graphBuilder->FindRDGBuffer("Scene-UBO");
 
 		graphBuilder->AddPass(
 			{ssaoTex, ssaoCompositeTex },
-			{},
+			{sceneUBO},
 			ERendererStage::EPostProcessingRender,
 			[=, this](RHICommandBuffer* cmd) {
 
@@ -544,19 +609,28 @@ namespace Spike {
 
 					RHITexture2D* normal = graphBuilder->GetTextureResource(normalTex);
 					RHITexture2D* depth = graphBuilder->GetTextureResource(depthTex);
+					RHIBuffer* ubo = graphBuilder->GetBufferResource(sceneUBO);
 
-					m_SSAOShader->SetTextureSRV(SSAOResources.SampledTextureA, depth->GetTextureView());
-					m_SSAOShader->SetTextureSRV(SSAOResources.SampledTextureB, normal->GetTextureView());
-					m_SSAOShader->SetTextureSRV(SSAOResources.NoiseMap, m_NoiseTexture->GetTextureView());
-					m_SSAOShader->SetTextureUAV(SSAOResources.OutTexture, ssao->GetTextureView());
-					m_SSAOShader->SetFloat(SSAOResources.Radius, 0.5f);
-					m_SSAOShader->SetFloat(SSAOResources.Bias, 0.025f);
-					m_SSAOShader->SetUint(SSAOResources.NumSamples, 32);
-					m_SSAOShader->SetFloat(SSAOResources.Intensity, 1.5f);
-					m_SSAOShader->SetUint(SSAOResources.SSAOStage, 0);
-					m_SSAOShader->SetVec2(SSAOResources.TexSize, { ssao->GetSizeXYZ().x,  ssao->GetSizeXYZ().y});
+					RHIBindingSet* genSet = GRDGPool->GetOrCreateBindingSet(m_GenShader->GetLayouts()[0]);
+					{
+						genSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, depth->GetTextureView(), EGPUAccessFlags::ESRV);
+						genSet->AddTextureWrite(1, 0, EShaderResourceType::ETextureSRV, normal->GetTextureView(), EGPUAccessFlags::ESRV);
+						genSet->AddTextureWrite(2, 0, EShaderResourceType::ETextureSRV, m_NoiseTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+						genSet->AddSamplerWrite(3, 0, EShaderResourceType::ESampler, m_NoiseTexture->GetSampler());
+						genSet->AddSamplerWrite(4, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
+						genSet->AddTextureWrite(5, 0, EShaderResourceType::ETextureUAV, ssao->GetTextureView(), EGPUAccessFlags::EUAVCompute);
+						genSet->AddBufferWrite(6, 0, EShaderResourceType::EConstantBuffer, m_KernelBuffer, m_KernelBuffer->GetSize(), 0);
+						genSet->AddBufferWrite(7, 0, EShaderResourceType::EConstantBuffer, ubo, ubo->GetSize(), 0);
+					}
 
-					GRHIDevice->BindShader(cmd, m_SSAOShader, sceneDataSet);
+					SSAOGenPushData pushData{};
+					pushData.Radius = 0.5f;
+					pushData.Bias = 0.025f;
+					pushData.NumSamples = 64;
+					pushData.Intensity = 1.0f;
+					pushData.TexSize = { ssao->GetSizeXYZ().x,  ssao->GetSizeXYZ().y };
+
+					GRHIDevice->BindShader(cmd, m_GenShader, {genSet}, &pushData);
 
 					uint32_t groupCountX = GetComputeGroupCount(ssao->GetSizeXYZ().x, 32);
 					uint32_t groupCountY = GetComputeGroupCount(ssao->GetSizeXYZ().y, 32);
@@ -569,13 +643,18 @@ namespace Spike {
 				{
 					graphBuilder->BarrierRDGTexture2D(cmd, ssaoComposite, EGPUAccessFlags::EUAVCompute);
 
-					m_SSAOShader->SetTextureSRV(SSAOResources.SampledTextureA, ssao->GetTextureView());
-					m_SSAOShader->SetTextureSRV(SSAOResources.SampledTextureB, context.OutTexture->GetTextureView());
-					m_SSAOShader->SetTextureUAV(SSAOResources.OutTexture, ssaoComposite->GetTextureView());
-					m_SSAOShader->SetUint(SSAOResources.SSAOStage, 1);
-					m_SSAOShader->SetVec2(SSAOResources.TexSize, { ssaoComposite->GetSizeXYZ().x,  ssaoComposite->GetSizeXYZ().y });
+					RHIBindingSet* compSet = GRDGPool->GetOrCreateBindingSet(m_CompositeShader->GetLayouts()[0]);
+					{
+						compSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, ssao->GetTextureView(), EGPUAccessFlags::ESRVCompute);
+						compSet->AddTextureWrite(1, 0, EShaderResourceType::ETextureSRV, context.OutTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+						compSet->AddSamplerWrite(2, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
+						compSet->AddTextureWrite(3, 0, EShaderResourceType::ETextureUAV, ssaoComposite->GetTextureView(), EGPUAccessFlags::EUAVCompute);
+					}
 
-					GRHIDevice->BindShader(cmd, m_SSAOShader, sceneDataSet);
+					SSAOCompositePushData pushData{};
+					pushData.TexSize = { ssaoComposite->GetSizeXYZ().x,  ssaoComposite->GetSizeXYZ().y };
+
+					GRHIDevice->BindShader(cmd, m_CompositeShader, {compSet}, &pushData);
 
 					uint32_t groupCountX = GetComputeGroupCount(ssaoComposite->GetSizeXYZ().x, 32);
 					uint32_t groupCountY = GetComputeGroupCount(ssaoComposite->GetSizeXYZ().y, 32);
@@ -603,16 +682,25 @@ namespace Spike {
 
 	BloomFeature::BloomFeature() {
 
-		ShaderDesc desc{};
-		desc.Type = EShaderType::ECompute;
-		desc.Name = "Bloom";
+		{
+			ShaderDesc desc{};
+			desc.Type = EShaderType::ECompute;
+			desc.Name = "BloomDownSample";
 
-		m_BloomShader = GShaderManager->GetShaderFromCache(desc);
+			m_DownSampleShader = GShaderManager->GetShaderFromCache(desc);
+		}
+		{
+			ShaderDesc desc{};
+			desc.Type = EShaderType::ECompute;
+			desc.Name = "BloomUpSample";
+
+			m_UpSampleShader = GShaderManager->GetShaderFromCache(desc);
+		}
 	}
 
 	BloomFeature::~BloomFeature() {}
 
-	void BloomFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) {
+	void BloomFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
 
 		SamplerDesc samplerDesc{};
 		samplerDesc.Filter = ESamplerFilter::EBilinear;
@@ -689,13 +777,16 @@ namespace Spike {
 
 					for (uint32_t i = 0; i < bloomDown->GetNumMips(); i++) {
 
+						RHIBindingSet* downSet = GRDGPool->GetOrCreateBindingSet(m_DownSampleShader->GetLayouts()[0]);
+
 						if (i == 0) {
-							m_BloomShader->SetTextureSRV(BloomResources.SampledTextureA, context.OutTexture->GetTextureView());
+							downSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, context.OutTexture->GetTextureView(), EGPUAccessFlags::ESRV);
 						}
 						else {
-							m_BloomShader->SetTextureUAVReadOnly(BloomResources.SampledTextureA, downViews[i - 1]);
+							downSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, downViews[i - 1], EGPUAccessFlags::EUAVCompute);
 						}
-						m_BloomShader->SetTextureUAV(BloomResources.OutTexture, downViews[i]);
+						downSet->AddSamplerWrite(1, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
+						downSet->AddTextureWrite(2, 0, EShaderResourceType::ETextureUAV, downViews[i], EGPUAccessFlags::EUAVCompute);
 
 						uint32_t srcWidth = outWidth >> i;
 						uint32_t srcHeight = outHeight >> i;
@@ -703,14 +794,14 @@ namespace Spike {
 						uint32_t levelWidth = srcWidth >> 1;
 						uint32_t levelHeight = srcHeight >> 1;
 
-						m_BloomShader->SetVec2(BloomResources.SrcSize, { srcWidth, srcHeight });
-						m_BloomShader->SetVec2(BloomResources.OutSize, { levelWidth, levelHeight });
-						m_BloomShader->SetUint(BloomResources.MipLevel, i);
-						m_BloomShader->SetFloat(BloomResources.Threadshold, 2.0f);
-						m_BloomShader->SetFloat(BloomResources.SoftThreadshold, 0.5f);
-						m_BloomShader->SetUint(BloomResources.BloomStage, 0);
+						BloomDownSamplePushData pushData{};
+						pushData.SrcSize = { srcWidth, srcHeight };
+						pushData.OutSize = { levelWidth, levelHeight };
+						pushData.MipLevel = i;
+						pushData.Threadshold = 2.0f;
+						pushData.SoftThreadshold = 0.5f;
 
-						GRHIDevice->BindShader(cmd, m_BloomShader);
+						GRHIDevice->BindShader(cmd, m_DownSampleShader, {downSet}, &pushData);
 
 						uint32_t groupCountX = GetComputeGroupCount(levelWidth, 32);
 						uint32_t groupCountY = GetComputeGroupCount(levelHeight, 32);
@@ -729,24 +820,28 @@ namespace Spike {
 
 					for (int i = mips; i >= 0; i--) {
 
+						RHIBindingSet* upSet = GRDGPool->GetOrCreateBindingSet(m_UpSampleShader->GetLayouts()[0]);
+
 						if (i == mips) {
-							m_BloomShader->SetTextureSRV(BloomResources.SampledTextureA, downViews[i + 1]);
+							upSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, downViews[i + 1], EGPUAccessFlags::ESRVCompute);
 						}
 						else {
-							m_BloomShader->SetTextureUAVReadOnly(BloomResources.SampledTextureA, upViews[i + 1]);
+							upSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, upViews[i + 1], EGPUAccessFlags::EUAVCompute);
 						}
 
-						m_BloomShader->SetTextureSRV(BloomResources.SampledTextureB, downViews[i]);
-						m_BloomShader->SetTextureUAV(BloomResources.OutTexture, upViews[i]);
+						upSet->AddTextureWrite(1, 0, EShaderResourceType::ETextureSRV, downViews[i], EGPUAccessFlags::ESRVCompute);
+						upSet->AddSamplerWrite(2, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
+						upSet->AddTextureWrite(3, 0, EShaderResourceType::ETextureUAV, upViews[i], EGPUAccessFlags::EUAVCompute);
 
 						uint32_t levelWidth = outWidth >> (i + 1);
 						uint32_t levelHeight = outHeight >> (i + 1);
 
-						m_BloomShader->SetVec2(BloomResources.OutSize, { levelWidth, levelHeight });
-						m_BloomShader->SetFloat(BloomResources.FilterRadius, 0.005f);
-						m_BloomShader->SetUint(BloomResources.BloomStage, 1);
+						BloomUpSamplePushData pushData{};
+						pushData.OutSize = { levelWidth, levelHeight };
+						pushData.BloomStage = 0;
+						pushData.FilterRadius = 0.005f;
 
-						GRHIDevice->BindShader(cmd, m_BloomShader);
+						GRHIDevice->BindShader(cmd, m_UpSampleShader, {upSet}, &pushData);
 
 						uint32_t groupCountX = GetComputeGroupCount(levelWidth, 32);
 						uint32_t groupCountY = GetComputeGroupCount(levelHeight, 32);
@@ -762,15 +857,21 @@ namespace Spike {
 				{
 					graphBuilder->BarrierRDGTexture2D(cmd, bloomComposite, EGPUAccessFlags::EUAVCompute);
 
-					m_BloomShader->SetTextureSRV(BloomResources.SampledTextureA, upViews[0]);
-					m_BloomShader->SetTextureSRV(BloomResources.SampledTextureB, context.OutTexture->GetTextureView());
-					m_BloomShader->SetTextureUAV(BloomResources.OutTexture, bloomComposite->GetTextureView());
-					m_BloomShader->SetVec2(BloomResources.OutSize, { outWidth, outHeight });
-					m_BloomShader->SetFloat(BloomResources.FilterRadius, 0.005f);
-					m_BloomShader->SetFloat(BloomResources.BloomIntensity, 0.4f);
-					m_BloomShader->SetUint(BloomResources.BloomStage, 2);
+					RHIBindingSet* compSet = GRDGPool->GetOrCreateBindingSet(m_UpSampleShader->GetLayouts()[0]);
+					{
+						compSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, upViews[0], EGPUAccessFlags::ESRVCompute);
+						compSet->AddTextureWrite(1, 0, EShaderResourceType::ETextureSRV, context.OutTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+						compSet->AddSamplerWrite(2, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
+						compSet->AddTextureWrite(3, 0, EShaderResourceType::ETextureUAV, bloomComposite->GetTextureView(), EGPUAccessFlags::EUAVCompute);
+					}
 
-					GRHIDevice->BindShader(cmd, m_BloomShader);
+					BloomUpSamplePushData pushData{};
+					pushData.OutSize = { outWidth, outHeight };
+					pushData.FilterRadius = 0.005f;
+					pushData.Intensity = 0.4f;
+					pushData.BloomStage = 1;
+
+					GRHIDevice->BindShader(cmd, m_UpSampleShader, {compSet}, &pushData);
 
 					uint32_t groupCountX = GetComputeGroupCount(outWidth, 32);
 					uint32_t groupCountY = GetComputeGroupCount(outHeight, 32);
@@ -807,7 +908,7 @@ namespace Spike {
 
 	ToneMapFeature::~ToneMapFeature() {}
 
-	void ToneMapFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context, RHIBindingSet* sceneDataSet) {
+	void ToneMapFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
 
 		uint32_t outWidth = context.OutTexture->GetSizeXYZ().x;
 		uint32_t outHeight = context.OutTexture->GetSizeXYZ().y;
@@ -828,14 +929,20 @@ namespace Spike {
 			[=, this](RHICommandBuffer* cmd) {
 
 				RHITexture2D* toneMap = graphBuilder->GetTextureResource(toneMapTex);
-
 				graphBuilder->BarrierRDGTexture2D(cmd, toneMap, EGPUAccessFlags::EUAVCompute);
-				m_ToneMapShader->SetTextureSRV(ToneMapResources.InTexture, context.OutTexture->GetTextureView());
-				m_ToneMapShader->SetTextureUAV(ToneMapResources.OutTexture, toneMap->GetTextureView());
-				m_ToneMapShader->SetFloat(ToneMapResources.Exposure, 3.0f);
-				m_ToneMapShader->SetVec2(ToneMapResources.TexSize, { outWidth, outHeight });
 
-				GRHIDevice->BindShader(cmd, m_ToneMapShader);
+				RHIBindingSet* toneMapSet = GRDGPool->GetOrCreateBindingSet(m_ToneMapShader->GetLayouts()[0]);
+				{
+					toneMapSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, context.OutTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+					toneMapSet->AddSamplerWrite(1, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
+					toneMapSet->AddTextureWrite(2, 0, EShaderResourceType::ETextureUAV, toneMap->GetTextureView(), EGPUAccessFlags::EUAVCompute);
+				}
+
+				ToneMapPushData pushData{};
+				pushData.Exposure = 3.0f;
+				pushData.TexSize = { outWidth, outHeight };
+
+				GRHIDevice->BindShader(cmd, m_ToneMapShader, {toneMapSet}, &pushData);
 
 				uint32_t groupCountX = GetComputeGroupCount(outWidth, 32);
 				uint32_t groupCountY = GetComputeGroupCount(outHeight, 32);

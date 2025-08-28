@@ -15,6 +15,7 @@ IncludeDir["VULKAN_SDK"] = "%{wks.location}/Source/ThirdParty/Vulkan/Include"
 IncludeDir["DXC"] = "%{wks.location}/Source/ThirdParty/DXC/include"
 IncludeDir["SHADER_COMPILER"] = "%{wks.location}/Source/Tools/ShaderCompiler/Include"
 IncludeDir["SHADERS_GENERATED"] = "%{wks.location}/Resources/Hlsl-Shaders/Include"
+IncludeDir["SPIRV_REFLECT"] = "%{wks.location}/Source/ThirdParty/SPIRV-Reflect/include"
 
 
 -- Libs Directories relative to the root folder

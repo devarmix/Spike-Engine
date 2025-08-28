@@ -1,10 +1,6 @@
 #include "ShaderCommon.hlsli"
 
-BEGIN_DECL_SHADER_RESOURCES(Resources)
-    DECL_SHADER_TEXTURE_UAV(OutTexture)
-
-	DECL_SHADER_RESOURCES_STRUCT_PADDING(3)
-END_DECL_SHADER_RESOURCES(Resources)
+[[vk::binding(0, 0)]] RWTexture2D<float2> OutTexture;
 
 #define PI 3.1415926536
 #define NUM_SAMPLES 1024u
@@ -97,8 +93,7 @@ void CSMain(uint3 threadID : SV_DispatchThreadID) {
         float2 uv;
         uv.x = (float(threadID.x) + 0.5f) / float(BRDF_SIZE);
         uv.y = (float(threadID.y) + 0.5f) / float(BRDF_SIZE);
-		
-		TEXTURE_2D_UAV_FLOAT2(output, Resources.OutTexture)
-		output.Store(threadID.xy, BRDF(uv.x, 1.0f - uv.y));
+
+		OutTexture[threadID.xy] = BRDF(uv.x, 1.0f - uv.y);
     }
 }

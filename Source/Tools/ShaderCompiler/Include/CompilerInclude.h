@@ -4,6 +4,18 @@
 
 namespace ShaderCompiler {
 
+    // copy from Engine/Renderer/Shader.h
+    enum class EShaderResourceType : uint8_t {
+
+        ENone = 0,
+        ETextureSRV,
+        ETextureUAV,
+        EBufferSRV,
+        EBufferUAV,
+        EConstantBuffer,
+        ESampler
+    };
+
     struct BinaryShader {
 
         std::vector<char> VertexRange;
@@ -23,8 +35,18 @@ namespace ShaderCompiler {
 
         struct ShaderMetadata {
 
-            uint8_t SizeOfResources;
-            uint8_t UsesSceneData;
+            struct ShaderBinding {
+
+                EShaderResourceType Type;
+                uint32_t Binding;
+                uint32_t Count;
+                uint32_t Set;
+            };
+
+            std::vector<ShaderBinding> Bindings;
+            uint32_t PushDataSize;
+
+            bool IsMaterialShader = false;
         } ShaderData;
 
         void Serialize(std::ofstream& stream) const;

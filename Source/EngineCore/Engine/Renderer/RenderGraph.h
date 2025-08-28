@@ -37,6 +37,7 @@ namespace Spike {
 		RHITexture2D* GetOrCreateTexture2D(const Texture2DDesc& desc);
 		RHITextureView* GetOrCreateTextureView(const TextureViewDesc& desc);
 		RHIBuffer* GetOrCreateBuffer(const BufferDesc& desc);
+		RHIBindingSet* GetOrCreateBindingSet(RHIBindingSetLayout* layout);
 
 	private:
 
@@ -58,9 +59,16 @@ namespace Spike {
 			RHIBuffer* Resource;
 		};
 
+		struct RDGPooledBindingSet {
+
+			uint32_t LastUsedFrame;
+			RHIBindingSet* Resource;
+		};
+
 		std::vector<RDGPooledTexture> m_TexturePool;
 		std::vector<RDGPooledTextureView> m_TextureViewPool;
 		std::vector<RDGPooledBuffer> m_BufferPool;
+		std::vector<RDGPooledBindingSet> m_SetPool;
 
 		const uint32_t m_FramesBeforeDelete = 2;
 	};

@@ -73,8 +73,8 @@ namespace Spike {
 		EGPUAccessFlags TextureAccess;
 
 		RHIBuffer* Buffer = nullptr;
-		uint64_t BufferRange;
-		uint64_t BufferOffset;
+		size_t BufferRange;
+		size_t BufferOffset;
 
 		RHISampler* Sampler = nullptr;
 	};
@@ -87,7 +87,10 @@ namespace Spike {
 		virtual void InitRHI() override;
 		virtual void ReleaseRHI() override;
 
-		void AddResourceWrite(const BindingSetWriteDesc& desc) { m_Writes.push_back(desc); }
+		void AddTextureWrite(uint32_t slot, uint32_t arrayEl, EShaderResourceType type, RHITextureView* view, EGPUAccessFlags access);
+		void AddBufferWrite(uint32_t slot, uint32_t arrayEl, EShaderResourceType type, RHIBuffer* buffer, size_t range, size_t offset);
+		void AddSamplerWrite(uint32_t slot, uint32_t arrayEl, EShaderResourceType type, RHISampler* sampler);
+
 		void ClearWrites() { m_Writes.clear(); }
 		const std::vector<BindingSetWriteDesc>& GetWrites() const { return m_Writes; }
 
@@ -128,7 +131,8 @@ namespace Spike {
 				&& ColorTargetFormats.size() == other.ColorTargetFormats.size()
 				&& EnableDepthTest == other.EnableDepthTest
 				&& EnableDepthWrite == other.EnableDepthWrite
-				&& CullBackFaces == other.CullBackFaces))
+				&& CullBackFaces == other.CullBackFaces
+				&& FrontFace == other.FrontFace))
 				return false;
 
 			for (uint32_t i = 0; i < ColorTargetFormats.size(); i++) {
@@ -154,6 +158,7 @@ namespace Spike {
 				HashCombine(h, std::hash<bool>{}(desc.EnableDepthTest));
 				HashCombine(h, std::hash<bool>{}(desc.EnableDepthWrite));
 				HashCombine(h, std::hash<bool>{}(desc.CullBackFaces));
+				HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.FrontFace));
 				return h;
 			}
 		};
@@ -167,27 +172,14 @@ namespace Spike {
 		virtual void InitRHI() override;
 		virtual void ReleaseRHI() override;
 
-		void SetFloat(uint8_t resource, float value);
-		void SetUint(uint8_t resource, uint32_t value);
-		void SetVec2(uint8_t resource, const Vec2& value);
-		void SetVec4(uint8_t resource, const Vec4& value);
-		void SetMat2x2(uint8_t resource, const Mat2x2& value);
-		void SetMat4x4(uint8_t resource, const Mat4x4& value);
-		void SetTextureSRV(uint8_t resource, RHITextureView* value);
-		void SetTextureUAVReadOnly(uint8_t resource, RHITextureView* value);
-		void SetTextureUAV(uint8_t resource, RHITextureView* value);
-		void SetBufferSRV(uint8_t resource, RHIBuffer* value);
-		void SetBufferUAV(uint8_t resource, RHIBuffer* value);
-
 		EShaderType GetShaderType() const { return m_Desc.Type; }
 		const std::string& GetName() const { return m_Desc.Name; }
 		const ShaderCompiler::BinaryShader::MaterialMetadata& GetMaterialData() const { return m_BinaryShader.MaterialData; }
 
-		const uint8_t* GetResourcesData() const { return m_ResourcesData; }
-		uint32_t GetResourcesSize() const { return m_BinaryShader.ShaderData.SizeOfResources; }
-
 		RHIData* GetRHIData() { return m_RHIData; }
 		const ShaderDesc& GetDesc() const { return m_Desc; }
+		const std::vector<RHIBindingSetLayout*>& GetLayouts() const { return m_Layouts; }
+		uint32_t GetPushDataSize() const { return m_BinaryShader.ShaderData.PushDataSize; }
 
 	private:
 
@@ -195,7 +187,7 @@ namespace Spike {
 		ShaderDesc m_Desc;
 
 		ShaderCompiler::BinaryShader m_BinaryShader;
-		uint8_t* m_ResourcesData;
+		std::vector<RHIBindingSetLayout*> m_Layouts;
 	};
 
 	class ShaderManager {
@@ -206,22 +198,15 @@ namespace Spike {
 		void FreeShaderCache();
 		RHIShader* GetShaderFromCache(const ShaderDesc& desc);
 
-		uint32_t GetTextureSRVIndex(RHITextureView* texture, bool isReadOnlyUAV);
-		uint32_t GetTextureUAVIndex(RHITextureView* texture);
-		uint32_t GetBufferSRVIndex(RHIBuffer* buffer);
-		uint32_t GetBufferUAVIndex(RHIBuffer* buffer);
-		uint32_t GetSamplerIndex(RHISampler* sampler);
+		uint32_t GetMatTextureIndex(RHITextureView* texture);
+		uint32_t GetMatSamplerIndex(RHISampler* sampler);
+		void ReleaseMatTextureIndex(uint32_t index);
+		void ReleaseMatSamplerIndex(uint32_t index);
 
-		void ReleaseTextureSRVIndex(uint32_t index, ETextureType textureType);
-		void ReleaseTextureUAVIndex(uint32_t index, ETextureType textureType, ETextureFormat format);
-		void ReleaseBufferSRVIndex(uint32_t index);
-		void ReleaseBufferUAVIndex(uint32_t index);
-		void ReleaseSamplerIndex(uint32_t index);
-
-		uint32_t GetMaterialDataIndex();
-		void ReleaseMaterialDataIndex(uint32_t index);
-		void UpdateMaterialData(uint32_t index);
-		void InitMaterialDataBuffer();
+		uint32_t GetMatDataIndex();
+		void ReleaseMatDataIndex(uint32_t index);
+		void UpdateMatData(uint32_t index);
+		void InitMatDataBuffer();
 
 		struct alignas(16) MaterialData {
 
@@ -234,10 +219,9 @@ namespace Spike {
 		};
 
 		MaterialData& GetMaterialData(uint32_t index);
-
-		RHIBindingSet* GetBindlessSet() { return m_BindlessSet; }
-		RHIBindingSetLayout* GetSceneLayout() { return m_SceneLayout; }
-		RHIBindingSetLayout* GetBindlessLayout() { return m_BindlessLayout; }
+		RHIBindingSet* GetMaterialSet() { return m_MaterialSet; }
+		RHIBindingSetLayout* GetMeshDrawLayout() { return m_MeshDrawLayout; }
+		RHIBindingSetLayout* GetMaterialLayout() { return m_MaterialLayout; }
 
 	private:
 
@@ -252,21 +236,14 @@ namespace Spike {
 			void ReleaseIndex(uint32_t index);
 		};
 
-		FIFOIndexQueue m_Texture2DSRVQueue;
-		FIFOIndexQueue m_Texture2DUAVFloatQueue;
-		FIFOIndexQueue m_Texture2DUAVFloat2Queue;
-		FIFOIndexQueue m_Texture2DUAVFloat4Queue;
-		FIFOIndexQueue m_CubeTextureSRVQueue;
-		FIFOIndexQueue m_BufferSRVQueue;
-		FIFOIndexQueue m_BufferUAVQueue;
-		FIFOIndexQueue m_SamplerQueue;
-
-		RHIBindingSetLayout* m_BindlessLayout;
-		RHIBindingSetLayout* m_SceneLayout;
-		RHIBindingSet* m_BindlessSet;
-
+		FIFOIndexQueue m_MatTextureQueue;
+		FIFOIndexQueue m_MatSamplerQueue;
+		FIFOIndexQueue m_MatDataQueue;
 		RHIBuffer* m_MaterialDataBuffer;
-		FIFOIndexQueue m_MaterialDataQueue;
+
+		RHIBindingSetLayout* m_MaterialLayout;
+		RHIBindingSetLayout* m_MeshDrawLayout;
+		RHIBindingSet* m_MaterialSet;
 
 		std::unordered_map<ShaderDesc, RHIShader*, ShaderDesc::Hasher> m_ShaderCache;
 	};

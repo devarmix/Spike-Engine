@@ -11,7 +11,7 @@ namespace Spike {
 		ESRVCompute     = BIT(1),
 		ESRVGraphics    = BIT(2),
 		EUAVCompute     = BIT(3),
-		EUAVGraphics     = BIT(4),
+		EUAVGraphics    = BIT(4),
 		ECopySrc        = BIT(5),
 		ECopyDst        = BIT(6),
 		EColorTarget    = BIT(7),

@@ -1,10 +1,14 @@
 #include "ShaderCommon.hlsli"
 
-BEGIN_DECL_SHADER_RESOURCES(Resources)
-    DECL_SHADER_TEXTURE_SRV(InImage)
-    DECL_SHADER_TEXTURE_UAV(OutImage)
-    DECL_SHADER_UINT(MipSize)
-END_DECL_SHADER_RESOURCES(Resources)
+[[vk::binding(0, 0)]] Texture2D<float> InImage;
+[[vk::binding(1, 0)]] SamplerState DepthSampler;
+[[vk::binding(2, 0)]] RWTexture2D<float> OutImage;
+
+struct PyramidConstants {
+
+    uint MipSize;
+    float Padding0[3];
+}; [[vk::push_constant]] PyramidConstants Resources;
 
 [numthreads(32, 32, 1)]
 void CSMain(uint3 threadID : SV_DispatchThreadID) {
@@ -13,10 +17,7 @@ void CSMain(uint3 threadID : SV_DispatchThreadID) {
 
         float2 uv = (0.5f + float2(threadID.xy)) / float(Resources.MipSize);
 
-        TEXTURE_2D_SRV(inDepth, Resources.InImage)
-        TEXTURE_2D_UAV_FLOAT(output, Resources.OutImage)
-
-        float depth = inDepth.SampleLevel(uv, 0.0).r;
-        output.Store(threadID.xy, depth);
+        float depth = InImage.SampleLevel(DepthSampler, uv, 0.0).r;
+        OutImage[threadID.xy] =  depth;
     }
 }

@@ -1,17 +1,21 @@
-#define USE_SCENE_RENDERING_DATA
 #include "ShaderCommon.hlsli"
 
-BEGIN_DECL_SHADER_RESOURCES(Resources)
-    DECL_SHADER_TEXTURE_SRV(AlbedoMap)
-    DECL_SHADER_TEXTURE_SRV(NormalMap)
-    DECL_SHADER_TEXTURE_SRV(MaterialMap)
-    DECL_SHADER_TEXTURE_SRV(DepthMap)
-    DECL_SHADER_TEXTURE_SRV(EnvMap)
-    DECL_SHADER_TEXTURE_SRV(IrrMap)
-    DECL_SHADER_TEXTURE_SRV(BRDFMap)
-    DECL_SHADER_BUFFER_SRV(LightsBuffer)
-    DECL_SHADER_UINT(EnvMapNumMips)
-END_DECL_SHADER_RESOURCES(Resources)
+[[vk::binding(0, 0)]] ConstantBuffer<SceneGPUData> SceneDataBuffer;
+[[vk::binding(1, 0)]] Texture2D<float4> AlbedoMap;
+[[vk::binding(2, 0)]] Texture2D<float4> NormalMap;
+[[vk::binding(3, 0)]] Texture2D<float4> MaterialMap;
+[[vk::binding(4, 0)]] Texture2D<float> DepthMap;
+[[vk::binding(5, 0)]] TextureCube<float4> EnvMap;
+[[vk::binding(6, 0)]] TextureCube<float4> IrrMap;
+[[vk::binding(7, 0)]] Texture2D<float2> BRDFMap;
+[[vk::binding(8, 0)]] SamplerState TexSampler;
+[[vk::binding(9, 0)]] StructuredBuffer<SceneLightGPUData> LightsBuffer;
+
+struct LightingConstants {
+
+    uint EnvMapNumMips;
+    float Padding0[3];
+}; [[vk::push_constant]] LightingConstants Resources;
 
 #define PI 3.1415926535897932384626433832795
 
@@ -60,7 +64,7 @@ struct IBLinfo
 {
     float3 DiffuseLight;
     float3 SpecularLight;
-    float3 Brdf;
+    float2 Brdf;
 };
 
 float DistributionGGX(float nDotH, float rough) {
@@ -191,30 +195,22 @@ VSOutput VSMain(uint vertexID : SV_VertexID) {
 
 float4 PSMain(VSOutput input) : SV_TARGET0 {
 
-    TEXTURE_2D_SRV(albedoTex, Resources.AlbedoMap)
-    TEXTURE_2D_SRV(normalTex, Resources.NormalMap)
-    TEXTURE_2D_SRV(materialTex, Resources.MaterialMap)
-    TEXTURE_2D_SRV(depthTex, Resources.DepthMap)
-    CUBE_TEXTURE_SRV(envTex, Resources.EnvMap)
-    CUBE_TEXTURE_SRV(irrTex, Resources.IrrMap)
-    TEXTURE_2D_SRV(brdfTex, Resources.BRDFMap)
-
-    float depth = depthTex.Sample(input.TexCoord).r;
+    float depth = DepthMap.Sample(TexSampler, input.TexCoord).r;
     if (depth == 0.0f) {
         discard;
     }
 
-    float3 normal = normalTex.Sample(input.TexCoord).rgb;
+    float3 normal = NormalMap.Sample(TexSampler, input.TexCoord).rgb;
     float3 position = DepthToWorld(input.TexCoord, depth);
     float3 view = normalize(SceneDataBuffer.CameraPos.xyz - position);
     float3 reflection = -normalize(reflect(view, normal));
 
     Material material;
     {
-        material.Albedo = albedoTex.Sample(input.TexCoord).rgb;
-        material.MetallicFactor = materialTex.Sample(input.TexCoord).g;
-        material.RoughnessFactor = materialTex.Sample(input.TexCoord).r;
-        material.AO = materialTex.Sample(input.TexCoord).b;
+        material.Albedo = AlbedoMap.Sample(TexSampler, input.TexCoord).rgb;
+        material.MetallicFactor = MaterialMap.Sample(TexSampler, input.TexCoord).g;
+        material.RoughnessFactor = MaterialMap.Sample(TexSampler, input.TexCoord).r;
+        material.AO = MaterialMap.Sample(TexSampler, input.TexCoord).b;
     }
 
     PBRinfo pbrInfo;
@@ -238,23 +234,21 @@ float4 PSMain(VSOutput input) : SV_TARGET0 {
 
     IBLinfo iblInfo;
     {
-        iblInfo.DiffuseLight = irrTex.Sample(normal).rgb;
+        iblInfo.DiffuseLight = IrrMap.Sample(TexSampler, normal).rgb;
 
         float2 brdfSamplePoint = clamp(float2(pbrInfo.NdotV, 1.0f - pbrInfo.PerceptualRoughness), (float2)0.0f, (float2)1.0f);
 
         float mipCount = Resources.EnvMapNumMips;
         float lod = pbrInfo.PerceptualRoughness * mipCount;
-        iblInfo.Brdf = brdfTex.Sample(brdfSamplePoint).rgb;
+        iblInfo.Brdf = BRDFMap.Sample(TexSampler, brdfSamplePoint);
       
-        iblInfo.SpecularLight = envTex.SampleLevel(reflection.xyz, lod).rgb;
+        iblInfo.SpecularLight = EnvMap.SampleLevel(TexSampler, reflection.xyz, lod).rgb;
     }
 
     float3 color = GetIBLcontribution(pbrInfo, iblInfo, material);
-
-    BUFFER_SRV(lightsBuffer, Resources.LightsBuffer)
     for (uint i = 0u; i < SceneDataBuffer.LightsCount; i++) {
 
-        SceneLightGPUData light = lightsBuffer.LoadAtIndex<SceneLightGPUData>(i);
+        SceneLightGPUData light = LightsBuffer[i];
 
         if (light.Type == 0) {
 

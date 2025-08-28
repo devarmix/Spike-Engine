@@ -45,22 +45,23 @@ namespace Spike {
 
 	void RHITexture2D::ReleaseRHIImmediate() {
 
-		GRHIDevice->DestroyTexture2DRHI(m_RHIData);
-
-		DeletePixelData();
 		m_TextureView->ReleaseRHIImmediate();
 		delete m_TextureView;
+
+		GRHIDevice->DestroyTexture2DRHI(m_RHIData);
+		DeletePixelData();
 	}
 
 	void RHITexture2D::ReleaseRHI() {
+
+		m_TextureView->ReleaseRHI();
+		delete m_TextureView;
 
 		GFrameRenderer->PushToExecQueue([data = m_RHIData]() {
 			GRHIDevice->DestroyTexture2DRHI(data);
 			});
 
 		DeletePixelData();
-		m_TextureView->ReleaseRHI();
-		delete m_TextureView;
 	}
 
 	void RHITexture2D::DeletePixelData() {

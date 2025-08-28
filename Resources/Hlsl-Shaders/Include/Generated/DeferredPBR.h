@@ -1,6 +1,3 @@
-constexpr struct DeferredPBRResourcesStruct {
-    uint8_t SceneObjectsBuffer = 0;
-} DeferredPBRResources;
 constexpr struct DeferredPBRMaterialResourcesStruct {
     uint8_t AlbedoMap = 0;
     uint8_t NormalMap = 1;

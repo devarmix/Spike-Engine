@@ -94,12 +94,10 @@ namespace Spike {
 
 		// init pools
 		{
-			std::array<VkDescriptorPoolSize, 4> poolSizes{
+			std::array<VkDescriptorPoolSize, 2> poolSizes{
 
-				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 1000},
-				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 1000},
-				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 1000},
-				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 1000}
+				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 500},
+				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 500}
 			};
 
 			VkDescriptorPoolCreateInfo PoolInfo{};
@@ -113,9 +111,13 @@ namespace Spike {
 			VK_CHECK(vkCreateDescriptorPool(m_Device.Device, &PoolInfo, nullptr, &m_BindlessPool));
 		}
 		{
-			std::array<VkDescriptorPoolSize, 1> poolSizes{
+			std::array<VkDescriptorPoolSize, 5> poolSizes{
 
-				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 20}
+				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, .descriptorCount = 500},
+				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, .descriptorCount = 500},
+				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, .descriptorCount = 500},
+				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .descriptorCount = 500},
+				VkDescriptorPoolSize{.type = VK_DESCRIPTOR_TYPE_SAMPLER, .descriptorCount = 500}
 			};
 
 			VkDescriptorPoolCreateInfo PoolInfo{};
@@ -123,10 +125,10 @@ namespace Spike {
 			PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
 			PoolInfo.poolSizeCount = (uint32_t)poolSizes.size();
 			PoolInfo.pPoolSizes = poolSizes.data();
-			PoolInfo.maxSets = 20;
+			PoolInfo.maxSets = 500;
 			PoolInfo.pNext = nullptr;
 
-			VK_CHECK(vkCreateDescriptorPool(m_Device.Device, &PoolInfo, nullptr, &m_SceneSetPool));
+			VK_CHECK(vkCreateDescriptorPool(m_Device.Device, &PoolInfo, nullptr, &m_GlobalSetPool));
 		}
 	}
 
@@ -154,7 +156,7 @@ namespace Spike {
 		}
 
 		vkDestroyDescriptorPool(m_Device.Device, m_BindlessPool, nullptr);
-		vkDestroyDescriptorPool(m_Device.Device, m_SceneSetPool, nullptr);
+		vkDestroyDescriptorPool(m_Device.Device, m_GlobalSetPool, nullptr);
 
 		m_Swapchain.Destroy(m_Device);
 		m_Device.Destroy();
@@ -450,6 +452,14 @@ namespace Spike {
 		BarrierBuffer(cmd, buffer, size, offset, EGPUAccessFlags::ECopyDst, newAccess);
 	}
 
+	uint64_t VulkanRHIDevice::GetBufferGPUAddress(RHIBuffer* buffer) {
+
+		VulkanRHIBuffer::Data* vkBuffer = (VulkanRHIBuffer::Data*)buffer->GetRHIData()->GetNativeData();
+
+		VkBufferDeviceAddressInfo vDeviceAddressInfo{ .sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = vkBuffer->Buffer };
+		return vkGetBufferDeviceAddress(m_Device.Device, &vDeviceAddressInfo);
+	}
+
 	RHIData* VulkanRHIDevice::CreateBindingSetLayoutRHI(const BindingSetLayoutDesc& desc) {
 
 		VulkanRHIBindingSetLayout* layout = new VulkanRHIBindingSetLayout();
@@ -479,7 +489,7 @@ namespace Spike {
 			layoutBindingFlags.resize(desc.Bindings.size());
 
 			for (int i = 0; i < layoutBindingFlags.size(); i++) {
-				layoutBindingFlags[i] = VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT;
+				layoutBindingFlags[i] = (vkBindings[i].descriptorCount > 1) ? VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT | VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT : 0;
 			}
 
 			VkDescriptorSetLayoutBindingFlagsCreateInfo layoutBindingFlagsInfo{};
@@ -520,7 +530,7 @@ namespace Spike {
 		VulkanRHIBindingSet* set = new VulkanRHIBindingSet();
 		VulkanRHIBindingSetLayout::Data* vkLayout = (VulkanRHIBindingSetLayout::Data*)layout->GetRHIData()->GetNativeData();
 
-		set->NativeData.AllocatedPool = layout->GetDesc().UseDescriptorIndexing ? m_BindlessPool : m_SceneSetPool;
+		set->NativeData.AllocatedPool = layout->GetDesc().UseDescriptorIndexing ? m_BindlessPool : m_GlobalSetPool;
 
 		VkDescriptorSetAllocateInfo SetInfo{};
 		SetInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -545,7 +555,7 @@ namespace Spike {
 		delete data;
 	}
 
-	RHIData* VulkanRHIDevice::CreateShaderRHI(const ShaderDesc& desc, const ShaderCompiler::BinaryShader& binaryShader) {
+	RHIData* VulkanRHIDevice::CreateShaderRHI(const ShaderDesc& desc, const ShaderCompiler::BinaryShader& binaryShader, const std::vector<RHIBindingSetLayout*>& layouts) {
 
 		ENGINE_WARN(desc.Name);
 
@@ -557,7 +567,7 @@ namespace Spike {
 
 		VkPushConstantRange pushRange{};
 		pushRange.offset = 0;
-		pushRange.size = binaryShader.ShaderData.SizeOfResources;
+		pushRange.size = binaryShader.ShaderData.PushDataSize;
 		pushRange.stageFlags = 0;
 
 		if (desc.Type == EShaderType::EVertex || desc.Type == EShaderType::EGraphics) {
@@ -594,23 +604,20 @@ namespace Spike {
 			pushRange.stageFlags |= VK_SHADER_STAGE_COMPUTE_BIT;
 		}
 
-		std::vector<VkDescriptorSetLayout> layouts;
+		std::vector<VkDescriptorSetLayout> vkLayouts;
 		{
-			VulkanRHIBindingSetLayout::Data* vkBindlessLayout = (VulkanRHIBindingSetLayout::Data*)GShaderManager->GetBindlessLayout()->GetRHIData()->GetNativeData();
-			layouts.push_back(vkBindlessLayout->Layout);
+			for (auto layout : layouts) {
 
-			if (binaryShader.ShaderData.UsesSceneData) {
-
-				VulkanRHIBindingSetLayout::Data* vkSceneLayout = (VulkanRHIBindingSetLayout::Data*)GShaderManager->GetSceneLayout()->GetRHIData()->GetNativeData();
-				layouts.push_back(vkSceneLayout->Layout);
+				VulkanRHIBindingSetLayout::Data* vkLayout = (VulkanRHIBindingSetLayout::Data*)layout->GetRHIData()->GetNativeData();
+				vkLayouts.push_back(vkLayout->Layout);
 			}
 		}
 
 		VkPipelineLayoutCreateInfo layoutInfo = VulkanUtils::PipelineLayoutCreateInfo();
-		layoutInfo.setLayoutCount = (uint32_t)layouts.size();
-		layoutInfo.pSetLayouts = layouts.data();
-		layoutInfo.pPushConstantRanges = (binaryShader.ShaderData.SizeOfResources > 0) ? &pushRange : nullptr;
-		layoutInfo.pushConstantRangeCount = (binaryShader.ShaderData.SizeOfResources > 0) ? 1 : 0;
+		layoutInfo.setLayoutCount = (uint32_t)vkLayouts.size();
+		layoutInfo.pSetLayouts = vkLayouts.data();
+		layoutInfo.pPushConstantRanges = (binaryShader.ShaderData.PushDataSize > 0) ? &pushRange : nullptr;
+		layoutInfo.pushConstantRangeCount = (binaryShader.ShaderData.PushDataSize > 0) ? 1 : 0;
 
 		VK_CHECK(vkCreatePipelineLayout(m_Device.Device, &layoutInfo, nullptr, &shader->NativeData.PipelineLayout));
 
@@ -651,6 +658,9 @@ namespace Spike {
 				builder.SetDepthFormat(VK_FORMAT_D32_SFLOAT);
 				builder.EnableDepthTest(desc.EnableDepthWrite, VK_COMPARE_OP_GREATER_OR_EQUAL);
 			}
+			else {
+				builder.DisableDepthTest();
+			}
 
 			builder.PipelineLayout = shader->NativeData.PipelineLayout;
 			shader->NativeData.Pipeline = builder.BuildPipeline(m_Device.Device);
@@ -677,7 +687,7 @@ namespace Spike {
 		delete data;
 	}
 
-	void VulkanRHIDevice::BindShader(RHICommandBuffer* cmd, RHIShader* shader, RHIBindingSet* sceneDataSet) {
+	void VulkanRHIDevice::BindShader(RHICommandBuffer* cmd, RHIShader* shader, std::vector<RHIBindingSet*> shaderSets, void* pushData) {
 
 		VulkanRHIShader::Data* vkShader = (VulkanRHIShader::Data*)shader->GetRHIData()->GetNativeData();
 		VulkanRHICommandBuffer::Data* vkCmd = (VulkanRHICommandBuffer::Data*)cmd->GetRHIData()->GetNativeData();
@@ -685,8 +695,9 @@ namespace Spike {
 		VkPipelineBindPoint bindPoint = shader->GetShaderType() == EShaderType::ECompute ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS;
 		vkCmdBindPipeline(vkCmd->Cmd, bindPoint, vkShader->Pipeline);
 
-		auto bindDescSet = [&, this](RHIBindingSet* set, uint32_t bindIndex) {
+		for (int i = 0; i < shaderSets.size(); i++) {
 
+			RHIBindingSet* set = shaderSets[i];
 			VulkanRHIBindingSet::Data* vkSet = (VulkanRHIBindingSet::Data*)set->GetRHIData()->GetNativeData();
 
 			if (set->GetWrites().size() > 0) {
@@ -726,9 +737,9 @@ namespace Spike {
 
 						VkDescriptorBufferInfo& info = bufferInfos.emplace_back(
 							VkDescriptorBufferInfo{
-			                .buffer = vkBuff->Buffer,
-			                .offset = w.BufferOffset,
-			                .range = w.BufferRange
+							.buffer = vkBuff->Buffer,
+							.offset = w.BufferOffset,
+							.range = w.BufferRange
 							});
 						write.pBufferInfo = &info;
 					}
@@ -748,7 +759,7 @@ namespace Spike {
 					writes.push_back(write);
 				}
 
-				vkUpdateDescriptorSets(m_Device.Device, (uint32_t)writes.size(), writes.data(), 0, nullptr); 
+				vkUpdateDescriptorSets(m_Device.Device, (uint32_t)writes.size(), writes.data(), 0, nullptr);
 
 				set->ClearWrites();
 				writes.clear();
@@ -756,22 +767,17 @@ namespace Spike {
 				bufferInfos.clear();
 			}
 
-			vkCmdBindDescriptorSets(vkCmd->Cmd, bindPoint, vkShader->PipelineLayout, bindIndex, 1, &vkSet->Set, 0, nullptr);
-			};
-
-		bindDescSet(GShaderManager->GetBindlessSet(), 0);
-		if (sceneDataSet) {
-			bindDescSet(sceneDataSet, 1);
+			vkCmdBindDescriptorSets(vkCmd->Cmd, bindPoint, vkShader->PipelineLayout, i, 1, &vkSet->Set, 0, nullptr);
 		}
 
-		if (shader->GetResourcesSize() > 0) {
+		if (pushData) {
 
 			VkShaderStageFlags shaderStage = 0;
 			if (shader->GetShaderType() == EShaderType::EVertex || shader->GetShaderType() == EShaderType::EGraphics) shaderStage |= VK_SHADER_STAGE_VERTEX_BIT;
 			if (shader->GetShaderType() == EShaderType::EPixel || shader->GetShaderType() == EShaderType::EGraphics) shaderStage |= VK_SHADER_STAGE_FRAGMENT_BIT;
 			if (shader->GetShaderType() == EShaderType::ECompute) shaderStage |= VK_SHADER_STAGE_COMPUTE_BIT;
 
-			vkCmdPushConstants(vkCmd->Cmd, vkShader->PipelineLayout, shaderStage, 0, shader->GetResourcesSize(), shader->GetResourcesData());
+			vkCmdPushConstants(vkCmd->Cmd, vkShader->PipelineLayout, shaderStage, 0, shader->GetPushDataSize(), pushData);
 		}
 	}
 
@@ -946,7 +952,7 @@ namespace Spike {
 			depthAttachment = VulkanUtils::DepthAttachmentInfo(vkView->View, info.DepthClear ? &depthClear : nullptr, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL);
 		}
 
-		VkRenderingInfo renderInfo = VulkanUtils::RenderingInfo({info.DrawSize.x, info.DrawSize.y}, colorAttachments.size() > 0 ? colorAttachments.data() : nullptr, colorAttachments.size(),
+		VkRenderingInfo renderInfo = VulkanUtils::RenderingInfo({info.DrawSize.x, info.DrawSize.y}, colorAttachments.size() > 0 ? colorAttachments.data() : nullptr, (uint32_t)colorAttachments.size(),
 			info.DepthTarget ? &depthAttachment : nullptr);
 		vkCmdBeginRendering(vkCmd->Cmd, &renderInfo);
 
@@ -982,6 +988,8 @@ namespace Spike {
 
 		vkCmdDrawIndirectCount(vkCmd->Cmd, vkCommBuff->Buffer, offset, vkCountBuff->Buffer, 
 			countBufferOffset, maxDrawCount, commStride);
+
+		//vkCmdDrawIndirect(vkCmd->Cmd, vkCommBuff->Buffer, offset, 1, commStride);
 	}
 
 	void VulkanRHIDevice::Draw(RHICommandBuffer* cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {

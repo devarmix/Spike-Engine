@@ -2,7 +2,6 @@
 #include <Engine/Core/Application.h>
 #include <Engine/Renderer/Shader.h>
 #include <Engine/Renderer/GfxDevice.h>
-#include <Generated/GeneratedBRDF.h>
 #include <Engine/Core/Timestep.h>
 #include <Engine/Core/Log.h>
 
@@ -119,18 +118,24 @@ namespace Spike {
 			shaderDesc.Name = "BRDF";
 
 			RHIShader* shader = GShaderManager->GetShaderFromCache(shaderDesc);
-			shader->SetTextureUAV(BRDFResources.OutTexture, m_BRDFLut->GetTextureView());
+
+			RHIBindingSet* brdfSet = new RHIBindingSet(shader->GetLayouts()[0]);
+			brdfSet->InitRHI();
+			brdfSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureUAV, m_BRDFLut->GetTextureView(), EGPUAccessFlags::EUAVCompute);
 
 			GRHIDevice->ImmediateSubmit([&, this](RHICommandBuffer* cmd) {
 
 				GRHIDevice->BarrierTexture2D(cmd, m_BRDFLut, EGPUAccessFlags::ENone, EGPUAccessFlags::EUAVCompute);
-				GRHIDevice->BindShader(cmd, shader);
+				GRHIDevice->BindShader(cmd, shader, {brdfSet});
 
 				uint32_t groupCount = GetComputeGroupCount(BRDF_LUT_SIZE, 8);
 				GRHIDevice->DispatchCompute(cmd, groupCount, groupCount, 1);
 
 				GRHIDevice->BarrierTexture2D(cmd, m_BRDFLut, EGPUAccessFlags::EUAVCompute, EGPUAccessFlags::ESRV);
 				});
+
+			brdfSet->ReleaseRHI();
+			delete brdfSet;
 		}
 
 		m_FrameCount = 0;
@@ -168,21 +173,12 @@ namespace Spike {
 		RDGBuilder builder = RDGBuilder();
 		uint32_t frameIndex = m_FrameCount % 2;
 
-		RHIBindingSet* sceneDataSet = new RHIBindingSet(GShaderManager->GetSceneLayout());
-		sceneDataSet->InitRHI();
-
 		for (auto& feature : features) {
 
-			feature->BuildGraph(&builder, &scene, context, sceneDataSet);
+			feature->BuildGraph(&builder, &scene, context);
 		}
 
 		builder.Execute(m_CommandBuffers[frameIndex]);
-
-		PushToExecQueue([sceneDataSet]() {
-
-			sceneDataSet->ReleaseRHI();
-			delete sceneDataSet;
-			});
 	}
 
 	void FrameRenderer::RenderSwapchain(uint32_t width, uint32_t height, RHITexture2D* fillTexture) {
