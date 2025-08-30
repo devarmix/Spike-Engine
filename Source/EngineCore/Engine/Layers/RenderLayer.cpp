@@ -6,12 +6,15 @@
 #include <Engine/Core/Application.h>
 
 #include <imgui_impl_sdl2.h>
+#include <Engine/Core/Log.h>
 
 namespace Spike {
 
 	void RenderLayer::OnUpdate(float deltaTime) {
 
 		EXECUTE_ON_RENDER_THREAD([]() {
+
+			ENGINE_TRACE("UP");
 			GRDGPool->FreeUnused();
 			});
 	}
@@ -34,11 +37,17 @@ namespace Spike {
 		EXECUTE_ON_RENDER_THREAD([]() {
 
 			GRHIDevice->WaitGPUIdle();
+			ENGINE_TRACE("DEL BG");
 
 			delete GRDGPool;
+			ENGINE_TRACE("DEL RDG Pool");
 			delete GFrameRenderer;
+			ENGINE_TRACE("DEL FRAME RENDR");
 			delete GSamplerCache;
+			ENGINE_TRACE("DEL SAMPLER CACHE");
 			delete GShaderManager;
+
+			ENGINE_TRACE("DEL END");
 			});
 	}
 

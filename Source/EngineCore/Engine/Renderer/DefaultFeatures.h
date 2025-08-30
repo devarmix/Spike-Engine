@@ -101,4 +101,16 @@ namespace Spike {
 		RHIShader* m_WeightsShader;
 		RHIShader* m_NeighborsShader;
 	};
+
+	class FXAAFeature : public SceneRenderFeature {
+	public:
+		FXAAFeature();
+		virtual ~FXAAFeature() override;
+
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+
+	private:
+
+		RHIShader* m_FXAAShader;
+	};
 }

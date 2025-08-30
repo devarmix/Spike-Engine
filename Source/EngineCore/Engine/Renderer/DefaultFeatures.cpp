@@ -14,6 +14,7 @@
 #include <Generated/SMAA_Edge.h>
 #include <Generated/SMAA_Weights.h>
 #include <Generated/SMAA_Neighbors.h>
+#include <Generated/FXAA.h>
 
 #include <random>
 
@@ -1171,6 +1172,77 @@ namespace Spike {
 					region.Offset = { 0.0f, 0.0f, 0.0f };
 
 					GRHIDevice->CopyTexture(cmd, smaaComposite, region, context.OutTexture, region, { outWidth, outHeight });
+					graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::ESRV);
+				}
+			});
+	}
+
+
+	FXAAFeature::FXAAFeature() {
+
+		ShaderDesc desc{};
+		desc.Type = EShaderType::ECompute;
+		desc.Name = "FXAA";
+
+		m_FXAAShader = GShaderManager->GetShaderFromCache(desc);
+	}
+
+	FXAAFeature::~FXAAFeature() {}
+
+	void FXAAFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
+
+		uint32_t outWidth = context.OutTexture->GetSizeXYZ().x;
+		uint32_t outHeight = context.OutTexture->GetSizeXYZ().y;
+
+		Texture2DDesc desc{};
+		desc.Width = outWidth;
+		desc.Height = outHeight;
+		desc.Format = ETextureFormat::ERGBA16F;
+		desc.UsageFlags = ETextureUsageFlags::EStorage | ETextureUsageFlags::ECopySrc;
+
+		RDGHandle fxaaCompositeTex = graphBuilder->CreateRDGTexture2D("FXAA-Composite", desc);
+		graphBuilder->AddPass(
+			{ fxaaCompositeTex },
+			{},
+			ERendererStage::EPostProcessingRender,
+			[=, this](RHICommandBuffer* cmd) {
+
+				RHITexture2D* fxaaComposite = graphBuilder->GetTextureResource(fxaaCompositeTex);
+
+				// compute fxaa
+				{
+					graphBuilder->BarrierRDGTexture2D(cmd, fxaaComposite, EGPUAccessFlags::EUAVCompute);
+
+					RHIBindingSet* fxaaSet = GRDGPool->GetOrCreateBindingSet(m_FXAAShader->GetLayouts()[0]);
+					{
+						fxaaSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureSRV, context.OutTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+						fxaaSet->AddSamplerWrite(1, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
+						fxaaSet->AddTextureWrite(2, 0, EShaderResourceType::ETextureUAV, fxaaComposite->GetTextureView(), EGPUAccessFlags::EUAVCompute);
+					}
+
+					FXAAPushData pushData{};
+					pushData.ScreenSize = { 1.f / outWidth, 1.f / outHeight, outWidth, outHeight };
+
+					GRHIDevice->BindShader(cmd, m_FXAAShader, { fxaaSet }, &pushData);
+
+					uint32_t groupCountX = GetComputeGroupCount(outWidth, 32);
+					uint32_t groupCountY = GetComputeGroupCount(outHeight, 32);
+					GRHIDevice->DispatchCompute(cmd, groupCountX, groupCountY, 1);
+
+					graphBuilder->BarrierRDGTexture2D(cmd, fxaaComposite, EGPUAccessFlags::ECopySrc);
+				}
+
+				// copy fxaa to main tex
+				{
+					graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::ECopyDst);
+
+					RHIDevice::TextureCopyRegion region{};
+					region.BaseArrayLayer = 0;
+					region.LayerCount = 1;
+					region.MipLevel = 0;
+					region.Offset = { 0.0f, 0.0f, 0.0f };
+
+					GRHIDevice->CopyTexture(cmd, fxaaComposite, region, context.OutTexture, region, { outWidth, outHeight });
 					graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::ESRV);
 				}
 			});

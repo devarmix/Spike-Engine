@@ -49,6 +49,10 @@ namespace Spike {
 	void RHITextureView::ReleaseRHIImmediate() {
 
 		GRHIDevice->DestroyTextureViewRHI(m_RHIData);
+
+		if (m_MaterialIndex != INVALID_SHADER_INDEX) {
+			GShaderManager->ReleaseMatTextureIndex(m_MaterialIndex);
+		}
 	}
 
 	void RHITextureView::ReleaseRHI() {

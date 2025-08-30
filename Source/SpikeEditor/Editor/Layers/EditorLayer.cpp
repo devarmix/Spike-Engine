@@ -306,9 +306,9 @@ namespace SpikeEditor {
 				    m_Features.push_back(new DeferredLightingFeature());
 					m_Features.push_back(new SkyboxFeature());
 					m_Features.push_back(new SSAOFeature());
+					m_Features.push_back(new FXAAFeature());
 					m_Features.push_back(new BloomFeature());
 					m_Features.push_back(new ToneMapFeature());
-					m_Features.push_back(new SMAAFeature());
 				}
 				}));
 		}

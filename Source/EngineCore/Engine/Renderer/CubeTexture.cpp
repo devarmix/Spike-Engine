@@ -130,20 +130,20 @@ namespace Spike {
 
 	void RHICubeTexture::ReleaseRHIImmediate() {
 
-		GRHIDevice->DestroyCubeTextureRHI(m_RHIData);
-
 		m_TextureView->ReleaseRHIImmediate();
 		delete m_TextureView;
+
+		GRHIDevice->DestroyCubeTextureRHI(m_RHIData);
 	}
 
 	void RHICubeTexture::ReleaseRHI() {
 
+		m_TextureView->ReleaseRHI();
+		delete m_TextureView;
+
 		GFrameRenderer->PushToExecQueue([data = m_RHIData]() {
 			GRHIDevice->DestroyCubeTextureRHI(data);
 			});
-
-		m_TextureView->ReleaseRHI();
-		delete m_TextureView;
 	}
 
 
