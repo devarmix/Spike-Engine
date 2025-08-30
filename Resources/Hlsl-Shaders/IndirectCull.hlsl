@@ -96,7 +96,8 @@ bool IsVisible(uint objectID, bool prepass) {
 			    float occluderDepth = DepthPyramid.SampleLevel(PyramidSampler, 0.5f * (AABB.xy + AABB.zw), mipIndex).x;
 			    float nearestBoundsDepth = zNear / (-centerViewSpace.z - boundsRadius);
 
-			    bool bOcclusionCulled = occluderDepth >= nearestBoundsDepth;
+				const float eps = 0.000025f;
+			    bool bOcclusionCulled = occluderDepth >= nearestBoundsDepth + eps;
 			    visible = !bOcclusionCulled;
 		    }
 	    }

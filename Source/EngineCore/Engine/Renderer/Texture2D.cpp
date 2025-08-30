@@ -15,7 +15,6 @@ namespace Spike {
 	RHITexture2D::RHITexture2D(const Texture2DDesc& desc) : m_Desc(desc) {
 
 		m_RHIData = nullptr;
-		m_Sampler = nullptr;
 
 		TextureViewDesc viewDesc{};
 		viewDesc.BaseMip = 0;
@@ -31,8 +30,8 @@ namespace Spike {
 
 		m_RHIData = GRHIDevice->CreateTexture2DRHI(m_Desc);
 
-		if (EnumHasAllFlags(m_Desc.UsageFlags, ETextureUsageFlags::ESampled)) {
-			m_Sampler = GSamplerCache->Get(m_Desc.SamplerDesc);
+		if (EnumHasAllFlags(m_Desc.UsageFlags, ETextureUsageFlags::ESampled) && m_Desc.AutoCreateSampler && !m_Desc.Sampler) {
+			m_Desc.Sampler = GSamplerCache->Get(m_Desc.SamplerDesc);
 		}
 
 		if (!m_Desc.NeedCPUData) {

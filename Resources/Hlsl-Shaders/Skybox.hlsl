@@ -4,6 +4,12 @@
 [[vk::binding(1, 0)]] SamplerState TexSampler;
 [[vk::binding(2, 0)]] ConstantBuffer<SceneGPUData> SceneDataBuffer;
 
+struct SkyboxConstants {
+
+    float Intensity;
+    float Padding0[3];
+}; [[vk::push_constant]] SkyboxConstants Resources;
+
 struct VSOutput {
 
     float3 ViewDir : TEXCOORD;
@@ -24,5 +30,5 @@ VSOutput VSMain(uint vertexID : SV_VertexID) {
 float4 PSMain(VSOutput input) : SV_TARGET0 {
 
     float3 color = SkyboxMap.SampleLevel(TexSampler, normalize(input.ViewDir), 0.0).rgb;
-    return float4(color, 1.0f);
+    return float4(color * Resources.Intensity, 1.0f);
 }

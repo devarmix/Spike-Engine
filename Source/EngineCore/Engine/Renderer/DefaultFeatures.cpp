@@ -1,5 +1,7 @@
 #include <Engine/Renderer/DefaultFeatures.h>
 #include <Engine/Core/Log.h>
+#include <Engine/Utils/RenderUtils.h>
+
 #include <Generated/IndirectCull.h>
 #include <Generated/DepthPyramid.h>
 #include <Generated/DeferredLighting.h>
@@ -8,6 +10,10 @@
 #include <Generated/BloomDownSample.h>
 #include <Generated/BloomUpSample.h>
 #include <Generated/ToneMap.h>
+#include <Generated/Skybox.h>
+#include <Generated/SMAA_Edge.h>
+#include <Generated/SMAA_Weights.h>
+#include <Generated/SMAA_Neighbors.h>
 
 #include <random>
 
@@ -403,7 +409,8 @@ namespace Spike {
 					lightingSet->AddTextureWrite(6, 0, EShaderResourceType::ETextureSRV, context.IrradianceTexture->GetTextureView(), EGPUAccessFlags::ESRV);
 					lightingSet->AddTextureWrite(7, 0, EShaderResourceType::ETextureSRV, brdf->GetTextureView(), EGPUAccessFlags::ESRV);
 					lightingSet->AddSamplerWrite(8, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
-					lightingSet->AddBufferWrite(9, 0, EShaderResourceType::EBufferSRV, frameData.LightsBuffer, sizeof(SceneLightGPUData) * scene->Lights.size(), frameData.LightsOffset);
+					lightingSet->AddSamplerWrite(9, 0, EShaderResourceType::ESampler, context.EnvironmentTexture->GetSampler());
+					lightingSet->AddBufferWrite(10, 0, EShaderResourceType::EBufferSRV, frameData.LightsBuffer, sizeof(SceneLightGPUData) * scene->Lights.size(), frameData.LightsOffset);
 				}
 
 				DeferredLightingPushData pushData{};
@@ -472,7 +479,10 @@ namespace Spike {
 				info.DepthClear = nullptr;
 				info.DrawSize = { context.OutTexture->GetSizeXYZ().x, context.OutTexture->GetSizeXYZ().y };
 
-				GRHIDevice->BindShader(cmd, m_SkyboxShader, {skyboxSet});
+				SkyboxPushData pushData{};
+				pushData.Intensity = 2.5f;
+
+				GRHIDevice->BindShader(cmd, m_SkyboxShader, {skyboxSet}, &pushData);
 				GRHIDevice->BeginRendering(cmd, info);
 				GRHIDevice->Draw(cmd, 3, 1, 0, 0);
 				GRHIDevice->EndRendering(cmd);
@@ -917,7 +927,7 @@ namespace Spike {
 		texDesc.Width = outWidth;
 		texDesc.Height = outHeight;
 		texDesc.Format = ETextureFormat::ERGBA16F;
-		texDesc.UsageFlags = ETextureUsageFlags::EStorage | ETextureUsageFlags::ECopySrc;
+		texDesc.UsageFlags = ETextureUsageFlags::EStorage | ETextureUsageFlags::ECopySrc; 
 		texDesc.NumMips = 1;
 
 		RDGHandle toneMapTex = graphBuilder->CreateRDGTexture2D("ToneMap-Composite", texDesc);
@@ -939,7 +949,7 @@ namespace Spike {
 				}
 
 				ToneMapPushData pushData{};
-				pushData.Exposure = 3.0f;
+				pushData.Exposure = 5.0f;
 				pushData.TexSize = { outWidth, outHeight };
 
 				GRHIDevice->BindShader(cmd, m_ToneMapShader, {toneMapSet}, &pushData);
@@ -950,7 +960,7 @@ namespace Spike {
 				GRHIDevice->DispatchCompute(cmd, groupCountX, groupCountY, 1);
 				graphBuilder->BarrierRDGTexture2D(cmd, toneMap, EGPUAccessFlags::ECopySrc);
 
-				// copy bloom to main tex
+				// copy tone map to main tex
 				{
 					graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::ECopyDst);
 
@@ -961,6 +971,206 @@ namespace Spike {
 					region.Offset = { 0.0f, 0.0f, 0.0f };
 
 					GRHIDevice->CopyTexture(cmd, toneMap, region, context.OutTexture, region, { outWidth, outHeight });
+					graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::ESRV);
+				}
+			});
+	}
+
+
+	SMAAFeature::SMAAFeature() {
+
+		SamplerDesc samplerDesc{};
+		samplerDesc.Filter = ESamplerFilter::EBilinear;
+		samplerDesc.AddressU = ESamplerAddress::EClamp;
+		samplerDesc.AddressV = ESamplerAddress::EClamp;
+		samplerDesc.AddressW = ESamplerAddress::EClamp;
+		m_LinearSampler = GSamplerCache->Get(samplerDesc);
+
+		samplerDesc.Filter = ESamplerFilter::EPoint;
+		m_PointSampler = GSamplerCache->Get(samplerDesc);
+
+		{
+			Texture2DDesc desc{};
+			desc.Width = 160;
+			desc.Height = 560;
+			desc.Format = ETextureFormat::ERG8U;
+			desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
+			desc.NumMips = 1;
+			desc.AutoCreateSampler = false;
+			desc.PixelData = RenderUtils::LoadSMAA_AreaTex();
+
+			m_AreaTex = new RHITexture2D(desc);
+			m_AreaTex->InitRHI();
+		}
+		{
+			Texture2DDesc desc{};
+			desc.Width = 64;
+			desc.Height = 16;
+			desc.Format = ETextureFormat::ER8U;
+			desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
+			desc.NumMips = 1;
+			desc.AutoCreateSampler = false;
+			desc.PixelData = RenderUtils::LoadSMAA_SearchTex();
+
+			m_SearchTex = new RHITexture2D(desc);
+			m_SearchTex->InitRHI();
+		}
+		{
+			ShaderDesc desc{};
+			desc.Type = EShaderType::ECompute;
+			desc.Name = "SMAA_Edge";
+
+			m_EdgesShader = GShaderManager->GetShaderFromCache(desc);
+		}
+		{
+			ShaderDesc desc{};
+			desc.Type = EShaderType::ECompute;
+			desc.Name = "SMAA_Weights";
+
+			m_WeightsShader = GShaderManager->GetShaderFromCache(desc);
+		}
+		{
+			ShaderDesc desc{};
+			desc.Type = EShaderType::ECompute;
+			desc.Name = "SMAA_Neighbors";
+
+			m_NeighborsShader = GShaderManager->GetShaderFromCache(desc);
+		}
+	}
+
+	SMAAFeature::~SMAAFeature() {
+
+		m_AreaTex->ReleaseRHI();
+		delete m_AreaTex;
+
+		m_SearchTex->ReleaseRHI();
+		delete m_SearchTex;
+	}
+
+	void SMAAFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
+
+		uint32_t outWidth = context.OutTexture->GetSizeXYZ().x;
+		uint32_t outHeight = context.OutTexture->GetSizeXYZ().y;
+
+		Texture2DDesc desc{};
+		desc.Width = outWidth;
+		desc.Height = outHeight;
+		desc.Format = ETextureFormat::ERGBA16F;
+		desc.AutoCreateSampler = false;
+		//desc.SamplerDesc = m_LinearSampler->GetDesc();
+		desc.UsageFlags = ETextureUsageFlags::EStorage | ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
+		desc.NumMips = 1;
+
+		RDGHandle edgesTex = graphBuilder->CreateRDGTexture2D("SMAA-Edges", desc);
+		RDGHandle weightsTex = graphBuilder->CreateRDGTexture2D("SMAA-Weights", desc);
+
+		desc.UsageFlags = ETextureUsageFlags::EStorage | ETextureUsageFlags::ECopySrc;
+		RDGHandle smaaCompositeTex = graphBuilder->CreateRDGTexture2D("SMAA-Composite", desc);
+		RDGHandle depthTex = graphBuilder->FindRDGTexture2D("GBuffer-Depth");
+
+		graphBuilder->AddPass(
+			{ edgesTex, weightsTex, smaaCompositeTex, depthTex },
+			{},
+			ERendererStage::EAfterPostProcessingRender,
+			[=, this](RHICommandBuffer* cmd) {
+
+				RHITexture2D* edges = graphBuilder->GetTextureResource(edgesTex);
+				RHITexture2D* depth = graphBuilder->GetTextureResource(depthTex);
+
+				// compute edges
+				{
+					graphBuilder->BarrierRDGTexture2D(cmd, edges, EGPUAccessFlags::ECopyDst);
+					GRHIDevice->ClearTexture(cmd, edges, EGPUAccessFlags::ECopyDst, Vec4(0.f));
+					graphBuilder->BarrierRDGTexture2D(cmd, edges, EGPUAccessFlags::EUAVCompute);
+
+					RHIBindingSet* edgesSet = GRDGPool->GetOrCreateBindingSet(m_EdgesShader->GetLayouts()[0]);
+					{
+						edgesSet->AddSamplerWrite(0, 0, EShaderResourceType::ESampler, m_LinearSampler);
+						edgesSet->AddSamplerWrite(1, 0, EShaderResourceType::ESampler, m_PointSampler);
+						edgesSet->AddTextureWrite(2, 0, EShaderResourceType::ETextureSRV, context.OutTexture->GetTextureView(), EGPUAccessFlags::ESRV);
+						edgesSet->AddTextureWrite(3, 0, EShaderResourceType::ETextureUAV, edges->GetTextureView(), EGPUAccessFlags::EUAVCompute);
+						edgesSet->AddTextureWrite(4, 0, EShaderResourceType::ETextureSRV, depth->GetTextureView(), EGPUAccessFlags::ESRV);
+					}
+
+					SMAA_EdgePushData pushData{};
+					pushData.ScreenSize = { 1.f / outWidth, 1.f / outHeight, outWidth, outHeight };
+
+					GRHIDevice->BindShader(cmd, m_EdgesShader, { edgesSet }, &pushData);
+
+					uint32_t groupCountX = GetComputeGroupCount(outWidth, 32);
+					uint32_t groupCountY = GetComputeGroupCount(outHeight, 32);
+					GRHIDevice->DispatchCompute(cmd, groupCountX, groupCountY, 1);
+
+					graphBuilder->BarrierRDGTexture2D(cmd, edges, EGPUAccessFlags::ESRVCompute);
+				}
+
+				RHITexture2D* weights = graphBuilder->GetTextureResource(weightsTex);
+
+				// compute weights
+				{
+					graphBuilder->BarrierRDGTexture2D(cmd, weights, EGPUAccessFlags::ECopyDst);
+					GRHIDevice->ClearTexture(cmd, weights, EGPUAccessFlags::ECopyDst, Vec4(0.f));
+					graphBuilder->BarrierRDGTexture2D(cmd, weights, EGPUAccessFlags::EUAVCompute);
+
+					RHIBindingSet* weightsSet = GRDGPool->GetOrCreateBindingSet(m_WeightsShader->GetLayouts()[0]);
+					{
+						weightsSet->AddSamplerWrite(0, 0, EShaderResourceType::ESampler, m_LinearSampler);
+						weightsSet->AddTextureWrite(2, 0, EShaderResourceType::ETextureSRV, edges->GetTextureView(), EGPUAccessFlags::ESRVCompute);
+						weightsSet->AddTextureWrite(3, 0, EShaderResourceType::ETextureSRV, m_AreaTex->GetTextureView(), EGPUAccessFlags::ESRV);
+						weightsSet->AddTextureWrite(4, 0, EShaderResourceType::ETextureSRV, m_SearchTex->GetTextureView(), EGPUAccessFlags::ESRV);
+						weightsSet->AddTextureWrite(5, 0, EShaderResourceType::ETextureUAV, weights->GetTextureView(), EGPUAccessFlags::EUAVCompute);
+					}
+
+					SMAA_WeightsPushData pushData{};
+					pushData.SubSampleIndices = Vec4(0.f);
+					pushData.ScreenSize = { 1.f / outWidth, 1.f / outHeight, outWidth, outHeight };
+
+					GRHIDevice->BindShader(cmd, m_WeightsShader, { weightsSet }, &pushData);
+
+					uint32_t groupCountX = GetComputeGroupCount(outWidth, 32);
+					uint32_t groupCountY = GetComputeGroupCount(outHeight, 32);
+					GRHIDevice->DispatchCompute(cmd, groupCountX, groupCountY, 1);
+
+					graphBuilder->BarrierRDGTexture2D(cmd, weights, EGPUAccessFlags::ESRVCompute);
+				}
+
+				RHITexture2D* smaaComposite = graphBuilder->GetTextureResource(smaaCompositeTex);
+
+				// render final image with smaa
+				{
+					graphBuilder->BarrierRDGTexture2D(cmd, smaaComposite, EGPUAccessFlags::EUAVCompute);
+
+					RHIBindingSet* compSet = GRDGPool->GetOrCreateBindingSet(m_NeighborsShader->GetLayouts()[0]);
+					{
+						compSet->AddSamplerWrite(0, 0, EShaderResourceType::ESampler, m_LinearSampler);
+						compSet->AddTextureWrite(2, 0, EShaderResourceType::ETextureSRV, context.OutTexture->GetTextureView(), EGPUAccessFlags::ESRVCompute);
+						compSet->AddTextureWrite(3, 0, EShaderResourceType::ETextureSRV, weights->GetTextureView(), EGPUAccessFlags::ESRV);
+						compSet->AddTextureWrite(4, 0, EShaderResourceType::ETextureUAV, smaaComposite->GetTextureView(), EGPUAccessFlags::EUAVCompute);
+					}
+
+					SMAA_NeighborsPushData pushData{};
+					pushData.ScreenSize = { 1.f / outWidth, 1.f / outHeight, outWidth, outHeight };
+
+					GRHIDevice->BindShader(cmd, m_NeighborsShader, { compSet }, &pushData);
+
+					uint32_t groupCountX = GetComputeGroupCount(outWidth, 32);
+					uint32_t groupCountY = GetComputeGroupCount(outHeight, 32);
+					GRHIDevice->DispatchCompute(cmd, groupCountX, groupCountY, 1);
+
+					graphBuilder->BarrierRDGTexture2D(cmd, smaaComposite, EGPUAccessFlags::ECopySrc);
+				}
+
+				// copy smaa to main tex
+				{
+					graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::ECopyDst);
+
+					RHIDevice::TextureCopyRegion region{};
+					region.BaseArrayLayer = 0;
+					region.LayerCount = 1;
+					region.MipLevel = 0;
+					region.Offset = { 0.0f, 0.0f, 0.0f };
+
+					GRHIDevice->CopyTexture(cmd, smaaComposite, region, context.OutTexture, region, { outWidth, outHeight });
 					graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::ESRV);
 				}
 			});

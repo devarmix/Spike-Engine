@@ -366,10 +366,12 @@ namespace Spike {
 
 							if (m_Textures[aliasedHandle].LastPassUse < tex.FirstPassUse) {
 
-								m_Textures[aliasedHandle].LastPassUse = tex.LastPassUse;
-								tex.Resource = m_Textures[aliasedHandle].Resource;
+								if (tex.Desc == m_Textures[aliasedHandle].Desc) {
+									m_Textures[aliasedHandle].LastPassUse = tex.LastPassUse;
+									tex.Resource = m_Textures[aliasedHandle].Resource;
 
-								break;
+									break;
+								}
 							}
 						}
 
@@ -392,8 +394,10 @@ namespace Spike {
 
 							if (m_Buffers[aliasedHandle].LastPassUse < buff.FirstPassUse) {
 
-								m_Buffers[aliasedHandle].LastPassUse = buff.LastPassUse;
-								buff.Resource = m_Buffers[aliasedHandle].Resource;
+								if(buff.Desc == m_Buffers[aliasedHandle].Desc) {
+									m_Buffers[aliasedHandle].LastPassUse = buff.LastPassUse;
+									buff.Resource = m_Buffers[aliasedHandle].Resource;
+								}
 
 								break;
 							}
@@ -414,5 +418,8 @@ namespace Spike {
 				pass.Func(cmd);
 			}
 		}
+
+		ENGINE_TRACE("RenderGraph virtual tex handles: {}", m_Textures.size());
+		ENGINE_TRACE("RenderGraph allocated aliased tex: {}", tempTexAliasedPool.size());
 	}
 }

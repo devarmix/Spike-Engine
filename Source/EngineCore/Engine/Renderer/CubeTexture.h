@@ -23,18 +23,27 @@ namespace Spike {
 
 		ETextureFormat Format;
 		ETextureUsageFlags UsageFlags;
-		RHITexture* SamplerTexture;
 		ECubeTextureFilterMode FilterMode = ECubeTextureFilterMode::ENone;
+		bool AutoCreateSampler = true;
+		RHITexture* SamplerTexture;
 
 		SamplerDesc SamplerDesc;
+		RHISampler* Sampler = nullptr;
 
 		bool operator==(const CubeTextureDesc& other) const {
 
-			return (Size == other.Size
+			if (!(Size == other.Size
+				&& FilterMode == other.FilterMode
 				&& NumMips == other.NumMips
 				&& Format == other.Format
-				&& UsageFlags == other.UsageFlags
-				&& SamplerDesc == other.SamplerDesc);
+				&& UsageFlags == other.UsageFlags)) return false;
+
+			if (AutoCreateSampler) {
+
+				if (!other.AutoCreateSampler || SamplerDesc != other.SamplerDesc) return false;
+			}
+
+			return true;
 		}
 	};
 
@@ -52,6 +61,7 @@ namespace Spike {
 		virtual Vec3Uint GetSizeXYZ() const override { return Vec3(m_Desc.Size, m_Desc.Size, 1); }
 		virtual uint32_t GetNumMips() const override { return m_Desc.NumMips; }
 		virtual ETextureType GetTextureType() const override { return ETextureType::ECube; }
+		virtual RHISampler* GetSampler() override { return m_Desc.Sampler; }
 
 		ECubeTextureFilterMode GetFilterMode() const { return m_Desc.FilterMode; }
 		const CubeTextureDesc& GetDesc() { return m_Desc; }

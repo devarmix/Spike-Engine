@@ -40,6 +40,7 @@ namespace Spike {
 
 		Vec4 BoundsOrigin; // w - bounds radius
 		Vec4 BoundsExtents;
+
 		Mat4x4 GlobalTransform;
 		Mat4x4 InverseTransform;
 
@@ -68,6 +69,11 @@ namespace Spike {
 		int Type; // 0 = directional, 1 = point, 2 = spot
 		float InnerConeCos;
 		float OuterConeCos;
+
+		float LightConstant;
+		float LightQuadratic;
+		float LightLinear;
+		float Radius;
 	};
 
 	struct alignas(16) SceneGPUData {

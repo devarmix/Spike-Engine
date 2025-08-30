@@ -16,7 +16,7 @@ struct FilteringConstants {
 #define FILTER_TYPE_RADIANCE_MAP 2
 
 #define PI 3.1415926536
-#define NUM_RADIANCE_SAMPLES 128u
+#define NUM_RADIANCE_SAMPLES 1024u
 #define IRRADIANCE_SAMPLE_DELTA 0.004f
 
 // glsl style mod

@@ -9,7 +9,8 @@
 [[vk::binding(6, 0)]] TextureCube<float4> IrrMap;
 [[vk::binding(7, 0)]] Texture2D<float2> BRDFMap;
 [[vk::binding(8, 0)]] SamplerState TexSampler;
-[[vk::binding(9, 0)]] StructuredBuffer<SceneLightGPUData> LightsBuffer;
+[[vk::binding(9, 0)]] SamplerState EnvMapSampler;
+[[vk::binding(10, 0)]] StructuredBuffer<SceneLightGPUData> LightsBuffer;
 
 struct LightingConstants {
 
@@ -106,7 +107,7 @@ float3 CalculateDirLight(SceneLightGPUData light, float3 normal, float3 view, Ma
         pbrInfo.VdotH = max(dot(halfway, view), 0.0);
     }
 
-    float3 inRadiance = light.Intensity * light.Color.rbg;
+    float3 inRadiance = light.Intensity * light.Color.rgb;
 
     // Cook-torrance brdf
     float3 F = FresnelSchlick(pbrInfo);
@@ -129,6 +130,9 @@ float3 CalculateDirLight(SceneLightGPUData light, float3 normal, float3 view, Ma
 }
 
 float3 CalculatePointLight(SceneLightGPUData light, float3 normal, float3 view, Material material, PBRinfo pbrInfo, float3 position) {
+
+    float distance = length(light.Position.xyz - position);
+    if (distance > light.Radius) return float3(0.f, 0.f, 0.f);
 
     float3 lightDir = normalize(light.Position.xyz - position);
     float3 halfway = normalize(view + lightDir);
@@ -158,15 +162,7 @@ float3 CalculatePointLight(SceneLightGPUData light, float3 normal, float3 view, 
     float3 diffuse = kD * (pbrInfo.DiffuseColor / PI);
     float3 specular = numerator / max(denominator, 0.0001f);
 
-    // TODO: Make these const. adjustable by the GUI.
-    // Distance of 50:
-    float lightConst = 1.0f;
-    float lightLinear = 0.09f;
-    float lightQuadratic = 0.032f;
-   
-    float distance = length(light.Position.xyz - position);
-    float attenuation = (1.0f / (lightConst + lightLinear * distance + lightQuadratic * (distance * distance)));
-
+    float attenuation = (1.0f / (light.LightConstant + light.LightLinear * distance + light.LightQuadratic * (distance * distance)));
     return (attenuation * (diffuse + specular) * inRadiance * pbrInfo.NdotL);
 }
 
@@ -242,7 +238,7 @@ float4 PSMain(VSOutput input) : SV_TARGET0 {
         float lod = pbrInfo.PerceptualRoughness * mipCount;
         iblInfo.Brdf = BRDFMap.Sample(TexSampler, brdfSamplePoint);
       
-        iblInfo.SpecularLight = EnvMap.SampleLevel(TexSampler, reflection.xyz, lod).rgb;
+        iblInfo.SpecularLight = EnvMap.SampleLevel(EnvMapSampler, reflection.xyz, lod).rgb;
     }
 
     float3 color = GetIBLcontribution(pbrInfo, iblInfo, material);

@@ -175,6 +175,12 @@ VkFormat Spike::VulkanUtils::TextureFormatToVulkan(ETextureFormat format) {
 	case Spike::ETextureFormat::ERG16F:
 		return VK_FORMAT_R16G16_SFLOAT;
 		break;
+	case Spike::ETextureFormat::ERG8U:
+		return VK_FORMAT_R8G8_UNORM;
+		break;
+	case Spike::ETextureFormat::ER8U:
+		return VK_FORMAT_R8_UNORM;
+		break;
 	default:
 		return VK_FORMAT_UNDEFINED;
 		break;

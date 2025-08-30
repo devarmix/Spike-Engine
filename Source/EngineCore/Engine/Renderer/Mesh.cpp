@@ -202,7 +202,7 @@ namespace Spike {
 					newSubMesh.BoundsOrigin = origin;
 					newSubMesh.BoundsExtents = extents;
 					newSubMesh.BoundsRadius = glm::length(extents);
-
+					 
 					//ENGINE_INFO("{}", newSubMesh.BoundsRadius);
 					//newSubMesh.BoundsRadius = 1.f;
 				}

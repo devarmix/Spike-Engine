@@ -54,6 +54,7 @@ namespace Spike {
 		};
 
 		virtual void CopyTexture(RHICommandBuffer* cmd, RHITexture* src, const TextureCopyRegion& srcRegion, RHITexture* dst, const TextureCopyRegion& dstRegion, Vec2Uint copySize) = 0;
+		virtual void ClearTexture(RHICommandBuffer* cmd, RHITexture* tex, EGPUAccessFlags access, const Vec4& color) = 0;
 
 		virtual RHIData* CreateTextureViewRHI(const TextureViewDesc& desc) = 0;
 		virtual void DestroyTextureViewRHI(RHIData* data) = 0;

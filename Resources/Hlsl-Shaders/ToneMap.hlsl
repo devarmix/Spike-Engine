@@ -44,6 +44,9 @@ void CSMain(uint3 threadID : SV_DispatchThreadID) {
         texCoord += (1.0f / Resources.TexSize) * 0.5f;
 
         float3 sampledColor = InTexture.SampleLevel(TexSampler, texCoord, 0.0).rgb;
+
+        //float gamma = 2.2f;
+        //sampledColor = pow(sampledColor, (float3)1.0f/gamma);
         OutTexture[threadID.xy] = float4(ToneMap(sampledColor), 1.0f);
     }
 }

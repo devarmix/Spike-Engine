@@ -42,7 +42,7 @@ VSOutput VSMain(VSInput input) {
     float4x4 transposeInverseTransform = transpose(objectData.InverseTransform);
 
     float3 tangent = normalize(mul(transposeInverseTransform, float4(v.Tangent.xyz, 0.0f)).xyz);
-    output.Normal = v.Normal;
+    output.Normal = normalize(mul(transposeInverseTransform, float4(v.Normal.xyz, 0.0f)).xyz);
     tangent = normalize(tangent - dot(tangent, output.Normal) * output.Normal);
 
     output.Tangent = float4(tangent, v.Tangent.w);
@@ -62,24 +62,28 @@ struct PSOutput {
 
 PSOutput PSMain(VSOutput input) {
 
-    float4 albedo = SampleMaterialTexture(input.MaterialDataIndex, AlbedoMap, input.TexCoord);
-    float3 normalSample = SampleMaterialTexture(input.MaterialDataIndex, NormalMap, input.TexCoord).rgb;
+    //float4 albedo = SampleMaterialTexture(input.MaterialDataIndex, AlbedoMap, input.TexCoord);
+    //float3 normalSample = SampleMaterialTexture(input.MaterialDataIndex, NormalMap, input.TexCoord).rgb;
 
-    float ao = SampleMaterialTexture(input.MaterialDataIndex, AOMap, input.TexCoord).r;
-    float metallic = SampleMaterialTexture(input.MaterialDataIndex, MettalicMap, input.TexCoord).r;
-    float roughness = SampleMaterialTexture(input.MaterialDataIndex, RoughnessMap, input.TexCoord).r;
+    //float ao = SampleMaterialTexture(input.MaterialDataIndex, AOMap, input.TexCoord).r;
+    //float metallic = SampleMaterialTexture(input.MaterialDataIndex, MettalicMap, input.TexCoord).r;
+    //float roughness = SampleMaterialTexture(input.MaterialDataIndex, RoughnessMap, input.TexCoord).r;
 
-    if (albedo.a < 0.8f) {
-        discard;
-    }
+    //if (albedo.a < 0.8f) {
+    //    discard;
+    //}
 
-    float3 B = cross(input.Normal, input.Tangent.xyz) * input.Tangent.w;
-    float3x3 TBN = float3x3(input.Tangent.xyz, B, input.Normal);
-    float3 N = normalize(mul(TBN, normalize(normalSample * 2.0f - 1.0f)));
+    //float3 B = cross(input.Normal, input.Tangent.xyz) * input.Tangent.w;
+    //float3x3 TBN = float3x3(input.Tangent.xyz, B, input.Normal);
+    //float3 N = normalize(mul(TBN, normalize(normalSample * 2.0f - 1.0f)));
 
     PSOutput output;
-    output.AlbedoColor = albedo;
-    output.NormalColor = float4(N, 1.0);
-    output.MaterialColor = float4(roughness, metallic, ao, 1.0);
+    //output.AlbedoColor = albedo;
+    //output.NormalColor = float4(N, 1.0);
+    //output.MaterialColor = float4(roughness, metallic, ao, 1.0);
+
+    output.AlbedoColor = float4(0.63f, 0.87f, 0.31f, 1.0f);
+    output.NormalColor = float4(input.Normal, 1.0f);
+    output.MaterialColor = float4(0.7f, 0.2f, 1.0f, 1.0f);
     return output;
 }

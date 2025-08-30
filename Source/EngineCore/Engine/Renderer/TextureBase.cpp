@@ -5,6 +5,40 @@
 
 Spike::SamplerCache* Spike::GSamplerCache = nullptr;
 
+uint32_t Spike::TextureFormatToSize(ETextureFormat format) {
+
+	switch (format)
+	{
+	case Spike::ETextureFormat::ERGBA8U:
+		return 4;
+		break;
+	case Spike::ETextureFormat::ERGBA16F:
+		return 8;
+		break;
+	case Spike::ETextureFormat::ERGBA32F:
+		return 16;
+		break;
+	case Spike::ETextureFormat::ED32F:
+		return 4;
+		break;
+	case Spike::ETextureFormat::ER32F:
+		return 4;
+		break;
+	case Spike::ETextureFormat::ERG16F:
+		return 4;
+		break;
+	case Spike::ETextureFormat::ERG8U:
+		return 2;
+		break;
+	case Spike::ETextureFormat::ER8U:
+		return 1;
+		break;
+	default:
+		return 0;
+		break;
+	}
+}
+
 namespace Spike {
 
 	void RHITextureView::InitRHI() {

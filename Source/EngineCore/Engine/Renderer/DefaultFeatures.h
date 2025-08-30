@@ -81,4 +81,24 @@ namespace Spike {
 
 		RHIShader* m_ToneMapShader;
 	};
+
+	class SMAAFeature : public SceneRenderFeature {
+	public:
+		SMAAFeature();
+		virtual ~SMAAFeature() override;
+
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+
+	private:
+
+		RHITexture2D* m_AreaTex;
+		RHITexture2D* m_SearchTex;
+
+		RHISampler* m_LinearSampler;
+		RHISampler* m_PointSampler;
+
+		RHIShader* m_EdgesShader;
+		RHIShader* m_WeightsShader;
+		RHIShader* m_NeighborsShader;
+	};
 }

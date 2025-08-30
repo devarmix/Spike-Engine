@@ -181,13 +181,7 @@ namespace Spike {
 
 		if (desc.PixelData) {
 
-			size_t dataSize = 0;
-			if (vkFormat == VK_FORMAT_R32G32B32A32_SFLOAT) {
-				dataSize = (size_t)desc.Width * desc.Height * 16;
-			}
-			else {
-				dataSize = (size_t)desc.Width * desc.Height * 4;
-			}
+			size_t dataSize = (size_t)desc.Width * desc.Height * TextureFormatToSize(desc.Format);
 
 			BufferDesc uploadDesc{};
 			uploadDesc.Size = dataSize;
@@ -343,6 +337,17 @@ namespace Spike {
 		copyInfo.pRegions = &copyRegion;
 
 		vkCmdCopyImage2(vkCmd->Cmd, &copyInfo);
+	}
+
+	void VulkanRHIDevice::ClearTexture(RHICommandBuffer* cmd, RHITexture* tex, EGPUAccessFlags access, const Vec4& color) {
+
+		VulkanRHICommandBuffer::Data* vkCmd = (VulkanRHICommandBuffer::Data*)cmd->GetRHIData()->GetNativeData();
+		VulkanRHITexture::Data* vkTex = (VulkanRHITexture::Data*)tex->GetRHIData()->GetNativeData();
+
+		VkImageSubresourceRange clearRange = VulkanUtils::ImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT);
+		VkClearColorValue clearValue = { color.x, color.y, color.z, color.w };
+
+		vkCmdClearColorImage(vkCmd->Cmd, vkTex->Image, VulkanUtils::GPUAccessToVulkanLayout(access), &clearValue, 1, &clearRange);
 	}
 
 	RHIData* VulkanRHIDevice::CreateTextureViewRHI(const TextureViewDesc& desc) {

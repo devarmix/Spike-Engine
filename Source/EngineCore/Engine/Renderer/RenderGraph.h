@@ -126,7 +126,7 @@ namespace Spike {
 
 		struct RDGResource {
 
-			uint32_t FirstPassUse = 0;
+			uint32_t FirstPassUse = UINT32_MAX;
 			uint32_t LastPassUse = 0;
 
 			std::string Name;

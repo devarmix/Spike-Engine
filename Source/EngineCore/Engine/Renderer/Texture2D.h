@@ -16,20 +16,28 @@ namespace Spike {
 		ETextureFormat Format;
 		ETextureUsageFlags UsageFlags;
 
-		void* PixelData = nullptr;
 		bool NeedCPUData = false;
+		bool AutoCreateSampler = true;
+		void* PixelData = nullptr;
 
 		SamplerDesc SamplerDesc;
+		RHISampler* Sampler = nullptr;
 
 		bool operator==(const Texture2DDesc& other) const {
 
-			return (Width == other.Width
+			if (!(Width == other.Width
 				&& Height == other.Height
 				&& NumMips == other.NumMips
 				&& Format == other.Format
 				&& UsageFlags == other.UsageFlags
-				&& NeedCPUData == other.NeedCPUData
-				&& SamplerDesc == other.SamplerDesc);
+				&& NeedCPUData == other.NeedCPUData)) return false;
+
+			if (AutoCreateSampler) {
+
+				if (!other.AutoCreateSampler || SamplerDesc != other.SamplerDesc) return false;
+			}
+
+			return true;
 		}
 	};
 
@@ -47,6 +55,7 @@ namespace Spike {
 		virtual Vec3Uint GetSizeXYZ() const override { return Vec3(m_Desc.Width, m_Desc.Height, 1); }
 		virtual uint32_t GetNumMips() const override { return m_Desc.NumMips; }
 		virtual ETextureType GetTextureType() const override { return ETextureType::E2D; }
+		virtual RHISampler* GetSampler() override { return m_Desc.Sampler; }
 
 		const Texture2DDesc& GetDesc() { return m_Desc; }
 

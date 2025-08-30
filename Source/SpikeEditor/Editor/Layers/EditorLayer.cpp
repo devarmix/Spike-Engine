@@ -4,6 +4,7 @@
 #include <Engine/Renderer/DefaultFeatures.h>
 
 #include <Engine/Core/Stats.h>
+#include <random>
 
 namespace SpikeEditor {
 
@@ -35,10 +36,11 @@ namespace SpikeEditor {
 			desc.SamplerDesc = samplerDesc;
 
 			m_SceneViewport->ReleaseResource();
-		    m_SceneViewport->CreateResource(desc);
+			m_SceneViewport->CreateResource(desc);
 		}
 
-		RHITexture2D* outTexResource = m_SceneViewport->GetResource();
+		RHITexture2D* outTexture = m_SceneViewport->GetResource();
+
 		RHICubeTexture* radianceMap = m_EnvironmentTexture->GetResource();
 		RHICubeTexture* irradianceMap = m_IrradianceTexture->GetResource();
 
@@ -88,12 +90,12 @@ namespace SpikeEditor {
 			RenderContext context{};
 			context.EnvironmentTexture = radianceMap;
 			context.IrradianceTexture = irradianceMap;
-			context.OutTexture = outTexResource;
+			context.OutTexture = outTexture;
 
 			GFrameRenderer->RenderScene(m_Scene, context, m_Features);
 
-			ImTextureID viewID = GRHIDevice->CreateDynamicGuiTexture(outTexResource->GetTextureView());
-			ImGui::Image(viewID, { (float)outTexResource->GetSizeXYZ().x, (float)outTexResource->GetSizeXYZ().y });
+			ImTextureID viewID = GRHIDevice->CreateDynamicGuiTexture(outTexture->GetTextureView());
+			ImGui::Image(viewID, { (float)outTexture->GetSizeXYZ().x, (float)outTexture->GetSizeXYZ().y });
 
 			ImGui::End();
 
@@ -123,7 +125,7 @@ namespace SpikeEditor {
 			m_SceneViewport = Texture2D::Create(desc);
 		}
 		{
-			m_SkyboxTexture = CubeTexture::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/HDR/AmbienceExposure4k.hdr", 1024, samplerDesc);
+			m_SkyboxTexture = CubeTexture::Create("C:/Users/Artem/Downloads/sky_26_2k/sky_26_2k.png", 1024, samplerDesc);
 
 			CubeTextureDesc desc{};
 			desc.Size = 64;
@@ -139,6 +141,7 @@ namespace SpikeEditor {
 			desc.Size = 1024;
 			desc.NumMips = GetNumTextureMips(1024, 1024);
 			desc.FilterMode = ECubeTextureFilterMode::ERadiance;
+			desc.SamplerDesc.MaxLOD = 16;
 
 			m_EnvironmentTexture = CubeTexture::Create(desc);
 		}
@@ -182,11 +185,11 @@ namespace SpikeEditor {
 			samplerDesc.AddressV = ESamplerAddress::ERepeat;
 			samplerDesc.AddressW = ESamplerAddress::ERepeat;
 
-			PBRMat->SetTextureSRV(DeferredPBRMaterialResources.AlbedoMap, albedoMap);
-			PBRMat->SetTextureSRV(DeferredPBRMaterialResources.NormalMap, normalMap);
-			PBRMat->SetTextureSRV(DeferredPBRMaterialResources.AOMap, aoMap);
-			PBRMat->SetTextureSRV(DeferredPBRMaterialResources.MettalicMap, metMap);
-			PBRMat->SetTextureSRV(DeferredPBRMaterialResources.RoughnessMap, rougMap);
+			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.AlbedoMap, albedoMap);
+			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.NormalMap, normalMap);
+			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.AOMap, aoMap);
+			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.MettalicMap, metMap);
+			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.RoughnessMap, rougMap);
 
 			for (int i = 0; i < m_LoadedMeshes[0]->SubMeshes.size(); i++) {
 
@@ -209,6 +212,10 @@ namespace SpikeEditor {
 					light.Color = { 0.9f, 0.2f, 1.0f, 1.0f };
 					light.Position = { 3.f, 0.f, -5.f, 0.f };
 					light.Type = 1;
+					light.LightConstant = 1.0f;
+					light.LightLinear = 0.09f; 
+					light.LightQuadratic = 0.032f;
+					light.Radius = 10;
 
 					m_Scene.Lights.push_back(light);
 				}
@@ -219,31 +226,61 @@ namespace SpikeEditor {
 					light.Color = { 0.5f, 0.9f, 1.0f, 1.0f };
 					light.Position = { 5.f, 4.f, 4.f, 0.0f };
 					light.Type = 1;
+					light.LightConstant = 1.0f;
+					light.LightLinear = 0.09f;
+					light.LightQuadratic = 0.032f;
+					light.Radius = 10;
 
 					m_Scene.Lights.push_back(light);
 				}
+				{
+					SceneLightGPUData light{};
 
-				uint32_t sideSize = 25; 
-				uint32_t objectStep = 3;
-				m_Scene.Objects.reserve(sideSize * sideSize * sideSize);
+					light.Intensity = 12;
+					light.Color = { 1.0f, 0.7f, 0.6f, 1.0f };
+					light.Position = { 5.f, 4.f, 4.f, 0.0f };
+					light.Type = 0;
+					light.Direction = Vec4(-58.823f, -588.235f, 735.394f, 0.0f);
+
+					m_Scene.Lights.push_back(light);
+				} 
+
+				uint32_t sideSize = 30; 
+				//uint32_t objectStep = 7;
+				m_Scene.Objects.reserve(sideSize * sideSize);
 
 				int visibilityIndex = 0;
 
+				std::uniform_real_distribution<float> randomFloats(1.5f, 3.5f);
+				std::uniform_real_distribution<float> zFloats(-2.0f, 3.5f);
+				std::uniform_real_distribution<float> randRot(0.0f, 20.f);
+				std::default_random_engine generator; 
+
 				for (uint32_t a = 0; a < sideSize; a++) {
 
-					for (uint32_t b = 0; b < sideSize; b++) {
+					for (uint32_t b = 0; b < sideSize / 2; b++) {
 
 						for (uint32_t c = 0; c < sideSize; c++) {
 
 							{
 								SceneObjectGPUData object{};
-								object.BoundsOrigin = Vec4(sMesh.BoundsOrigin, sMesh.BoundsRadius);
+								object.BoundsOrigin = Vec4(sMesh.BoundsOrigin, sMesh.BoundsRadius * 1.4f);
 								object.BoundsExtents = Vec4(sMesh.BoundsExtents, 1.f);
-								object.GlobalTransform = glm::translate(Mat4x4(1.f), Vec3(a * objectStep, b * objectStep, c * objectStep));
+
+								Quaternion pitchRotation = glm::angleAxis(randRot(generator), Vec3{1.f, 0.f, 0.f});
+								//Quaternion yawRotation = glm::angleAxis(randRot(generator), Vec3{ 0.f, 1.f, 0.f });
+								Quaternion rollRotation = glm::angleAxis(randRot(generator), Vec3{ 0.f, 0.f, 1.f });
+								
+								Mat4x4 rotMat = glm::toMat4(pitchRotation * rollRotation);
+
+								float objectStep = randomFloats(generator);
+								float zf = zFloats(generator);
+								object.GlobalTransform = glm::translate(Mat4x4(1.f), Vec3(a * objectStep, b * zf, c * objectStep));
+								object.GlobalTransform = object.GlobalTransform * rotMat;
 								object.InverseTransform = glm::inverse(object.GlobalTransform);
 								object.FirstIndex = sMesh.FirstIndex;
-								object.IndexCount = sMesh.IndexCount;
-								object.IndexBufferAddress = rhiMesh->GetIndexBuffer()->GetGPUAddress();
+								object.IndexCount = sMesh.IndexCount; 
+								object.IndexBufferAddress = rhiMesh->GetIndexBuffer()->GetGPUAddress(); 
 								object.VertexBufferAddress = rhiMesh->GetVertexBuffer()->GetGPUAddress();
 								object.MaterialBufferIndex = rhiMat->GetDataIndex();
 								object.DrawBatchID = 0;
@@ -252,7 +289,7 @@ namespace SpikeEditor {
 
 								m_Scene.Objects.push_back(object); 
 							}
-
+							 
 							visibilityIndex++;
 						}
 					}
@@ -271,6 +308,7 @@ namespace SpikeEditor {
 					m_Features.push_back(new SSAOFeature());
 					m_Features.push_back(new BloomFeature());
 					m_Features.push_back(new ToneMapFeature());
+					m_Features.push_back(new SMAAFeature());
 				}
 				}));
 		}

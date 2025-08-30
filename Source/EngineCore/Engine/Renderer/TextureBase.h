@@ -20,8 +20,12 @@ namespace Spike {
 		ERGBA32F,
 		ED32F,
 		ER32F,
-		ERG16F
+		ERG16F,
+		ERG8U,
+		ER8U
 	};
+
+	uint32_t TextureFormatToSize(ETextureFormat format);
 
 	enum class ETextureUsageFlags : uint8_t {
 
@@ -45,18 +49,17 @@ namespace Spike {
 		virtual Vec3Uint GetSizeXYZ() const = 0;
 		virtual uint32_t GetNumMips() const = 0;
 		virtual ETextureType GetTextureType() const = 0;
+		virtual RHISampler* GetSampler() = 0;
 
 		bool IsMipmaped() const { return GetNumMips() > 1; }
 
 		RHIData* GetRHIData() { return m_RHIData; }
 		RHITextureView* GetTextureView() { return m_TextureView; }
-		RHISampler* GetSampler() { return m_Sampler; }
 
 	protected:
 
 		RHIData* m_RHIData;
 		RHITextureView* m_TextureView;
-		RHISampler* m_Sampler;
 	};
 
 	struct TextureViewDesc {

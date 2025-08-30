@@ -6,23 +6,22 @@
 
 void Spike::SafeRHIResourceInit(RHIResource* resource) {
 
-	EXECUTE_ON_RENDER_THREAD([resource]() {
+	if (resource) {
 
-		if (resource) {
-
+		EXECUTE_ON_RENDER_THREAD([resource]() {
 			resource->InitRHI();
-		}
-		});
+			});
+	}
 }
 
 void Spike::SafeRHIResourceRelease(RHIResource* resource) {
 
-	EXECUTE_ON_RENDER_THREAD([resource]() {
+	if (resource) {
 
-		if (resource) {
+		EXECUTE_ON_RENDER_THREAD([resource]() {
 
 			resource->ReleaseRHI();
 			delete resource;
-		}
-		});
+			});
+	}
 }

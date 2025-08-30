@@ -95,7 +95,7 @@ namespace SpikeEditor {
 		return false;
 	}
 
-	bool EditorCamera::OnMouseButtonPress(const MouseButtonPressEvent& event) {
+	bool EditorCamera::OnMouseButtonPress(const MouseButtonPressEvent& event) { 
 
 		MouseButtonPressEvent e = event;
 

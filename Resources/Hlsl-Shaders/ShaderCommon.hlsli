@@ -53,6 +53,11 @@ struct SceneLightGPUData {
     int Type; // 0 = directional, 1 = point, 2 = spot
     float InnerConeCos;
     float OuterConeCos;
+
+    float LightConstant;
+    float LightQuadratic;
+    float LightLinear;
+    float Radius;
 };
 
 #ifdef MATERIAL_SHADER
