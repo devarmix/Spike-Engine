@@ -1,7 +1,9 @@
 #pragma once
 
 #include <Engine/Renderer/RHIResource.h>
+#include <Engine/Utils/MathUtils.h>
 #include <Engine/Core/Core.h>
+#include <Engine/Serialization/FileStream.h>
 
 namespace Spike {
 
@@ -16,8 +18,13 @@ namespace Spike {
 
 		ENone = 0,
 		ERGBA8U,
+		EBGRA8U,
 		ERGBA16F,
 		ERGBA32F,
+		ERGBBC1,
+		ERGBABC3,
+		ERGBABC6,
+		ERGBC5,
 		ED32F,
 		ER32F,
 		ERG16F,
@@ -26,8 +33,9 @@ namespace Spike {
 	};
 
 	uint32_t TextureFormatToSize(ETextureFormat format);
+	uint32_t GetNumTextureMips(uint32_t width, uint32_t height);
 
-	enum class ETextureUsageFlags : uint8_t {
+	enum class ETextureUsageFlags : uint8_t { 
 
 		ESampled         = BIT(0),
 		ECopySrc         = BIT(1),
@@ -53,12 +61,12 @@ namespace Spike {
 
 		bool IsMipmaped() const { return GetNumMips() > 1; }
 
-		RHIData* GetRHIData() { return m_RHIData; }
+		RHIData GetRHIData() const { return m_RHIData; }
 		RHITextureView* GetTextureView() { return m_TextureView; }
 
 	protected:
 
-		RHIData* m_RHIData;
+		RHIData m_RHIData;
 		RHITextureView* m_TextureView;
 	};
 
@@ -70,10 +78,12 @@ namespace Spike {
 		uint32_t NumArrayLayers;
 
 		RHITexture* SourceTexture;
+		ETextureType Type = ETextureType::ENone;
 
 		bool operator==(const TextureViewDesc& other) const {
 
 			return (BaseMip == other.BaseMip
+				&& Type == other.Type
 				&& BaseArrayLayer == other.BaseArrayLayer
 				&& NumMips == other.NumMips
 				&& NumArrayLayers == other.NumArrayLayers
@@ -83,19 +93,22 @@ namespace Spike {
 
 	class RHITextureView : public RHIResource {
 	public:
-		RHITextureView(const TextureViewDesc& desc) : m_Desc(desc), m_RHIData(nullptr), m_MaterialIndex(UINT32_MAX) {}
+		RHITextureView(const TextureViewDesc& desc) : m_Desc(desc), m_RHIData(0), m_MaterialIndex(UINT32_MAX) {}
 		virtual ~RHITextureView() override {}
 
 		virtual void InitRHI() override;
 		virtual void ReleaseRHI() override;
 		virtual void ReleaseRHIImmediate() override;
 
-		RHIData* GetRHIData() { return m_RHIData; }
+		RHIData GetRHIData() const { return m_RHIData; }
 
 		uint32_t GetNumMips() const { return m_Desc.NumMips; }
 		uint32_t GetBaseMip() const { return m_Desc.BaseMip; }
 		uint32_t GetBaseArrayLayer() const { return m_Desc.BaseArrayLayer; }
 		uint32_t GetNumArrayLayers() const { return m_Desc.NumArrayLayers; }
+
+		// None if use type of source texture
+		ETextureType GetType() const { return m_Desc.Type; }
 		RHITexture* GetSourceTexture() { return m_Desc.SourceTexture; }
 
 		const TextureViewDesc& GetDesc() const { return m_Desc; }
@@ -103,7 +116,7 @@ namespace Spike {
 
 	private:
 
-		RHIData* m_RHIData;
+		RHIData m_RHIData;
 		TextureViewDesc m_Desc;
 
 		uint32_t m_MaterialIndex;
@@ -146,7 +159,6 @@ namespace Spike {
 		float MinLOD = 0.f;
 		float MaxLOD = 0.f;
 		float MaxAnisotropy = 0.f;
-		bool EnableAnisotropy = false;
 
 		bool operator==(const SamplerDesc& other) const {
 
@@ -158,8 +170,7 @@ namespace Spike {
 				&& MipLODBias == other.MipLODBias
 				&& MinLOD == other.MinLOD
 				&& MaxLOD == other.MaxLOD
-				&& MaxAnisotropy == other.MaxAnisotropy
-				&& EnableAnisotropy == other.EnableAnisotropy);
+				&& MaxAnisotropy == other.MaxAnisotropy);
 		}
 
 		struct Hasher {
@@ -167,15 +178,14 @@ namespace Spike {
 			size_t operator()(const SamplerDesc& desc) const {
 
 				size_t h = std::hash<uint8_t>{}((uint8_t)desc.Filter);
-				HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.AddressU));
-				HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.AddressV));
-				HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.AddressW));
-				HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.Reduction));
-				HashCombine(h, std::hash<float>{}(desc.MipLODBias));
-				HashCombine(h, std::hash<float>{}(desc.MinLOD));
-				HashCombine(h, std::hash<float>{}(desc.MaxLOD));
-				HashCombine(h, std::hash<float>{}(desc.MaxAnisotropy));
-				HashCombine(h, std::hash<bool>{}(desc.EnableAnisotropy));
+				MathUtils::HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.AddressU));
+				MathUtils::HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.AddressV));
+				MathUtils::HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.AddressW));
+				MathUtils::HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.Reduction));
+				MathUtils::HashCombine(h, std::hash<float>{}(desc.MipLODBias));
+				MathUtils::HashCombine(h, std::hash<float>{}(desc.MinLOD));
+				MathUtils::HashCombine(h, std::hash<float>{}(desc.MaxLOD));
+				MathUtils::HashCombine(h, std::hash<float>{}(desc.MaxAnisotropy));
 
 				return h;
 			}
@@ -184,21 +194,21 @@ namespace Spike {
 
 	class RHISampler : public RHIResource {
 	public:
-		RHISampler(const SamplerDesc& desc) : m_Desc(desc), m_RHIData(nullptr), m_MaterialIndex(UINT32_MAX) {}
+		RHISampler(const SamplerDesc& desc) : m_Desc(desc), m_RHIData(0), m_MaterialIndex(UINT32_MAX) {}
 		virtual ~RHISampler() override {}
 
 		virtual void InitRHI() override;
 		virtual void ReleaseRHI() override;
 
 		const SamplerDesc& GetDesc() const { return m_Desc; }
-		RHIData* GetRHIData() { return m_RHIData; }
+		RHIData GetRHIData() const { return m_RHIData; }
 
 		uint32_t GetMaterialIndex();
 
 	private:
 
 		SamplerDesc m_Desc;
-		RHIData* m_RHIData;
+		RHIData m_RHIData;
 
 		uint32_t m_MaterialIndex;
 	};

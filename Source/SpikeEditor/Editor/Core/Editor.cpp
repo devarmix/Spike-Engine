@@ -6,7 +6,7 @@
 
 
 // --Entry Point--
-Spike::Application* Spike::CreateApplication() {
+Spike::Application* Spike::CreateApplication(int argc, char* argv[]) {
 
 	WindowDesc winDesc{
 
@@ -19,18 +19,19 @@ Spike::Application* Spike::CreateApplication() {
 
 		.Name = "Spike Editor",
 		.UsingImGui = true,
+		.UsingDocking = true,
 		.WindowDesc = winDesc
 	};
 
-	return new SpikeEditor::SpikeEditor(appDesc);
+	//assert(argc > 1 && "No project path was specified!");
+	return new Spike::SpikeEditor(appDesc, "C:/Users/Artem/Documents/Spike-Projects/Test");
 }
 
-SpikeEditor::SpikeEditor* SpikeEditor::GEditor = nullptr;
+Spike::SpikeEditor* Spike::GEditor = nullptr;
 
-namespace SpikeEditor {
+namespace Spike {
 
-	SpikeEditor::SpikeEditor(const Spike::ApplicationDesc& desc) : Application(desc) {
-
+	SpikeEditor::SpikeEditor(const Spike::ApplicationDesc& desc, const std::filesystem::path& projectPath) : Application(desc), m_ProjectPath(projectPath) {
 		GEditor = this;
 
 		m_EditorLayer = new EditorLayer();

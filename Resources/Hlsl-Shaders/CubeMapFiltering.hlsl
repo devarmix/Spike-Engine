@@ -17,7 +17,7 @@ struct FilteringConstants {
 
 #define PI 3.1415926536
 #define NUM_RADIANCE_SAMPLES 1024u
-#define IRRADIANCE_SAMPLE_DELTA 0.004f
+#define IRRADIANCE_SAMPLE_DELTA 0.01f
 
 // glsl style mod
 float mod(float a, float b) {
@@ -126,7 +126,6 @@ float3 FilterRadiance(float3 R) {
 }
 
 float3 FilterIrradiance(float3 N) {
-
     float3 irradiance = (float3)0.0;  
 
     float3 up = float3(0.0, 1.0, 0.0);

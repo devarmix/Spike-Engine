@@ -24,17 +24,18 @@ project "SpikeEditor"
         "%{IncludeDir.VMA}",
         "%{IncludeDir.VKBootstrap}",
 		"%{IncludeDir.VULKAN_SDK}",
-		"%{IncludeDir.FAST_GLTF}",
 		"%{IncludeDir.ENGINE_CORE}",
 		"%{IncludeDir.ENTT}",
 		"%{IncludeDir.SHADER_COMPILER}",
 		"%{IncludeDir.SHADERS_GENERATED}",
+		"%{IncludeDir.ASSIMP}",
 		""
 	}
 
 	links
 	{
-       "EngineCore"
+       "EngineCore",
+	   "%{LibsDir.ASSIMP}/x64/assimp-vc143-mt.lib"
 	}
 
 	filter("system:windows")
@@ -54,7 +55,8 @@ project "SpikeEditor"
 
 		postbuildcommands 
 		{
-			("{COPY} %{LibsDir.SDL}/x64/SDL2.dll %{wks.location}/Binaries/" .. outputDir .. "/%{prj.name}")
+			("{COPY} %{LibsDir.SDL}/x64/SDL2.dll %{wks.location}/Binaries/" .. outputDir .. "/%{prj.name}"),
+			("{COPY} %{LibsDir.ASSIMP}/x64/assimp-vc143-mt.dll %{wks.location}/Binaries/" .. outputDir .. "/%{prj.name}")
 		}
 
 	filter "configurations:Debug"

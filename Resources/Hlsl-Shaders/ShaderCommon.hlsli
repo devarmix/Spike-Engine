@@ -8,6 +8,9 @@ struct SceneGPUData {
 
     float4 CameraPos;
     float4 FrustumPlanes[6];
+    float4 SunColor;
+    float4 SunDirection;
+    float SunIntensity;
 
     float P00;
     float P11;
@@ -17,8 +20,7 @@ struct SceneGPUData {
     uint LightsCount;
     uint ObjectsCount;
 
-    float Padding0[2];
-    float4 Padding1[3];
+    float Padding0[5];
 };
 
 struct SceneObjectGPUData {
@@ -37,28 +39,49 @@ struct SceneObjectGPUData {
 	uint MaterialBufferIndex;
 	uint DrawBatchID;
 
-	int LastVisibilityIndex;
-	int CurrentVisibilityIndex;
-
-    float Padding0[2];
+	int VisibilityIdx;
+    float Padding0[3];
 };
 
 struct SceneLightGPUData {
 
     float4 Position;
-    float4 Direction; // for directional and spot
+    float4 Direction; // for spot
     float4 Color;
 
-    float Intensity;
     int Type; // 0 = directional, 1 = point, 2 = spot
+    float Intensity;
     float InnerConeCos;
     float OuterConeCos;
 
     float LightConstant;
     float LightQuadratic;
     float LightLinear;
-    float Radius;
+    float Range;
 };
+
+float4 UnpackUintToUnsignedVec4(uint packed) {
+    float r = float((packed & 0x000000ff) >> 0) / 255.f;
+    float g = float((packed & 0x0000ff00) >> 8) / 255.f;
+    float b = float((packed & 0x00ff0000) >> 16) / 255.f;
+    float a = float((packed & 0xff000000) >> 24) / 255.f;
+
+    return float4(r, g, b, a);
+}
+
+struct PackedHalf {
+    uint A;
+    uint B;
+};
+
+float4 UnpackHalfToSignedVec4(PackedHalf packed) {
+	float x = (float((packed.A & 0x0000ffff) >> 0) / 65535.f) * 2.f - 1.f;
+	float y = (float((packed.A & 0xffff0000) >> 16) / 65535.f) * 2.f - 1.f;
+	float z = (float((packed.B & 0x0000ffff) >> 0) / 65535.f) * 2.f - 1.f;
+	float w = (float((packed.B & 0xffff0000) >> 16) / 65535.f) * 2.f - 1.f;
+
+	return float4(x, y, z, w);
+}
 
 #ifdef MATERIAL_SHADER
 
@@ -75,11 +98,14 @@ static const uint name = binding;                   \
 static const uint name##Sampler = binding;
 
 struct Vertex {
+    float Position[3];
+    uint Color;
 
-    float4 Position;           // w - UV_x
-    float4 Normal;             // w - UV_y
-    float4 Color;
-    float4 Tangent;            // w - handedness
+    float2 UV0;
+    float2 UV1;
+
+    PackedHalf Tangent;
+    PackedHalf Normal;
 };
 
 struct MaterialData {
@@ -96,7 +122,7 @@ struct MaterialData {
 [[vk::binding(1, 0)]] StructuredBuffer<SceneObjectGPUData> ObjectsBuffer;
 
 [[vk::binding(0, 1)]] StructuredBuffer<MaterialData> MaterialDataBuffer;
-[[vk::binding(1, 1)]] Texture2D<float4> TextureTable[];
+[[vk::binding(1, 1)]] Texture2D TextureTable[];
 [[vk::binding(2, 1)]] SamplerState SamplerTable[];
 
 #define INVALID_TABLE_INDEX 0xFFFFFFFFu

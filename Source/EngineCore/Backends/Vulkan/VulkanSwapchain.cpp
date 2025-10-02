@@ -1,5 +1,4 @@
 #include <Backends/Vulkan/VulkanSwapchain.h>
-
 #include <VkBootstrap.h>
 
 namespace Spike {
@@ -16,7 +15,7 @@ namespace Spike {
 			device.Device,
 			device.Surface };
 
-		Format = VK_FORMAT_R8G8B8A8_UNORM;
+		Format = VK_FORMAT_B8G8R8A8_UNORM;
 
 		vkb::Swapchain vkbSwapchain = swapchainBuilder
 			.set_desired_format(VkSurfaceFormatKHR{ .format = Format, .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR })

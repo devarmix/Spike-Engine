@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Engine/Core/Core.h>
+#include <Engine/Utils/Misc.h>
 #include <Engine/Renderer/Texture2D.h>
 #include <Engine/Renderer/CubeTexture.h>
 #include <Engine/Renderer/Buffer.h>
@@ -48,18 +49,18 @@ namespace Spike {
 
 	class RHIBindingSetLayout : public RHIResource {
 	public:
-		RHIBindingSetLayout(const BindingSetLayoutDesc& desc) : m_Desc(desc), m_RHIData(nullptr) {}
+		RHIBindingSetLayout(const BindingSetLayoutDesc& desc) : m_Desc(desc), m_RHIData(0) {}
 		virtual ~RHIBindingSetLayout() override {}
 
 		virtual void InitRHI() override;
 		virtual void ReleaseRHI() override;
 
-		RHIData* GetRHIData() { return m_RHIData; }
+		RHIData GetRHIData() const { return m_RHIData; }
 		const BindingSetLayoutDesc& GetDesc() const { return m_Desc; }
 
 	private:
 
-		RHIData* m_RHIData;
+		RHIData m_RHIData;
 		BindingSetLayoutDesc m_Desc;
 	};
 
@@ -81,7 +82,7 @@ namespace Spike {
 
 	class RHIBindingSet : public RHIResource {
 	public:
-		RHIBindingSet(RHIBindingSetLayout* layout) : m_Layout(layout), m_RHIData(nullptr) {}
+		RHIBindingSet(RHIBindingSetLayout* layout) : m_Layout(layout), m_RHIData(0) {}
 		virtual ~RHIBindingSet() override {}
 
 		virtual void InitRHI() override;
@@ -95,13 +96,13 @@ namespace Spike {
 		const std::vector<BindingSetWriteDesc>& GetWrites() const { return m_Writes; }
 
 		RHIBindingSetLayout* GetLayout() { return m_Layout; }
-		RHIData* GetRHIData() { return m_RHIData; }
+		RHIData GetRHIData() const { return m_RHIData; }
 
 	private:
 
 		std::vector<BindingSetWriteDesc> m_Writes;
 		RHIBindingSetLayout* m_Layout;
-		RHIData* m_RHIData;
+		RHIData m_RHIData;
 	};
 
 	enum class EFrontFace : uint8_t {
@@ -113,16 +114,19 @@ namespace Spike {
 
 	struct ShaderDesc {
 
+		bool EnableDepthTest = false;
+		bool EnableDepthWrite = false;
+		bool CullBackFaces = false;
+		bool EnableAlphaBlend = false;
+		bool EnableAdditiveBlend = false;
+
+		EFrontFace FrontFace = EFrontFace::EClockWise;
+
 		EShaderType Type;
 		std::string Name;
 
 		// settings for vertex / fragment shaders
 		std::vector<ETextureFormat> ColorTargetFormats;
-		bool EnableDepthTest = false;
-		bool EnableDepthWrite = false;
-		bool CullBackFaces = false;
-
-		EFrontFace FrontFace = EFrontFace::EClockWise;
 
 		bool operator==(const ShaderDesc& other) const {
 
@@ -149,16 +153,16 @@ namespace Spike {
 			size_t operator()(const ShaderDesc& desc) const {
 
 				size_t h = std::hash<uint8_t>{}((uint8_t)desc.Type);
-				HashCombine(h, std::hash<std::string>{}(desc.Name));
+				MathUtils::HashCombine(h, std::hash<std::string>{}(desc.Name));
 
 				for (auto f : desc.ColorTargetFormats) {
-					HashCombine(h, std::hash<uint8_t>{}((uint8_t)f));
+					MathUtils::HashCombine(h, std::hash<uint8_t>{}((uint8_t)f));
 				}
 
-				HashCombine(h, std::hash<bool>{}(desc.EnableDepthTest));
-				HashCombine(h, std::hash<bool>{}(desc.EnableDepthWrite));
-				HashCombine(h, std::hash<bool>{}(desc.CullBackFaces));
-				HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.FrontFace));
+				MathUtils::HashCombine(h, std::hash<bool>{}(desc.EnableDepthTest));
+				MathUtils::HashCombine(h, std::hash<bool>{}(desc.EnableDepthWrite));
+				MathUtils::HashCombine(h, std::hash<bool>{}(desc.CullBackFaces));
+				MathUtils::HashCombine(h, std::hash<uint8_t>{}((uint8_t)desc.FrontFace));
 				return h;
 			}
 		};
@@ -176,14 +180,14 @@ namespace Spike {
 		const std::string& GetName() const { return m_Desc.Name; }
 		const ShaderCompiler::BinaryShader::MaterialMetadata& GetMaterialData() const { return m_BinaryShader.MaterialData; }
 
-		RHIData* GetRHIData() { return m_RHIData; }
+		RHIData GetRHIData() const { return m_RHIData; }
 		const ShaderDesc& GetDesc() const { return m_Desc; }
 		const std::vector<RHIBindingSetLayout*>& GetLayouts() const { return m_Layouts; }
 		uint32_t GetPushDataSize() const { return m_BinaryShader.ShaderData.PushDataSize; }
 
 	private:
 
-		RHIData* m_RHIData;
+		RHIData m_RHIData;
 		ShaderDesc m_Desc;
 
 		ShaderCompiler::BinaryShader m_BinaryShader;
@@ -225,20 +229,9 @@ namespace Spike {
 
 	private:
 
-		struct FIFOIndexQueue {
-
-			FIFOIndexQueue() : NextIndex(0) { Queue.clear(); }
-
-			uint32_t NextIndex;
-			std::deque<uint32_t> Queue;
-
-			uint32_t GetFreeIndex();
-			void ReleaseIndex(uint32_t index);
-		};
-
-		FIFOIndexQueue m_MatTextureQueue;
-		FIFOIndexQueue m_MatSamplerQueue;
-		FIFOIndexQueue m_MatDataQueue;
+		IndexQueue m_MatTextureQueue;
+		IndexQueue m_MatSamplerQueue;
+		IndexQueue m_MatDataQueue;
 		RHIBuffer* m_MaterialDataBuffer;
 
 		RHIBindingSetLayout* m_MaterialLayout;

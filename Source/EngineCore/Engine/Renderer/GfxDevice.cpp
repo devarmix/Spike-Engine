@@ -35,7 +35,7 @@ namespace Spike {
 
 	void RHIDevice::Create(Window* window, bool useImGui) {
 
-		EXECUTE_ON_RENDER_THREAD([=]() {
+		SUBMIT_RENDER_COMMAND([=]() {
 
 			GRHIDevice = new VulkanRHIDevice(window, useImGui);
 			});

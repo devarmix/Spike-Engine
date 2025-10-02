@@ -6,7 +6,7 @@
 #include <vector>
 
 #include <wrl/client.h>
-#include <dxcapi.h>
+#include <dxc/dxcapi.h>
 
 namespace ShaderCompiler {
 
@@ -21,7 +21,8 @@ namespace ShaderCompiler {
     struct DXCWrapper {
 
         DXCWrapper();
-        Microsoft::WRL::ComPtr<IDxcBlob> Compile(EShaderCompilationTarget compTarget, const std::string& sourceCode, const std::string& includePath, const std::string& fullLocalPath);
+        Microsoft::WRL::ComPtr<IDxcBlob> Compile(EShaderCompilationTarget compTarget, const std::string& sourceCode, const std::filesystem::path& includePath, const std::filesystem::path& fullLocalPath);
+        Microsoft::WRL::ComPtr<IDxcBlob> PreProcess(const std::string& sourceCode, const std::filesystem::path& includePath, const std::filesystem::path& fullLocalPath);
 
         Microsoft::WRL::ComPtr<IDxcUtils> Utils{};
         Microsoft::WRL::ComPtr<IDxcCompiler3> Compiler{};
@@ -29,21 +30,19 @@ namespace ShaderCompiler {
         Microsoft::WRL::ComPtr<IDxcLibrary> Library{};
     };
 
-	void CompileShaders(const std::string& sourcePath, const std::string& cachePath, const std::string& genPath);
+	void CompileShaders(const std::filesystem::path& sourcePath, const std::filesystem::path& cachePath, const std::filesystem::path& genPath);
 
-	size_t ComputeShaderHash(const std::string& sourcePath, const std::string& includePath, const std::string& filename, std::vector<std::string>& allFilenames);
-
-    std::string LoadTextFile(const std::string& path);
-    bool LoadTextFile(const std::string& path, std::string& out);
+    std::string LoadTextFile(const std::filesystem::path& path);
+    bool LoadTextFile(const std::filesystem::path& path, std::string& out);
 
     template<typename T>
-    void IterateAllFilesInDirectory(const std::string& path, T&& iterator) {
+    void IterateAllFilesInDirectory(const std::filesystem::path& path, T&& iterator) {
 
-        for (const auto& entry : std::filesystem::directory_iterator(std::filesystem::path(path))) {
+        for (const auto& entry : std::filesystem::directory_iterator(path)) {
 
             std::filesystem::path filename = entry.path().filename();
             if (entry.is_directory()) {
-                IterateAllFilesInDirectory(entry.path().string(), iterator);
+                IterateAllFilesInDirectory(entry.path(), iterator);
             }
             else if (entry.is_regular_file()) {
                 if (filename.extension().string() == ".hlsl")

@@ -27,7 +27,6 @@ struct VSOutput {
 };
 
 VSOutput VSMain(VSInput input) {
-
     SceneObjectGPUData objectData = ObjectsBuffer[input.InstanceID];
 
     uint vIndex = vk::RawBufferLoad<uint>(objectData.IndexBufferAddress + ((input.VertexIndex + objectData.FirstIndex) * sizeof(uint)), 4);
@@ -35,17 +34,20 @@ VSOutput VSMain(VSInput input) {
 
     VSOutput output;
 
-    float4 fragPos = mul(objectData.GlobalTransform, float4(v.Position.xyz, 1.0f));
+    float4 fragPos = mul(objectData.GlobalTransform, float4(v.Position[0], v.Position[1], v.Position[2], 1.0f));
     output.VertexPos = mul(SceneDataBuffer.ViewProj, fragPos);
-    output.TexCoord = float2(v.Position.w, v.Normal.w);
+    output.TexCoord = v.UV0;
 
     float4x4 transposeInverseTransform = transpose(objectData.InverseTransform);
 
-    float3 tangent = normalize(mul(transposeInverseTransform, float4(v.Tangent.xyz, 0.0f)).xyz);
-    output.Normal = normalize(mul(transposeInverseTransform, float4(v.Normal.xyz, 0.0f)).xyz);
+    float4 unpackedTan = UnpackHalfToSignedVec4(v.Tangent);
+    float4 unpackedNormal = UnpackHalfToSignedVec4(v.Normal);
+
+    float3 tangent = normalize(mul(transposeInverseTransform, float4(unpackedTan.xyz, 0.0f)).xyz);
+    output.Normal = normalize(mul(transposeInverseTransform, float4(unpackedNormal.xyz, 0.0f)).xyz);
     tangent = normalize(tangent - dot(tangent, output.Normal) * output.Normal);
 
-    output.Tangent = float4(tangent, v.Tangent.w);
+    output.Tangent = float4(tangent, unpackedTan.w);
     output.Color = v.Color;
     output.MaterialDataIndex = objectData.MaterialBufferIndex;
 
@@ -63,7 +65,7 @@ struct PSOutput {
 PSOutput PSMain(VSOutput input) {
 
     //float4 albedo = SampleMaterialTexture(input.MaterialDataIndex, AlbedoMap, input.TexCoord);
-    //float3 normalSample = SampleMaterialTexture(input.MaterialDataIndex, NormalMap, input.TexCoord).rgb;
+    float3 normalSample = SampleMaterialTexture(input.MaterialDataIndex, NormalMap, input.TexCoord).rgb;
 
     //float ao = SampleMaterialTexture(input.MaterialDataIndex, AOMap, input.TexCoord).r;
     //float metallic = SampleMaterialTexture(input.MaterialDataIndex, MettalicMap, input.TexCoord).r;

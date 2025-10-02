@@ -21,7 +21,8 @@ namespace Spike {
 		ECopySrc      = BIT(2),
 		ECopyDst      = BIT(3),
 		EIndirect     = BIT(4),
-		EAddressable  = BIT(5)
+		EAddressable  = BIT(5),
+		EIndex        = BIT(6)
 	};
 	ENUM_FLAGS_OPERATORS(EBufferUsageFlags)
 
@@ -41,7 +42,7 @@ namespace Spike {
 
 	class RHIBuffer : public RHIResource {
 	public:
-		RHIBuffer(const BufferDesc& desc) : m_Desc(desc), m_RHIData(nullptr), m_MappedData(nullptr), m_GPUAddress(0) {}
+		RHIBuffer(const BufferDesc& desc) : m_Desc(desc), m_RHIData(0), m_MappedData(nullptr), m_GPUAddress(0) {}
 	    virtual ~RHIBuffer() override {}
 
 		virtual void InitRHI() override;
@@ -52,7 +53,7 @@ namespace Spike {
 		EBufferUsageFlags GetUsageFlags() const { return m_Desc.UsageFlags; }
 		EBufferMemUsage GetMemUsage() const { return m_Desc.MemUsage; }
 
-		RHIData* GetRHIData() { return m_RHIData; }
+		RHIData GetRHIData() const { return m_RHIData; }
 		void* GetMappedData() { return m_MappedData; }
 
 		const BufferDesc& GetDesc() { return m_Desc; }
@@ -61,7 +62,7 @@ namespace Spike {
 	private:
 
 		void* m_MappedData;
-		RHIData* m_RHIData;
+		RHIData m_RHIData;
 
 		BufferDesc m_Desc;
 		uint64_t m_GPUAddress;

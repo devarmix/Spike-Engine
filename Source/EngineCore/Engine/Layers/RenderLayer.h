@@ -9,7 +9,7 @@ namespace Spike {
 		RenderLayer() : Layer("Render Layer") {}
 		virtual ~RenderLayer() override {}
 
-		virtual void OnUpdate(float deltaTime) override;
+		virtual void Tick(float deltaTime) override;
 		virtual void OnAttach() override;
 		virtual void OnDetach() override;
 

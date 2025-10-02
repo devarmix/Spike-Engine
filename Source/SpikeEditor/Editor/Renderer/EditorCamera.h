@@ -3,21 +3,17 @@
 #include <Engine/SpikeEngine.h>
 #include <Engine/Events/Event.h>
 #include <Engine/Renderer/PerspectiveCamera.h>
-#include <Engine/Events/ApplicationEvents.h>
-using namespace Spike;
 
-namespace SpikeEditor {
+namespace Spike {
 
 	class EditorCamera : public PerspectiveCamera {
 	public:
-		EditorCamera();
-		~EditorCamera();
+		EditorCamera() {}
+		~EditorCamera() {}
 
-		void OnUpdate(float deltaTime);
-		void OnEvent(const GenericEvent& event);
+		void Tick(float deltaTime);
 
 		void SetViewportHovered(bool value) { m_ViewportHovered = value; }
-
 		void SetSpeed(float value);
 		void SetSpeedMultiplier(float value);
 
@@ -25,17 +21,6 @@ namespace SpikeEditor {
 		float GetSpeedMultiplier() const { return m_SpeedMultiplier; }
 
 	private:
-
-		bool OnKeyPress(const KeyPressEvent& event);
-		bool OnKeyRelease(const KeyReleaseEvent& event);
-
-		bool OnMouseMotion(const MouseMotionEvent& event);
-		bool OnMouseButtonPress(const MouseButtonPressEvent& event);
-		bool OnMouseButtonRelease(const MouseButtonReleaseEvent& event);
-		bool OnMouseScroll(const MouseScrollEvent& event);
-
-	private:
-
 		Vec3 m_TargetVelocity{};
 		Vec3 m_CurrentVelocity{};
 

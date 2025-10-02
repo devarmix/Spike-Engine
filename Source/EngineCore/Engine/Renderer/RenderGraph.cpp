@@ -35,8 +35,12 @@ namespace Spike {
 			}
 		}
 
+		// debug TODO: Move or remove
+		uint32_t allocTexSize = 0;
 		uint32_t texIndex = 0;
 		while (texIndex < m_TexturePool.size()) {
+
+			allocTexSize += m_TexturePool[texIndex].Resource->GetSizeXYZ().x * m_TexturePool[texIndex].Resource->GetSizeXYZ().y * TextureFormatToSize(m_TexturePool[texIndex].Resource->GetFormat());
 
 			if (m_TexturePool[texIndex].LastUsedFrame + m_FramesBeforeDelete < GFrameRenderer->GetFrameCount()) {
 
@@ -50,6 +54,7 @@ namespace Spike {
 				texIndex++;
 			}
 		}
+		ENGINE_TRACE("RDGResourcePool allocate textures size: {} MB", allocTexSize / 1000000);
 
 		uint32_t buffIndex = 0;
 		while (buffIndex < m_BufferPool.size()) {
@@ -249,7 +254,7 @@ namespace Spike {
 		auto it = m_TextureAccessMap.find(tex);
 		if (it != m_TextureAccessMap.end()) {
 
-			GRHIDevice->BarrierTexture2D(cmd, tex, m_TextureAccessMap[tex], newAccess);
+			GRHIDevice->BarrierTexture(cmd, tex, m_TextureAccessMap[tex], newAccess);
 			m_TextureAccessMap[tex] = newAccess;
 		}
 		else {
@@ -420,6 +425,6 @@ namespace Spike {
 		}
 
 		ENGINE_TRACE("RenderGraph virtual tex handles: {}", m_Textures.size());
-		ENGINE_TRACE("RenderGraph allocated aliased tex: {}", tempTexAliasedPool.size());
+		ENGINE_TRACE("RenderGraph aliased tex: {}", tempTexAliasedPool.size());
 	}
 }

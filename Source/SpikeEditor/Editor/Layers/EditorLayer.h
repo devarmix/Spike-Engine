@@ -1,47 +1,24 @@
 #pragma once
 
 #include <Engine/Core/Layer.h>
-#include <Engine/Renderer/FrameRenderer.h>
-using namespace Spike;
+#include <Editor/Renderer/Widget.h>
 
-#include <Editor/Renderer/EditorCamera.h>
-#include <imgui.h>
-
-namespace SpikeEditor {
+namespace Spike {
 
 	class EditorLayer : public Layer {
 	public:
 		EditorLayer() : Layer("Editor Layer") {}
 		~EditorLayer() override;
 
-		virtual void OnUpdate(float deltaTime) override;
+		virtual void Tick(float deltaTime) override;
 		virtual void OnAttach() override;
 		virtual void OnDetach() override;
 
 		virtual void OnEvent(const GenericEvent& event) override;
+	private:
+		void ConfigImGui();
 
 	private:
-
-		bool OnMouseButtonPress(const MouseButtonPressEvent& event);
-
-	private:
-
-		EditorCamera m_EditorCamera;
-
-		SceneRenderProxy m_Scene;
-		std::vector<SceneRenderFeature*> m_Features;
-
-		Ref<Texture2D> m_SceneViewport;
-		Ref<CubeTexture> m_IrradianceTexture;
-		Ref<CubeTexture> m_EnvironmentTexture;
-		Ref<CubeTexture> m_SkyboxTexture;
-
-		std::vector<Ref<Mesh>> m_LoadedMeshes;
-
-		bool m_ViewportHovered = false;
-		bool m_ViewportMinimized = false;
-
-		uint32_t m_Width = 1920;
-		uint32_t m_Height = 1080;
+		WorldViewportWidget m_WorldViewport;
 	};
 }

@@ -1,342 +1,161 @@
 #include <Editor/Layers/EditorLayer.h>
 #include <Engine/Core/Application.h>
-#include <Generated/DeferredPBR.h>
+#include <Editor/Project/Project.h>
+#include <Engine/World/Entity.h>
+#include <Engine/World/Components.h>
 #include <Engine/Renderer/DefaultFeatures.h>
+#include <Engine/Core/Log.h>
+#include <Editor/Core/Editor.h>
 
-#include <Engine/Core/Stats.h>
-#include <random>
-
-namespace SpikeEditor {
+namespace Spike {
 
 	EditorLayer::~EditorLayer() {
-
-		m_LoadedMeshes.clear();
-
-		for (auto f : m_Features)
-			delete f;
-
-		m_Features.clear();
+		delete GRegistry;
 	}
 
-	void EditorLayer::OnUpdate(float deltaTime) {
+	void EditorLayer::Tick(float deltaTime) {
 
-		if (!((float)m_Width == m_SceneViewport->GetSizeXYZ().x && (float)m_Height == m_SceneViewport->GetSizeXYZ().y) && m_Width > 0 && m_Height > 0) {
-
-			SamplerDesc samplerDesc{};
-			samplerDesc.Filter = ESamplerFilter::EBilinear;
-			samplerDesc.AddressU = ESamplerAddress::EClamp;
-			samplerDesc.AddressV = ESamplerAddress::EClamp;
-			samplerDesc.AddressW = ESamplerAddress::EClamp;
-
-			Texture2DDesc desc{};
-			desc.Width = m_Width;
-			desc.Height = m_Height;
-			desc.Format = ETextureFormat::ERGBA16F;
-			desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopySrc | ETextureUsageFlags::ECopyDst | ETextureUsageFlags::EColorTarget;
-			desc.SamplerDesc = samplerDesc;
-
-			m_SceneViewport->ReleaseResource();
-			m_SceneViewport->CreateResource(desc);
+		// tick actions
+		{
+			// save
+			if ((GInput->GetKeyDown(EKey::S) && GInput->GetKeyPressed(EKey::LCtrl)) 
+				|| (GInput->GetKeyPressed(EKey::S) && GInput->GetKeyDown(EKey::LCtrl))) {
+				ENGINE_WARN("Saving a project...");
+				GRegistry->Save();
+			}
 		}
 
-		RHITexture2D* outTexture = m_SceneViewport->GetResource();
+		// dockspace
+		{
+			static bool dockOpen = true;
+			static bool opt_fullscreen = true;
+			static bool opt_padding = false;
+			static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
 
-		RHICubeTexture* radianceMap = m_EnvironmentTexture->GetResource();
-		RHICubeTexture* irradianceMap = m_IrradianceTexture->GetResource();
-
-		EXECUTE_ON_RENDER_THREAD(([=, this]() {
-
-			ImGui::Begin("Scene Viewport");
-
-			m_ViewportHovered = ImGui::IsWindowHovered();
-
-			m_EditorCamera.SetViewportHovered(m_ViewportHovered);
-
-			// update camera
-			m_EditorCamera.OnUpdate(deltaTime);
-
-			// poll events
-			ImVec2 size = ImGui::GetContentRegionAvail();
-
-			if (m_Width != size.x || m_Height != size.y) {
-
-				if ((size.x <= 0 || size.y <= 0) && !m_ViewportMinimized) {
-
-					m_ViewportMinimized = true;
-				}
-
-				if (m_ViewportMinimized && (size.x > 0 && size.y > 0)) {
-
-					m_ViewportMinimized = false;
-				}
-
-				if (size.x < 0) m_Width = 0;
-				else m_Width = (uint32_t)size.x;
-
-				if (size.y < 0) m_Height = 0;
-				else m_Height = (uint32_t)size.y;
-			}
-
+			ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+			if (opt_fullscreen)
 			{
-				float aspect = (float)m_Width / (float)m_Height;
-
-				m_Scene.CameraData.Position = Vec4(m_EditorCamera.GetPosition(), 0.0f);
-				m_Scene.CameraData.View = m_EditorCamera.GetViewMatrix();
-				m_Scene.CameraData.Proj = m_EditorCamera.GetProjectionMatrix(aspect);
-				m_Scene.CameraData.FarProj = m_EditorCamera.GetCameraFarProj();
-				m_Scene.CameraData.NearProj = m_EditorCamera.GetCameraNearProj();
+				const ImGuiViewport* viewport = ImGui::GetMainViewport();
+				ImGui::SetNextWindowPos(viewport->WorkPos);
+				ImGui::SetNextWindowSize(viewport->WorkSize);
+				ImGui::SetNextWindowViewport(viewport->ID);
+				ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+				ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+				window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+				window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+			}
+			else
+			{
+				dockspace_flags &= ~ImGuiDockNodeFlags_PassthruCentralNode;
 			}
 
-			RenderContext context{};
-			context.EnvironmentTexture = radianceMap;
-			context.IrradianceTexture = irradianceMap;
-			context.OutTexture = outTexture;
+			if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
+				window_flags |= ImGuiWindowFlags_NoBackground; 
 
-			GFrameRenderer->RenderScene(m_Scene, context, m_Features);
+			if (!opt_padding)
+				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+			ImGui::Begin("DockSpace", &dockOpen, window_flags);
+			if (!opt_padding)
+				ImGui::PopStyleVar();
 
-			ImTextureID viewID = GRHIDevice->CreateDynamicGuiTexture(outTexture->GetTextureView());
-			ImGui::Image(viewID, { (float)outTexture->GetSizeXYZ().x, (float)outTexture->GetSizeXYZ().y });
+			if (opt_fullscreen)
+				ImGui::PopStyleVar(2);
 
+			ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
+			ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+		}
+
+		m_WorldViewport.Tick(deltaTime);
+
+		// end dockspace
+		{
 			ImGui::End();
-
-			ImGui::Begin("Stats");
-			ImGui::Text("FPS: %.1f", Stats::Data.Fps);
-			ImGui::Text("Frame Time: %.1f", Stats::Data.Frametime);
-			ImGui::End();
-			}));
+		}
 	}
 
 	void EditorLayer::OnAttach() {
+		GRegistry = new EditorRegistry();
+		GRegistry->Deserialize();
 
-		SamplerDesc samplerDesc{};
-		samplerDesc.Filter = ESamplerFilter::EBilinear;
-		samplerDesc.AddressU = ESamplerAddress::EClamp;
-		samplerDesc.AddressV = ESamplerAddress::EClamp;
-		samplerDesc.AddressW = ESamplerAddress::EClamp;
-
-		{
-			Texture2DDesc desc{};
-			desc.Width = 1920;
-			desc.Height = 1080;
-			desc.Format = ETextureFormat::ERGBA16F;
-			desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopySrc | ETextureUsageFlags::ECopyDst | ETextureUsageFlags::EColorTarget;
-			desc.SamplerDesc = samplerDesc;
-
-			m_SceneViewport = Texture2D::Create(desc);
-		}
-		{
-			m_SkyboxTexture = CubeTexture::Create("C:/Users/Artem/Downloads/sky_26_2k/sky_26_2k.png", 1024, samplerDesc);
-
-			CubeTextureDesc desc{};
-			desc.Size = 64;
-			desc.Format = ETextureFormat::ERGBA32F;
-			desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
-			desc.NumMips = 1;
-			desc.SamplerDesc = samplerDesc;
-			desc.FilterMode = ECubeTextureFilterMode::EIrradiance;
-			desc.SamplerTexture = m_SkyboxTexture->GetResource();
-
-			m_IrradianceTexture = CubeTexture::Create(desc);
-
-			desc.Size = 1024;
-			desc.NumMips = GetNumTextureMips(1024, 1024);
-			desc.FilterMode = ECubeTextureFilterMode::ERadiance;
-			desc.SamplerDesc.MaxLOD = 16;
-
-			m_EnvironmentTexture = CubeTexture::Create(desc);
-		}
-
-		m_LoadedMeshes = Mesh::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/models/cube.glb");
-
-		SamplerDesc mapsSamplerDesc{};
-		mapsSamplerDesc.Filter = ESamplerFilter::ETrilinear;
-		mapsSamplerDesc.AddressU = ESamplerAddress::ERepeat;
-		mapsSamplerDesc.AddressV = ESamplerAddress::ERepeat;
-		mapsSamplerDesc.AddressW = ESamplerAddress::ERepeat;
-		mapsSamplerDesc.EnableAnisotropy = true;
-		mapsSamplerDesc.MaxAnisotropy = 8.f;
-
-		Ref<Texture2D> albedoMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_albedo.png", mapsSamplerDesc);
-		Ref<Texture2D> normalMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_normal-ogl.png", mapsSamplerDesc);
-		Ref<Texture2D> aoMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_ao.png", mapsSamplerDesc);
-		Ref<Texture2D> metMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_metallic.png", mapsSamplerDesc);
-		Ref<Texture2D> rougMap = Texture2D::Create("C:/Users/Artem/Desktop/Spike-Engine/Resources/Test/textures/metal-siding-base_roughness.png", mapsSamplerDesc);
-
-		{
-			float roughness = 0.0f;
-			float metallic = 1.0f;
-
-			ShaderDesc desc{};
-			desc.Type = EShaderType::EGraphics;
-			desc.Name = "DeferredPBR";
-			desc.ColorTargetFormats = { ETextureFormat::ERGBA16F, ETextureFormat::ERGBA16F, ETextureFormat::ERGBA8U };
-			desc.EnableDepthTest = true;
-			desc.EnableDepthWrite = true;
-			desc.CullBackFaces = true;
-			desc.FrontFace = EFrontFace::ECounterClockWise;
-
-			Ref<Material> PBRMat = Material::Create(EMaterialSurfaceType::EOpaque, desc);
-
-			//PBRMat->AddScalarParameter("Roughness", 0, roughness);
-			//PBRMat->AddScalarParameter("Metallic", 1, metallic);
-
-			samplerDesc.Filter = ESamplerFilter::ETrilinear;
-			samplerDesc.AddressU = ESamplerAddress::ERepeat;
-			samplerDesc.AddressV = ESamplerAddress::ERepeat;
-			samplerDesc.AddressW = ESamplerAddress::ERepeat;
-
-			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.AlbedoMap, albedoMap);
-			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.NormalMap, normalMap);
-			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.AOMap, aoMap);
-			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.MettalicMap, metMap);
-			//PBRMat->SetTextureSRV(DeferredPBRMaterialResources.RoughnessMap, rougMap);
-
-			for (int i = 0; i < m_LoadedMeshes[0]->SubMeshes.size(); i++) {
-
-				m_LoadedMeshes[0]->SubMeshes[i].Material = PBRMat;
-			}
-		}
-
-		// create a scene to render
-		{
-			const SubMesh& sMesh = m_LoadedMeshes[0]->SubMeshes[0];
-			RHIMesh* rhiMesh = m_LoadedMeshes[0]->GetResource();
-			RHIMaterial* rhiMat = sMesh.Material->GetResource();
-
-			EXECUTE_ON_RENDER_THREAD(([=, this]() {
-
-				{
-					SceneLightGPUData light{};
-
-					light.Intensity = 30;
-					light.Color = { 0.9f, 0.2f, 1.0f, 1.0f };
-					light.Position = { 3.f, 0.f, -5.f, 0.f };
-					light.Type = 1;
-					light.LightConstant = 1.0f;
-					light.LightLinear = 0.09f; 
-					light.LightQuadratic = 0.032f;
-					light.Radius = 10;
-
-					m_Scene.Lights.push_back(light);
-				}
-				{
-					SceneLightGPUData light{};
-
-					light.Intensity = 12;
-					light.Color = { 0.5f, 0.9f, 1.0f, 1.0f };
-					light.Position = { 5.f, 4.f, 4.f, 0.0f };
-					light.Type = 1;
-					light.LightConstant = 1.0f;
-					light.LightLinear = 0.09f;
-					light.LightQuadratic = 0.032f;
-					light.Radius = 10;
-
-					m_Scene.Lights.push_back(light);
-				}
-				{
-					SceneLightGPUData light{};
-
-					light.Intensity = 12;
-					light.Color = { 1.0f, 0.7f, 0.6f, 1.0f };
-					light.Position = { 5.f, 4.f, 4.f, 0.0f };
-					light.Type = 0;
-					light.Direction = Vec4(-58.823f, -588.235f, 735.394f, 0.0f);
-
-					m_Scene.Lights.push_back(light);
-				} 
-
-				uint32_t sideSize = 30; 
-				//uint32_t objectStep = 7;
-				m_Scene.Objects.reserve(sideSize * sideSize);
-
-				int visibilityIndex = 0;
-
-				std::uniform_real_distribution<float> randomFloats(1.5f, 3.5f);
-				std::uniform_real_distribution<float> zFloats(-2.0f, 3.5f);
-				std::uniform_real_distribution<float> randRot(0.0f, 20.f);
-				std::default_random_engine generator; 
-
-				for (uint32_t a = 0; a < sideSize; a++) {
-
-					for (uint32_t b = 0; b < sideSize / 2; b++) {
-
-						for (uint32_t c = 0; c < sideSize; c++) {
-
-							{
-								SceneObjectGPUData object{};
-								object.BoundsOrigin = Vec4(sMesh.BoundsOrigin, sMesh.BoundsRadius * 1.4f);
-								object.BoundsExtents = Vec4(sMesh.BoundsExtents, 1.f);
-
-								Quaternion pitchRotation = glm::angleAxis(randRot(generator), Vec3{1.f, 0.f, 0.f});
-								//Quaternion yawRotation = glm::angleAxis(randRot(generator), Vec3{ 0.f, 1.f, 0.f });
-								Quaternion rollRotation = glm::angleAxis(randRot(generator), Vec3{ 0.f, 0.f, 1.f });
-								
-								Mat4x4 rotMat = glm::toMat4(pitchRotation * rollRotation);
-
-								float objectStep = randomFloats(generator);
-								float zf = zFloats(generator);
-								object.GlobalTransform = glm::translate(Mat4x4(1.f), Vec3(a * objectStep, b * zf, c * objectStep));
-								object.GlobalTransform = object.GlobalTransform * rotMat;
-								object.InverseTransform = glm::inverse(object.GlobalTransform);
-								object.FirstIndex = sMesh.FirstIndex;
-								object.IndexCount = sMesh.IndexCount; 
-								object.IndexBufferAddress = rhiMesh->GetIndexBuffer()->GetGPUAddress(); 
-								object.VertexBufferAddress = rhiMesh->GetVertexBuffer()->GetGPUAddress();
-								object.MaterialBufferIndex = rhiMat->GetDataIndex();
-								object.DrawBatchID = 0;
-								object.LastVisibilityIndex = visibilityIndex;
-								object.CurrentVisibilityIndex = visibilityIndex;
-
-								m_Scene.Objects.push_back(object); 
-							}
-							 
-							visibilityIndex++;
-						}
-					}
-				}
-				{
-					DrawBatch batch{};
-					batch.CommandsCount = m_Scene.Objects.size();
-					batch.Shader = rhiMat->GetShader();
-
-					m_Scene.Batches.push_back(batch);
-				}
-				{
-					m_Features.push_back(new GBufferFeature());
-				    m_Features.push_back(new DeferredLightingFeature());
-					m_Features.push_back(new SkyboxFeature());
-					m_Features.push_back(new SSAOFeature());
-					m_Features.push_back(new FXAAFeature());
-					m_Features.push_back(new BloomFeature());
-					m_Features.push_back(new ToneMapFeature());
-				}
-				}));
-		}
+		ConfigImGui();
 	}
 
 	void EditorLayer::OnDetach() {}
 
 	void EditorLayer::OnEvent(const GenericEvent& event) {
 
-		m_EditorCamera.OnEvent(event);
-
 		EventHandler handler(event);
-		handler.Handle<MouseButtonPressEvent>(BIND_FUNCTION(EditorLayer::OnMouseButtonPress));
+		handler.Handle<AssetImportedEvent>([this](const AssetImportedEvent& e) {
+			EditorRegistry* reg = (EditorRegistry*)GRegistry;
+			reg->ImportAsset(e.GetInfo());
+			return true;
+			});
 	}
 
-	bool EditorLayer::OnMouseButtonPress(const MouseButtonPressEvent& event) {
+	void EditorLayer::ConfigImGui() {
 
-		MouseButtonPressEvent e = event;
+		ImGuiStyle& style = ImGui::GetStyle();
+		ImVec4* colors = style.Colors;
 
-		EXECUTE_ON_RENDER_THREAD(([=, this]() {
+		// Corners
+		style.WindowRounding = 8.0f;
+		style.ChildRounding = 8.0f;
+		style.FrameRounding = 6.0f;
+		style.PopupRounding = 6.0f;
+		style.ScrollbarRounding = 6.0f;
+		style.GrabRounding = 6.0f;
+		style.TabRounding = 6.0f;
 
-			if (e.GetButton() == SDL_BUTTON_RIGHT && m_ViewportHovered) {
-
-				// if controlling camera, set this window as focused
-				ImGui::SetWindowFocus(GetName().c_str());
-			}
-			}));
-
-		return false;
+		// Colors
+		colors[ImGuiCol_Text] = ImVec4(0.95f, 0.96f, 0.98f, 1.00f);
+		colors[ImGuiCol_TextDisabled] = ImVec4(0.36f, 0.42f, 0.47f, 1.00f);
+		colors[ImGuiCol_WindowBg] = ImVec4(0.11f, 0.15f, 0.17f, 1.00f);
+		colors[ImGuiCol_ChildBg] = ImVec4(0.15f, 0.18f, 0.22f, 1.00f);
+		colors[ImGuiCol_PopupBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.94f);
+		colors[ImGuiCol_Border] = ImVec4(0.43f, 0.50f, 0.56f, 0.50f);
+		colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
+		colors[ImGuiCol_FrameBg] = ImVec4(0.20f, 0.25f, 0.29f, 1.00f);
+		colors[ImGuiCol_FrameBgHovered] = ImVec4(0.12f, 0.20f, 0.28f, 1.00f);
+		colors[ImGuiCol_FrameBgActive] = ImVec4(0.09f, 0.12f, 0.14f, 1.00f);
+		colors[ImGuiCol_TitleBg] = ImVec4(0.09f, 0.12f, 0.14f, 1.00f);
+		colors[ImGuiCol_TitleBgActive] = ImVec4(0.12f, 0.20f, 0.28f, 1.00f);
+		colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.00f, 0.00f, 0.00f, 0.51f);
+		colors[ImGuiCol_MenuBarBg] = ImVec4(0.15f, 0.18f, 0.22f, 1.00f);
+		colors[ImGuiCol_ScrollbarBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.53f);
+		colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.31f, 0.31f, 0.31f, 1.00f);
+		colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.41f, 0.41f, 0.41f, 1.00f);
+		colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.51f, 0.51f, 0.51f, 1.00f);
+		colors[ImGuiCol_CheckMark] = ImVec4(0.28f, 0.56f, 1.00f, 1.00f);
+		colors[ImGuiCol_SliderGrab] = ImVec4(0.28f, 0.56f, 1.00f, 1.00f);
+		colors[ImGuiCol_SliderGrabActive] = ImVec4(0.37f, 0.61f, 1.00f, 1.00f);
+		colors[ImGuiCol_Button] = ImVec4(0.20f, 0.25f, 0.29f, 1.00f);
+		colors[ImGuiCol_ButtonHovered] = ImVec4(0.28f, 0.56f, 1.00f, 1.00f);
+		colors[ImGuiCol_ButtonActive] = ImVec4(0.37f, 0.61f, 1.00f, 1.00f);
+		colors[ImGuiCol_Header] = ImVec4(0.20f, 0.25f, 0.29f, 0.55f);
+		colors[ImGuiCol_HeaderHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
+		colors[ImGuiCol_HeaderActive] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+		colors[ImGuiCol_Separator] = ImVec4(0.43f, 0.50f, 0.56f, 0.50f);
+		colors[ImGuiCol_SeparatorHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.78f);
+		colors[ImGuiCol_SeparatorActive] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+		colors[ImGuiCol_ResizeGrip] = ImVec4(0.26f, 0.59f, 0.98f, 0.25f);
+		colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
+		colors[ImGuiCol_ResizeGripActive] = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
+		colors[ImGuiCol_Tab] = ImVec4(0.11f, 0.15f, 0.17f, 1.00f);
+		colors[ImGuiCol_TabHovered] = ImVec4(0.28f, 0.56f, 1.00f, 0.80f);
+		colors[ImGuiCol_TabActive] = ImVec4(0.20f, 0.25f, 0.29f, 1.00f);
+		colors[ImGuiCol_TabUnfocused] = ImVec4(0.07f, 0.10f, 0.15f, 0.97f);
+		colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.14f, 0.22f, 0.36f, 1.00f);
+		colors[ImGuiCol_DockingPreview] = ImVec4(0.26f, 0.59f, 0.98f, 0.70f);
+		colors[ImGuiCol_DockingEmptyBg] = ImVec4(0.20f, 0.20f, 0.20f, 1.00f);
+		colors[ImGuiCol_PlotLines] = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
+		colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
+		colors[ImGuiCol_PlotHistogram] = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
+		colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
+		colors[ImGuiCol_TextSelectedBg] = ImVec4(0.26f, 0.59f, 0.98f, 0.35f);
+		colors[ImGuiCol_DragDropTarget] = ImVec4(1.00f, 0.00f, 0.00f, 0.90f);
+		colors[ImGuiCol_NavHighlight] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+		colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
+		colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
+		colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
 	}
 }

@@ -4,14 +4,14 @@
 #include <Generated/CubeMapFiltering.h>
 #include <Generated/CubeMapGen.h>
 #include <Engine/Renderer/FrameRenderer.h>
+#include <Engine/Core/Application.h>
 
 #include <stb_image.h>
 
 namespace Spike {
 
 	RHICubeTexture::RHICubeTexture(const CubeTextureDesc& desc) : m_Desc(desc) {
-
-		m_RHIData = nullptr;
+		m_RHIData = 0;
 
 		TextureViewDesc viewDesc{};
 		viewDesc.BaseMip = 0;
@@ -24,7 +24,6 @@ namespace Spike {
 	}
 
 	void RHICubeTexture::InitRHI() {
-
 		m_RHIData = GRHIDevice->CreateCubeTextureRHI(m_Desc);
 
 		if (EnumHasAllFlags(m_Desc.UsageFlags, ETextureUsageFlags::ESampled) && m_Desc.AutoCreateSampler && !m_Desc.Sampler) {
@@ -32,100 +31,6 @@ namespace Spike {
 		}
 
 		m_TextureView->InitRHI();
-
-		// filter the texture
-		{
-			ShaderDesc shaderDesc{};
-			shaderDesc.Type = EShaderType::ECompute;
-
-			bool isNoneFilter = (m_Desc.FilterMode == ECubeTextureFilterMode::ENone);
-			shaderDesc.Name = isNoneFilter ? "CubeMapGen" : "CubeMapFiltering";
-
-			RHIShader* shader = GShaderManager->GetShaderFromCache(shaderDesc);
-
-			Texture2DDesc offscreenDesc{};
-			offscreenDesc.Width = m_Desc.Size;
-			offscreenDesc.Height = m_Desc.Size;
-			offscreenDesc.Format = m_Desc.Format;
-			offscreenDesc.UsageFlags = ETextureUsageFlags::EStorage | ETextureUsageFlags::ECopySrc;
-			offscreenDesc.NumMips = 1;
-
-			RHITexture2D* offscreen = new RHITexture2D(offscreenDesc);
-			offscreen->InitRHI();
-
-			GRHIDevice->ImmediateSubmit([&, this](RHICommandBuffer* cmd) {
-
-				GRHIDevice->BarrierCubeTexture(cmd, this, EGPUAccessFlags::ENone, EGPUAccessFlags::ECopyDst);
-				GRHIDevice->BarrierTexture2D(cmd, offscreen, EGPUAccessFlags::ENone, EGPUAccessFlags::EUAVCompute);
-
-				RHIBindingSet* cubeSet = new RHIBindingSet(shader->GetLayouts()[0]);
-				cubeSet->InitRHI();
-				{
-					cubeSet->AddTextureWrite(0, 0, EShaderResourceType::ETextureUAV, offscreen->GetTextureView(), EGPUAccessFlags::EUAVCompute);
-					cubeSet->AddTextureWrite(1, 0, EShaderResourceType::ETextureSRV, m_Desc.SamplerTexture->GetTextureView(), EGPUAccessFlags::ESRV);
-					cubeSet->AddSamplerWrite(2, 0, EShaderResourceType::ESampler, m_Desc.SamplerTexture->GetSampler());
-				}
-
-				for (int f = 0; f < 6; f++) {
-
-					for (uint32_t m = 0; m < m_Desc.NumMips; m++) {
-
-						uint32_t mipSize = m_Desc.Size >> m;
-						if (mipSize < 1) mipSize = 1;
-
-						if (isNoneFilter) {
-
-							CubeMapGenPushData pushData{};
-							pushData.FaceIndex = f;
-							pushData.OutSize = mipSize;
-
-							GRHIDevice->BindShader(cmd, shader, {cubeSet}, &pushData);
-						}
-						else {
-
-							CubeMapFilteringPushData pushData{};
-							pushData.FaceIndex = f;
-							pushData.FilterType = (uint8_t)m_Desc.FilterMode;
-							pushData.OutSize = mipSize;
-
-							if (m_Desc.FilterMode == ECubeTextureFilterMode::ERadiance) {
-								pushData.Roughness = (float)m / (float)(m_Desc.NumMips - 1);
-							}
-
-							GRHIDevice->BindShader(cmd, shader, { cubeSet }, &pushData);
-						}
-
-						uint32_t groupCount = GetComputeGroupCount(mipSize, 8);
-						GRHIDevice->DispatchCompute(cmd, groupCount, groupCount, 1);
-
-						// copy offscreen to our cube map
-						{
-							GRHIDevice->BarrierTexture2D(cmd, offscreen, EGPUAccessFlags::EUAVCompute, EGPUAccessFlags::ECopySrc);
-
-							RHIDevice::TextureCopyRegion srcRegion{};
-							srcRegion.BaseArrayLayer = 0;
-							srcRegion.LayerCount = 1;
-							srcRegion.MipLevel = 0;
-							srcRegion.Offset = { 0, 0, 0 };
-
-							RHIDevice::TextureCopyRegion dstRegion{};
-							dstRegion.BaseArrayLayer = f;
-							dstRegion.LayerCount = 1;
-							dstRegion.MipLevel = m;
-							dstRegion.Offset = { 0, 0, 0 };
-
-							GRHIDevice->CopyTexture(cmd, offscreen, srcRegion, this, dstRegion, { mipSize, mipSize });
-							GRHIDevice->BarrierTexture2D(cmd, offscreen, EGPUAccessFlags::ECopySrc, EGPUAccessFlags::EUAVCompute);
-						}
-					}
-				}
-
-				GRHIDevice->BarrierCubeTexture(cmd, this, EGPUAccessFlags::ECopyDst, EGPUAccessFlags::ESRV);
-				});
-
-			offscreen->ReleaseRHIImmediate();
-			delete offscreen;
-		}
 	}
 
 	void RHICubeTexture::ReleaseRHIImmediate() {
@@ -141,48 +46,69 @@ namespace Spike {
 		m_TextureView->ReleaseRHI();
 		delete m_TextureView;
 
-		GFrameRenderer->PushToExecQueue([data = m_RHIData]() {
+		GFrameRenderer->SubmitToFrameQueue([data = m_RHIData]() {
 			GRHIDevice->DestroyCubeTextureRHI(data);
 			});
 	}
 
 
-	CubeTexture::CubeTexture(const CubeTextureDesc& desc) {
-
+	CubeTexture::CubeTexture(const CubeTextureDesc& desc, UUID id) {
+		m_ID = id;
 		CreateResource(desc);
 	}
 
 	CubeTexture::~CubeTexture() {
-
 		ReleaseResource();
-		ASSET_CORE_DESTROY();
 	}
 
-	Ref<CubeTexture> CubeTexture::Create(const CubeTextureDesc& desc) {
+	Ref<CubeTexture> CubeTexture::Create(BinaryReadStream& stream, UUID id) {
 
-		return CreateRef<CubeTexture>(desc);
-	}
+		char magic[4] = {};
+		stream >> magic;
 
-	Ref<CubeTexture> CubeTexture::Create(const char* filePath, uint32_t size, const SamplerDesc& samplerDesc, ETextureFormat format) {
+		if (memcmp(magic, CUBE_TEXTURE_MAGIC, sizeof(char) * 4) != 0) {
+			ENGINE_ERROR("Corrupted cube texture asset file: {}", (uint64_t)id);
+			return nullptr;
+		}
 
-		SamplerDesc texSamplerDesc{};
-		texSamplerDesc.Filter = ESamplerFilter::EBilinear;
-		texSamplerDesc.AddressU = ESamplerAddress::EClamp;
-		texSamplerDesc.AddressV = ESamplerAddress::EClamp;
-		texSamplerDesc.AddressW = ESamplerAddress::EClamp;
-
-		Ref<Texture2D> samplerTexture = Texture2D::Create(filePath,texSamplerDesc,  format);
+		CubeTextureHeader header{};
+		std::vector<size_t> mipSizes{};
+		stream >> header >> mipSizes;
 
 		CubeTextureDesc desc{};
-		desc.Size = size;
-		desc.Format = format;
+		desc.Size = header.Size;
+		desc.Format = header.Format;
+		desc.NumMips = (uint32_t)mipSizes.size();
 		desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
-		desc.NumMips = 1;
-		desc.SamplerDesc = samplerDesc;
-		desc.FilterMode = ECubeTextureFilterMode::ENone;
-		desc.SamplerTexture = samplerTexture->GetResource();
+		desc.SamplerDesc.Filter = header.Filter;
+		desc.SamplerDesc.AddressU = header.AddressU;
+		desc.SamplerDesc.AddressV = header.AddressV;
+		desc.SamplerDesc.AddressW = header.AddressW;
+		desc.SamplerDesc.AddressW = ESamplerAddress::EClamp;
 
-		return CubeTexture::Create(desc);
+		uint8_t* buff = new uint8_t[header.ByteSize];
+		stream.ReadRaw(buff, header.ByteSize);
+
+		Ref<CubeTexture> tex = CreateRef<CubeTexture>(desc, id);
+		SUBMIT_RENDER_COMMAND(([rhi = tex->GetResource(), sizes = std::move(mipSizes), copySize = header.ByteSize, buff]() {
+
+			size_t offset = 0;
+			std::vector<RHIDevice::SubResourceCopyRegion> regions{};
+			for (uint32_t f = 0; f < 6; f++) {
+				for (uint32_t m = 0; m < rhi->GetNumMips(); m++) {
+
+					RHIDevice::SubResourceCopyRegion& region = regions.emplace_back(RHIDevice::SubResourceCopyRegion{});
+					region.ArrayLayer = f;
+					region.DataOffset = offset;
+					region.MipLevel = m;
+					offset += sizes[m];
+				}
+			}
+			GRHIDevice->CopyDataToTexture(buff, 0, rhi, EGPUAccessFlags::ENone, EGPUAccessFlags::ESRV, regions, copySize);
+			delete[] buff;
+			}));
+
+		return tex;
 	}
 
 	void CubeTexture::CreateResource(const CubeTextureDesc& desc) {

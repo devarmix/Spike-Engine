@@ -11,12 +11,12 @@ struct DrawIndirectCommand {
 [[vk::binding(0, 0)]] RWStructuredBuffer<DrawIndirectCommand> DrawCommandsBuffer;
 [[vk::binding(1, 0)]] RWByteAddressBuffer DrawCountsBuffer;
 [[vk::binding(2, 0)]] StructuredBuffer<uint> BatchOffsetsBuffer;
-[[vk::binding(3, 0)]] StructuredBuffer<uint> LastVisibilityBuffer;
-[[vk::binding(4, 0)]] RWStructuredBuffer<uint> CurrentVisibilityBuffer;
-[[vk::binding(5, 0)]] Texture2D<float> DepthPyramid;
-[[vk::binding(6, 0)]] SamplerState PyramidSampler;
-[[vk::binding(7, 0)]] StructuredBuffer<SceneObjectGPUData> ObjectsBuffer;
-[[vk::binding(8, 0)]] ConstantBuffer<SceneGPUData> SceneDataBuffer;
+[[vk::binding(3, 0)]] RWStructuredBuffer<uint> VisibilityBuffer;
+//[[vk::binding(4, 0)]] RWStructuredBuffer<uint> CurrentVisibilityBuffer;
+[[vk::binding(4, 0)]] Texture2D<float> DepthPyramid;
+[[vk::binding(5, 0)]] SamplerState PyramidSampler;
+[[vk::binding(6, 0)]] StructuredBuffer<SceneObjectGPUData> ObjectsBuffer;
+[[vk::binding(7, 0)]] ConstantBuffer<SceneGPUData> SceneDataBuffer;
 
 struct CullConstants {
 
@@ -53,14 +53,13 @@ bool TryCalculateSphereBounds(float3 center, float radius, float zNear, float P0
 }
 
 bool IsVisible(uint objectID, bool prepass) {
-
 	SceneObjectGPUData objectData = ObjectsBuffer[objectID];
 
 	float3 boundsCenter = objectData.BoundsOrigin.xyz;
 	boundsCenter = mul(objectData.GlobalTransform, float4(boundsCenter, 1.f)).xyz;
 	float boundsRadius = objectData.BoundsOrigin.w;
 
-    uint lastVisibility = LastVisibilityBuffer[objectData.LastVisibilityIndex];
+    uint lastVisibility = VisibilityBuffer[objectData.VisibilityIdx];
 	bool visible = prepass ? lastVisibility == 1 : true;
 
 	if (visible) {
@@ -108,7 +107,6 @@ bool IsVisible(uint objectID, bool prepass) {
 
 [numthreads(256, 1, 1)]
 void CSMain(uint3 threadID : SV_DispatchThreadID) {
-
     if (threadID.x < SceneDataBuffer.ObjectsCount) {
 
         bool prepass = Resources.IsPrepass == 1;
@@ -117,11 +115,10 @@ void CSMain(uint3 threadID : SV_DispatchThreadID) {
         uint localDataIndex = threadID.x;
         SceneObjectGPUData objectData = ObjectsBuffer[localDataIndex];
 
-        uint lastVisibility = LastVisibilityBuffer[objectData.LastVisibilityIndex];
+        uint lastVisibility = VisibilityBuffer[objectData.VisibilityIdx];
         bool drawMesh = prepass ? visible : visible && lastVisibility == 0;
 
         if (drawMesh) {
-
             uint batchOffset = BatchOffsetsBuffer[objectData.DrawBatchID];
 
             uint localIndex;
@@ -138,7 +135,7 @@ void CSMain(uint3 threadID : SV_DispatchThreadID) {
         }
 
         if (!prepass) {
-            CurrentVisibilityBuffer[objectData.CurrentVisibilityIndex] = visible ? 1 : 0;
+            VisibilityBuffer[objectData.VisibilityIdx] = visible ? 1 : 0;
         }
     }
 }

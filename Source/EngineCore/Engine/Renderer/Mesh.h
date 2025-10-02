@@ -1,40 +1,41 @@
 #pragma once
 
 #include <Engine/Core/Core.h>
+#include <Engine/Utils/MathUtils.h>
 #include <Engine/Asset/Asset.h>
 
 #include <Engine/Renderer/Material.h>
 #include <Engine/Renderer/RHIResource.h>
-#include <filesystem>
-#include <glm/glm.hpp>
 using namespace Spike;
 
 namespace Spike {
 
-	struct Vertex {
+	struct alignas(16) Vertex {
 
-		Vec4 Position;           // w - UV_x
-		Vec4 Normal;             // w - UV_y
-		Vec4 Color;
-		Vec4 Tangent;            // w - handedness
+		Vec3 Position;
+		uint32_t Color;
+
+		Vec2 UV0;
+		Vec2 UV1;
+
+		PackedHalf Tangent;
+		PackedHalf Normal;
 	};
 
 	struct SubMesh {
 
 		uint32_t FirstIndex;
 		uint32_t IndexCount;
-
-		Vec3 BoundsOrigin;
-		Vec3 BoundsExtents;
-		float BoundsRadius;
-
-		Ref<Material> Material;
 	};
+
+	constexpr char MESH_MAGIC[4] = { 'S', 'E', 'M', 'S' };
 
 	struct MeshDesc {
 
 		std::vector<Vertex> Vertices;
 		std::vector<uint32_t> Indices;
+		std::vector<SubMesh> SubMeshes;
+
 		bool NeedCPUData = false;
 	};
 
@@ -51,6 +52,9 @@ namespace Spike {
 
 		const std::vector<Vertex>& GetVertices() const { return m_Desc.Vertices; }
 		const std::vector<uint32_t>& GetIndices() const { return m_Desc.Indices; }
+
+		Vec3 GetBoundsOrigin() const { return m_BoundsOrigin; }
+		float GetBoundsRadius() const { return m_BoundsRadius; }
 		const MeshDesc& GetDesc() const { return m_Desc; }
 
 	private:
@@ -59,15 +63,17 @@ namespace Spike {
 
 		RHIBuffer* m_VertexBuffer;
 		RHIBuffer* m_IndexBuffer;
+
+		Vec3 m_BoundsOrigin;
+		float m_BoundsRadius;
 	};
 
 	class Mesh : public Asset {
 	public:
-		Mesh(const MeshDesc& desc);
+		Mesh(const MeshDesc& desc, UUID id);
 		virtual ~Mesh() override;
 
-		static Ref<Mesh> Create(const MeshDesc& desc);
-		static std::vector<Ref<Mesh>> Create(const std::filesystem::path& filePath);
+		static Ref<Mesh> Create(BinaryReadStream& stream, UUID id);
 		
 		RHIMesh* GetResource() { return m_RHIResource; }
 		void ReleaseResource();
@@ -76,8 +82,7 @@ namespace Spike {
 		const std::vector<Vertex>& GetVertices() const { return m_RHIResource->GetVertices(); }
 		const std::vector<uint32_t>& GetIndices() const { return m_RHIResource->GetIndices(); }
 
-	public:
-		std::vector<SubMesh> SubMeshes;
+		ASSET_CLASS_TYPE(EAssetType::EMesh);
 
 	private:
 		RHIMesh* m_RHIResource;

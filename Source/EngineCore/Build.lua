@@ -24,7 +24,6 @@ project "EngineCore"
         "%{IncludeDir.VMA}",
         "%{IncludeDir.VK_BOOTSTRAP}",
 		"%{IncludeDir.VULKAN_SDK}",
-		"%{IncludeDir.FAST_GLTF}",
 		"%{IncludeDir.ENTT}",
 		"%{IncludeDir.SHADER_COMPILER}",
 		"%{IncludeDir.SHADERS_GENERATED}",
@@ -35,7 +34,6 @@ project "EngineCore"
 	{
         "ImGUI",
 		"VK-Bootstrap",
-		"FastGLTF",
 
 		-- SDL libs
 		"%{LibsDir.SDL}/x64/SDL2.lib",

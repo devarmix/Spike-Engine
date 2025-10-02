@@ -20,14 +20,9 @@ namespace Spike {
 		ESRV = ESRVCompute | ESRVGraphics,
 		EUAV = EUAVCompute | EUAVGraphics
 	};
-	ENUM_FLAGS_OPERATORS(EGPUAccessFlags)
+	ENUM_FLAGS_OPERATORS(EGPUAccessFlags);
 
-	class RHIData {
-	public:
-		virtual ~RHIData() = default;
-
-		virtual void* GetNativeData() = 0;
-	};
+	using RHIData = uint64_t;
 
 	class RHIResource {
 	public:

@@ -4,13 +4,11 @@
 
 namespace Spike {
 
-	enum EventType {
+	enum class EEventType {
 
-		NONE = 0, 
-		WindowResize, WindowClose, WindowMinimize, WindowRestore, 
-		SDL, SceneViewportResize, SceneViewportMinimize, SceneViewportRestore,
-		KeyPress, KeyRelease, KeyRepeat,
-		MouseButtonPress, MouseButtonRelease, MouseMotion, MouseScroll
+		ENone = 0, 
+		EWindowResize, EWindowClose, EWindowMinimize, EWindowRestore, ESDL,
+		EAssetImported
 	};
 
 	class GenericEvent {
@@ -18,8 +16,7 @@ namespace Spike {
 		virtual ~GenericEvent() = default;
 
 		virtual std::string GetName() const = 0;
-
-		virtual EventType GetEventType() const = 0;
+		virtual EEventType GetEventType() const = 0;
 
 		void SetHandled() const { m_IsHandled = true; }
 		bool IsHandled() const { return m_IsHandled; }
@@ -53,5 +50,5 @@ namespace Spike {
 }
 
 #define EVENT_CLASS_TYPE(type) \
-        static Spike::EventType GetStaticType() { return Spike::EventType::type; } \
-        Spike::EventType GetEventType() const override { return GetStaticType(); }
+        static Spike::EEventType GetStaticType() { return Spike::EEventType::type; } \
+        Spike::EEventType GetEventType() const override { return GetStaticType(); }

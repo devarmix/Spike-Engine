@@ -23,9 +23,7 @@ namespace Spike {
 
 		ETextureFormat Format;
 		ETextureUsageFlags UsageFlags;
-		ECubeTextureFilterMode FilterMode = ECubeTextureFilterMode::ENone;
 		bool AutoCreateSampler = true;
-		RHITexture* SamplerTexture;
 
 		SamplerDesc SamplerDesc;
 		RHISampler* Sampler = nullptr;
@@ -33,19 +31,31 @@ namespace Spike {
 		bool operator==(const CubeTextureDesc& other) const {
 
 			if (!(Size == other.Size
-				&& FilterMode == other.FilterMode
 				&& NumMips == other.NumMips
 				&& Format == other.Format
 				&& UsageFlags == other.UsageFlags)) return false;
 
 			if (AutoCreateSampler) {
-
 				if (!other.AutoCreateSampler || SamplerDesc != other.SamplerDesc) return false;
 			}
 
 			return true;
 		}
 	};
+
+	struct CubeTextureHeader {
+
+		uint32_t Size;
+		uint32_t NumMips;
+		size_t ByteSize;
+
+		ETextureFormat Format;
+		ESamplerFilter Filter;
+		ESamplerAddress AddressU;
+		ESamplerAddress AddressV;
+		ESamplerAddress AddressW;
+	};
+	constexpr char CUBE_TEXTURE_MAGIC[4] = { 'S', 'E', 'C', 'T' };
 
 	class RHICubeTexture : public RHITexture {
 	public:
@@ -63,7 +73,6 @@ namespace Spike {
 		virtual ETextureType GetTextureType() const override { return ETextureType::ECube; }
 		virtual RHISampler* GetSampler() override { return m_Desc.Sampler; }
 
-		ECubeTextureFilterMode GetFilterMode() const { return m_Desc.FilterMode; }
 		const CubeTextureDesc& GetDesc() { return m_Desc; }
 
 	private:
@@ -73,11 +82,10 @@ namespace Spike {
 
 	class CubeTexture : public Asset {
 	public:
-		CubeTexture(const CubeTextureDesc& desc);
+		CubeTexture(const CubeTextureDesc& desc, UUID id);
 		virtual ~CubeTexture() override;
 
-		static Ref<CubeTexture> Create(const char* filePath, uint32_t size, const SamplerDesc& samplerDesc, ETextureFormat format = ETextureFormat::ERGBA32F);
-		static Ref<CubeTexture> Create(const CubeTextureDesc& desc);
+		static Ref<CubeTexture> Create(BinaryReadStream& stream, UUID id);
 
 		RHICubeTexture* GetResource() { return m_RHIResource; }
 		void ReleaseResource();
@@ -85,11 +93,10 @@ namespace Spike {
 
 		Vec3Uint GetSizeXYZ() const { return m_RHIResource->GetSizeXYZ(); }
 		ETextureFormat GetFormat() const { return m_RHIResource->GetFormat(); }
-		ECubeTextureFilterMode GetFilterMode() const { return m_RHIResource->GetFilterMode(); }
 		uint32_t GetNumMips() const { return m_RHIResource->GetNumMips(); }
 		bool IsMipmapped() const { return m_RHIResource->IsMipmaped(); }
 
-		//ASSET_CLASS_TYPE(CubeTextureAsset)
+		ASSET_CLASS_TYPE(EAssetType::ECubeTexture)
 
 	private:
 

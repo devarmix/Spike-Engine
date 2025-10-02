@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Engine/Events/Event.h>
-#include <SDL.h>
+#include <sdl2/SDL_events.h>
 
 namespace Spike {
 
@@ -14,7 +14,7 @@ namespace Spike {
 
 		std::string GetName() const override { return "Window Resize Event"; }
 
-		EVENT_CLASS_TYPE(WindowResize)
+		EVENT_CLASS_TYPE(EWindowResize);
 
 	private:
 		unsigned int m_Width;
@@ -26,7 +26,7 @@ namespace Spike {
 		WindowCloseEvent() {}
 		std::string GetName() const override { return "Window Close Event"; }
 
-		EVENT_CLASS_TYPE(WindowClose)
+		EVENT_CLASS_TYPE(EWindowClose);
 	};
 
 	class WindowMinimizeEvent : public GenericEvent {
@@ -34,7 +34,7 @@ namespace Spike {
 		WindowMinimizeEvent() {}
 		std::string GetName() const override { return "Window Minimize Event"; }
 
-		EVENT_CLASS_TYPE(WindowMinimize)
+		EVENT_CLASS_TYPE(EWindowMinimize);
 	};
 
 	class WindowRestoreEvent : public GenericEvent {
@@ -42,114 +42,19 @@ namespace Spike {
 		WindowRestoreEvent() {}
 		std::string GetName() const override { return "Window Restore Event"; }
 
-		EVENT_CLASS_TYPE(WindowRestore)
+		EVENT_CLASS_TYPE(EWindowRestore);
 	};
 
 	class SDLEvent : public GenericEvent {
 	public:
-		SDLEvent(SDL_Event& e) : event(e) {}
+		SDLEvent(const SDL_Event& e) : event(e) {}
 		std::string GetName() const override { return "SDL Event"; }
 
 		const SDL_Event& GetEvent() const { return event; }
 
-		EVENT_CLASS_TYPE(SDL)
+		EVENT_CLASS_TYPE(ESDL);
 
 	private:
 		SDL_Event event;
-	};
-
-	class KeyPressEvent : public GenericEvent {
-	public:
-		KeyPressEvent(SDL_Keycode key) : m_Key(key) {}
-		std::string GetName() const override { return "Key Press Event"; }
-
-		SDL_Keycode GetKey() const { return m_Key; }
-
-		EVENT_CLASS_TYPE(KeyPress)
-
-	private:
-		SDL_Keycode m_Key;
-	};
-
-	class KeyReleaseEvent : public GenericEvent {
-	public:
-		KeyReleaseEvent(SDL_Keycode key) : m_Key(key) {}
-		std::string GetName() const override { return "Key Release Event"; }
-
-		SDL_Keycode GetKey() const { return m_Key; }
-
-		EVENT_CLASS_TYPE(KeyRelease)
-
-	private:
-		SDL_Keycode m_Key;
-	};
-
-	class KeyRepeatEvent : public GenericEvent {
-	public:
-		KeyRepeatEvent(SDL_Keycode key) : m_Key(key) {}
-		std::string GetName() const override { return "Key Repeat Event"; }
-
-		SDL_Keycode GetKey() const { return m_Key; }
-
-		EVENT_CLASS_TYPE(KeyRepeat)
-
-	private:
-		SDL_Keycode m_Key;
-	};
-
-	class MouseButtonPressEvent : public GenericEvent {
-	public:
-		MouseButtonPressEvent(Uint8 button) : m_Button(button) {}
-		std::string GetName() const override { return "Mouse Button Press Event"; }
-
-		Uint8 GetButton() const { return m_Button; }
-
-		EVENT_CLASS_TYPE(MouseButtonPress)
-
-	private:
-		Uint8 m_Button;
-	};
-
-	class MouseButtonReleaseEvent : public GenericEvent {
-	public:
-		MouseButtonReleaseEvent(Uint8 button) : m_Button(button) {}
-		std::string GetName() const override { return "Mouse Button Release Event"; }
-
-		Uint8 GetButton() const { return m_Button; }
-
-		EVENT_CLASS_TYPE(MouseButtonRelease)
-
-	private:
-		Uint8 m_Button;
-	};
-
-	class MouseMotionEvent : public GenericEvent {
-	public:
-		MouseMotionEvent(float deltaX, float deltaY) : m_MouseDeltaX(deltaX), m_MouseDeltaY(deltaY) {}
-		std::string GetName() const override { return "Mouse Motion Event"; }
-
-		float GetDeltaX() const { return m_MouseDeltaX; }
-		float GetDeltaY() const { return m_MouseDeltaY; }
-
-		EVENT_CLASS_TYPE(MouseMotion)
-
-	private:
-		float m_MouseDeltaX;
-		float m_MouseDeltaY;
-	};
-	
-	class MouseScrollEvent : public GenericEvent {
-	public:
-		MouseScrollEvent(float x, float y) : m_ScrollX(x), m_ScrollY(y) {}
-		std::string GetName() const override { return "Mouse Scroll Event"; }
-
-		float GetScrollX() const { return m_ScrollX; }
-		float GetScrollY() const { return m_ScrollY; }
-
-		EVENT_CLASS_TYPE(MouseScroll)
-
-	private:
-		float m_ScrollX;
-		float m_ScrollY;
 	};
 }

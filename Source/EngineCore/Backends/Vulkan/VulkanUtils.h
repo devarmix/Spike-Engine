@@ -48,8 +48,6 @@ namespace Spike {
 		void BarrierImage(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags imageAspectFlags, VkImageLayout currentLayout, VkImageLayout newLayout);
 		void BarrierImage(VkCommandBuffer cmd, VkImage image, VkImageAspectFlags imageAspectFlags, VkImageLayout currentLayout, VkImageLayout newLayout,
 			VkAccessFlags2 srcAccessMask, VkAccessFlags2 dstAccessMask, VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage);
-		//void CopyImageToImage(VkCommandBuffer cmd, VkImage source, VkImage destination, VkExtent2D srcSize, VkExtent2D dstSize);
-		void GenerateMipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize);
 
 		void BarrierBuffer(VkCommandBuffer cmd, VkBuffer buffer, size_t size, size_t offset, VkAccessFlags2 srcAccess, VkAccessFlags2 dstAccess,
 			VkPipelineStageFlags2 srcStage, VkPipelineStageFlags2 dstStage);

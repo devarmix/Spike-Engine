@@ -9,34 +9,30 @@ uint32_t Spike::TextureFormatToSize(ETextureFormat format) {
 
 	switch (format)
 	{
-	case Spike::ETextureFormat::ERGBA8U:
-		return 4;
-		break;
+	case Spike::ETextureFormat::ERGBBC1:
 	case Spike::ETextureFormat::ERGBA16F:
 		return 8;
-		break;
 	case Spike::ETextureFormat::ERGBA32F:
+	case Spike::ETextureFormat::ERGBABC3:
+	case Spike::ETextureFormat::ERGBC5:
+	case Spike::ETextureFormat::ERGBABC6:
 		return 16;
-		break;
+	case Spike::ETextureFormat::ERGBA8U:
 	case Spike::ETextureFormat::ED32F:
-		return 4;
-		break;
 	case Spike::ETextureFormat::ER32F:
-		return 4;
-		break;
 	case Spike::ETextureFormat::ERG16F:
 		return 4;
-		break;
 	case Spike::ETextureFormat::ERG8U:
 		return 2;
-		break;
 	case Spike::ETextureFormat::ER8U:
 		return 1;
-		break;
 	default:
 		return 0;
-		break;
 	}
+}
+
+uint32_t Spike::GetNumTextureMips(uint32_t width, uint32_t height) {
+	return uint32_t(std::floor(std::log2(std::max(width, height)))) + 1;
 }
 
 namespace Spike {
@@ -57,7 +53,7 @@ namespace Spike {
 
 	void RHITextureView::ReleaseRHI() {
 
-		GFrameRenderer->PushToExecQueue([data = m_RHIData, matIndex = m_MaterialIndex]() {
+		GFrameRenderer->SubmitToFrameQueue([data = m_RHIData, matIndex = m_MaterialIndex]() {
 			GRHIDevice->DestroyTextureViewRHI(data);
 
 			if (matIndex != INVALID_SHADER_INDEX) {
@@ -110,7 +106,6 @@ namespace Spike {
 	}
 
 	RHISampler* SamplerCache::Get(const SamplerDesc& desc) {
-
 		RHISampler* out = nullptr;
 
 		auto it = m_Cache.find(desc);

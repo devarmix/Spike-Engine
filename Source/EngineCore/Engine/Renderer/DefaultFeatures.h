@@ -4,12 +4,12 @@
 
 namespace Spike {
 
-	class GBufferFeature : public SceneRenderFeature {
+	class GBufferFeature : public RenderFeature {
 	public:
 		GBufferFeature();
 		virtual ~GBufferFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) override;
 
 	private:
 
@@ -17,36 +17,36 @@ namespace Spike {
 		RHIShader* m_HzbShader;
 	};
 
-	class DeferredLightingFeature : public SceneRenderFeature {
+	class DeferredLightingFeature : public RenderFeature {
 	public:
 		DeferredLightingFeature();
 		virtual ~DeferredLightingFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) override;
 
 	private:
 
 		RHIShader* m_LightingShader;
 	};
 
-	class SkyboxFeature : public SceneRenderFeature {
+	class SkyboxFeature : public RenderFeature {
 	public:
 		SkyboxFeature();
 		virtual ~SkyboxFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) override;
 
 	private:
 
 		RHIShader* m_SkyboxShader;
 	};
 
-	class SSAOFeature : public SceneRenderFeature {
+	class SSAOFeature : public RenderFeature {
 	public:
 		SSAOFeature();
 		virtual ~SSAOFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) override;
 
 	private:
 
@@ -57,12 +57,12 @@ namespace Spike {
 		RHIBuffer* m_KernelBuffer;
 	};
 
-	class BloomFeature : public SceneRenderFeature {
+	class BloomFeature : public RenderFeature {
 	public:
 		BloomFeature();
 		virtual ~BloomFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) override;
 
 	private:
 
@@ -70,24 +70,24 @@ namespace Spike {
 		RHIShader* m_UpSampleShader;
 	};
 
-	class ToneMapFeature : public SceneRenderFeature {
+	class ToneMapFeature : public RenderFeature {
 	public:
 		ToneMapFeature();
 		virtual ~ToneMapFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) override;
 
 	private:
 
 		RHIShader* m_ToneMapShader;
 	};
 
-	class SMAAFeature : public SceneRenderFeature {
+	class SMAAFeature : public RenderFeature {
 	public:
 		SMAAFeature();
 		virtual ~SMAAFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) override;
 
 	private:
 
@@ -102,12 +102,12 @@ namespace Spike {
 		RHIShader* m_NeighborsShader;
 	};
 
-	class FXAAFeature : public SceneRenderFeature {
+	class FXAAFeature : public RenderFeature {
 	public:
 		FXAAFeature();
 		virtual ~FXAAFeature() override;
 
-		virtual void BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) override;
+		virtual void BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) override;
 
 	private:
 

@@ -1,8 +1,5 @@
 #include <Core/Compiler.h>
 #include <regex>
-
-#include <wrl/client.h>
-#include <dxcapi.h>
 #include <spirv_reflect.h>
 
 #define EXIT_WITH_ERROR(...) \
@@ -14,11 +11,7 @@ void HashCombine(size_t& hash1, size_t hash2) {
 	hash1 ^= hash2 + 0x9e3779b9 + (hash1 << 6) + (hash1 >> 2);
 }
 
-std::string GetFilePath(const std::string& path, const std::string& filename) {
-	return path + "/" + filename;
-}
-
-bool ShaderCompiler::LoadTextFile(const std::string& path, std::string& out) {
+bool ShaderCompiler::LoadTextFile(const std::filesystem::path& path, std::string& out) {
 
 	std::ifstream stream(path);
 
@@ -35,74 +28,51 @@ bool ShaderCompiler::LoadTextFile(const std::string& path, std::string& out) {
 	return false;
 }
 
-std::string ShaderCompiler::LoadTextFile(const std::string& path) {
+std::string ShaderCompiler::LoadTextFile(const std::filesystem::path& path) {
 
 	std::string out;
 	if (!LoadTextFile(path, out)) {
-		EXIT_WITH_ERROR("Failed to open: {}", path);
+		EXIT_WITH_ERROR("Failed to open: {}", path.string());
 	}
 
 	return out;
 }
 
-size_t ShaderCompiler::ComputeShaderHash(const std::string& path, const std::string& includePath, const std::string& filename, std::vector<std::string>& allFilenames) {
-
-	std::string fileSource;
-	if (!LoadTextFile(GetFilePath(includePath, filename), fileSource)) {
-		fileSource = LoadTextFile(GetFilePath(path, filename));
-	}
-
-	size_t hash = std::hash<std::string>{}(fileSource);
-
-	std::regex pattern(R"(#include\s+\"([^"]+)\")");
-	auto begin = std::sregex_iterator(fileSource.begin(), fileSource.end(), pattern);
-
-	for (auto& i = begin; i != std::sregex_iterator(); i++) {
-		std::string name = (*i)[1].str();
-		{
-			auto it = std::find(allFilenames.begin(), allFilenames.end(), name);
-			if (it != allFilenames.end()) {
-				EXIT_WITH_ERROR("Found circular dependency: {} includes itself!", name);
-			}
-			allFilenames.push_back(name);
-		}
-		HashCombine(hash, ComputeShaderHash(path, includePath, (*i)[1].str(), allFilenames));
-	}
-
-	return hash;
-}
-
-void ShaderCompiler::CompileShaders(const std::string& sourcePath, const std::string& cachePath, const std::string& genPath) {
+void ShaderCompiler::CompileShaders(const std::filesystem::path& sourcePath, const std::filesystem::path& cachePath, const std::filesystem::path& genPath) {
 
 	DXCWrapper compiler = DXCWrapper();
 
-	IterateAllFilesInDirectory(sourcePath, [&](const std::string& path, const std::string& filename, const std::string& shaderName) {
+	IterateAllFilesInDirectory(sourcePath, [&](const std::filesystem::path& path, const std::string& filename, const std::string& shaderName) {
 		COMPILER_TRACE("Parsing shader: {}", filename);
 
-		std::vector<std::string> allFilenames = { filename };
-		size_t hash = ComputeShaderHash(path, sourcePath, filename, allFilenames);
-
-		std::string fullLocalPath = GetFilePath(path, filename);
-		std::string sourceCode = LoadTextFile(fullLocalPath);
+		std::string sourceCode = LoadTextFile(path / filename);
 		std::vector<EShaderCompilationTarget> compTargets;
+		size_t hash = 0;
 		{
-			std::smatch match;
+			Microsoft::WRL::ComPtr<IDxcBlob> shaderBlob = compiler.PreProcess(sourceCode, sourcePath, path / filename);
+			std::string ppsc(shaderBlob->GetBufferSize(), NULL);
+			memcpy(ppsc.data(), shaderBlob->GetBufferPointer(), ppsc.size());
+
+			hash = std::hash<std::string>{}(ppsc);
 			{
-				std::regex pattern(R"(CSMain\s*\([^)]*\))");
-				if (std::regex_search(sourceCode, match, pattern)) {
-					compTargets.push_back(EShaderCompilationTarget::ECompute);
+				std::smatch match;
+				{
+					std::regex pattern(R"(CSMain\s*\([^)]*\))");
+					if (std::regex_search(ppsc, match, pattern)) {
+						compTargets.push_back(EShaderCompilationTarget::ECompute);
+					}
 				}
-			}
-			{
-				std::regex pattern(R"(VSMain\s*\([^)]*\))");
-				if (std::regex_search(sourceCode, match, pattern)) {
-					compTargets.push_back(EShaderCompilationTarget::EVertex);
+				{
+					std::regex pattern(R"(VSMain\s*\([^)]*\))");
+					if (std::regex_search(ppsc, match, pattern)) {
+						compTargets.push_back(EShaderCompilationTarget::EVertex);
+					}
 				}
-			}
-			{
-				std::regex pattern(R"(PSMain\s*\([^)]*\))");
-				if (std::regex_search(sourceCode, match, pattern)) {
-					compTargets.push_back(EShaderCompilationTarget::EPixel);
+				{
+					std::regex pattern(R"(PSMain\s*\([^)]*\))");
+					if (std::regex_search(ppsc, match, pattern)) {
+						compTargets.push_back(EShaderCompilationTarget::EPixel);
+					}
 				}
 			}
 		}
@@ -110,12 +80,11 @@ void ShaderCompiler::CompileShaders(const std::string& sourcePath, const std::st
 		if (compTargets.size() == 0) {
 			EXIT_WITH_ERROR("Shader: {} has no entry points!", filename);
 		}
-
 		{
 			std::string binaryName = shaderName + ".bin";
 
 			bool needsCompilation = true;
-			std::ifstream rFile(GetFilePath(cachePath, binaryName), std::ios::binary);
+			std::ifstream rFile(cachePath/binaryName, std::ios::binary);
 			if (rFile.is_open()) {
 
 				if (!ValidateBinary(rFile)) {
@@ -132,17 +101,17 @@ void ShaderCompiler::CompileShaders(const std::string& sourcePath, const std::st
 
 			if (needsCompilation) {
 				std::filesystem::create_directories(cachePath);
-				std::ofstream wFile(GetFilePath(cachePath, binaryName), std::ios::binary | std::ios::out | std::ios::trunc);
+				std::ofstream wFile(cachePath/binaryName, std::ios::binary | std::ios::out | std::ios::trunc);
 
-				const uint32_t MAGIC_ID = 'SCBF';
-				wFile.write((char*)&MAGIC_ID, sizeof(uint32_t));
+				const char MAGIC_ID[4] = { 'S', 'C', 'B', 'F' };
+				wFile.write((char*)&MAGIC_ID, sizeof(char) * 4);
 
 				BinaryShader shader{};
 				shader.Hash = hash;
 
 				for (auto& target : compTargets) {
 
-					Microsoft::WRL::ComPtr<IDxcBlob> shaderBlob = compiler.Compile(target, sourceCode, sourcePath, fullLocalPath);
+					Microsoft::WRL::ComPtr<IDxcBlob> shaderBlob = compiler.Compile(target, sourceCode, sourcePath, path/filename);
 
 					size_t sizeOfBlob = shaderBlob->GetBufferSize();
 					switch (target)
@@ -386,7 +355,7 @@ void ShaderCompiler::CompileShaders(const std::string& sourcePath, const std::st
 
 						std::filesystem::create_directories(genPath);
 						std::string genHeaderName = shaderName + ".h";
-						std::ofstream genHeader(GetFilePath(genPath, genHeaderName), std::ios::out | std::ios::trunc);
+						std::ofstream genHeader(genPath/genHeaderName, std::ios::out | std::ios::trunc);
 
 						genHeader << genHeaderStr;
 						genHeader.close();
@@ -429,7 +398,7 @@ namespace ShaderCompiler {
 		}
 	}
 
-	Microsoft::WRL::ComPtr<IDxcBlob> DXCWrapper::Compile(EShaderCompilationTarget compTarget, const std::string& sourceCode, const std::string& includePath, const std::string& fullLocalPath) {
+	Microsoft::WRL::ComPtr<IDxcBlob> DXCWrapper::Compile(EShaderCompilationTarget compTarget, const std::string& sourceCode, const std::filesystem::path& includePath, const std::filesystem::path& fullLocalPath) {
 
 		DxcBuffer srcBuffer = {
 
@@ -459,8 +428,8 @@ namespace ShaderCompiler {
 			break;
 		}
 
-		std::wstring wincludePath(includePath.begin(), includePath.end());
-		std::wstring wfilePath(fullLocalPath.begin(), fullLocalPath.end());
+		std::wstring wincludePath(includePath.c_str());
+		std::wstring wfilePath(fullLocalPath.c_str());
 		std::vector<LPCWSTR> args = {
 
 			L"-Zpc",
@@ -490,6 +459,49 @@ namespace ShaderCompiler {
 			hres = result->GetErrorBuffer(&errorBlob);
 			if (SUCCEEDED(hres) && errorBlob) {
 				EXIT_WITH_ERROR("Compilation failed: {}", (const char*)errorBlob->GetBufferPointer())
+			}
+		}
+
+		Microsoft::WRL::ComPtr<IDxcBlob> shaderObj;
+		result->GetResult(&shaderObj);
+
+		return shaderObj;
+	}
+
+	Microsoft::WRL::ComPtr<IDxcBlob> DXCWrapper::PreProcess(const std::string& sourceCode, const std::filesystem::path& includePath, const std::filesystem::path& fullLocalPath) {
+
+		DxcBuffer srcBuffer = {
+
+			.Ptr = &*sourceCode.begin(),
+			.Size = (uint32_t)sourceCode.size(),
+			.Encoding = 0
+		};
+
+		std::wstring wincludePath(includePath.c_str());
+		std::wstring wfilePath(fullLocalPath.c_str());
+		std::vector<LPCWSTR> args = {
+
+			L"-HV",
+			L"2021",
+			L"-I",
+			wincludePath.c_str(),
+			L"-P",
+			wfilePath.c_str()
+		};
+
+		HRESULT hres{};
+
+		Microsoft::WRL::ComPtr<IDxcResult> result;
+		hres = Compiler->Compile(&srcBuffer, args.data(), (uint32_t)args.size(), IncludeHandler.Get(), IID_PPV_ARGS(&result));
+
+		if (SUCCEEDED(hres))
+			result->GetStatus(&hres);
+
+		if (FAILED(hres) && (result)) {
+			Microsoft::WRL::ComPtr<IDxcBlobEncoding> errorBlob;
+			hres = result->GetErrorBuffer(&errorBlob);
+			if (SUCCEEDED(hres) && errorBlob) {
+				EXIT_WITH_ERROR("PreProcessing failed: {}", (const char*)errorBlob->GetBufferPointer())
 			}
 		}
 

@@ -2,7 +2,7 @@
 
 #include <Engine/Core/Window.h>
 #include <Engine/Events/ApplicationEvents.h>
-#include <SDL.h>
+#include <sdl2/SDL.h>
 
 namespace Spike {
 
@@ -17,7 +17,7 @@ namespace Spike {
 		virtual const std::string& GetName() const override { return m_Data.Name; }
 		virtual void* GetNativeWindow() const override { return m_Window; }
 
-		virtual void OnUpdate() override;
+		virtual void Tick() override;
 
 		virtual void SetEventCallback(const EventCallbackFn& callback) override { m_Data.EventCallback = callback; }
 

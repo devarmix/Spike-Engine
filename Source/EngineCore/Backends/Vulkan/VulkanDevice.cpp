@@ -1,7 +1,7 @@
 #include <Backends/Vulkan/VulkanDevice.h>
 
 #include <VkBootstrap.h>
-#include <SDL_vulkan.h>
+#include <sdl2/SDL_vulkan.h>
 
 namespace Spike {
 

@@ -46,7 +46,7 @@ namespace Spike {
 	}
 
 
-    RHIShader::RHIShader(const ShaderDesc& desc, ShaderCompiler::BinaryShader& binaryShader) : m_Desc(desc), m_RHIData(nullptr) {
+    RHIShader::RHIShader(const ShaderDesc& desc, ShaderCompiler::BinaryShader& binaryShader) : m_Desc(desc), m_RHIData(0) {
 
 		if (desc.Type == EShaderType::EVertex || desc.Type == EShaderType::EGraphics) m_BinaryShader.VertexRange = std::move(binaryShader.VertexRange);
 		if (desc.Type == EShaderType::EPixel || desc.Type == EShaderType::EGraphics) m_BinaryShader.PixelRange = std::move(binaryShader.PixelRange);
@@ -171,7 +171,7 @@ namespace Spike {
 
 	uint32_t ShaderManager::GetMatTextureIndex(RHITextureView* texture) {
 
-		uint32_t texIndex = m_MatTextureQueue.GetFreeIndex();
+		uint32_t texIndex = m_MatTextureQueue.Grab();
 
 		m_MaterialSet->AddTextureWrite(1, texIndex, EShaderResourceType::ETextureSRV, texture, EGPUAccessFlags::ESRVGraphics);
 		return texIndex;
@@ -179,28 +179,26 @@ namespace Spike {
 
 	uint32_t ShaderManager::GetMatSamplerIndex(RHISampler* sampler) {
 
-		uint32_t samplerIndex = m_MatSamplerQueue.GetFreeIndex();
+		uint32_t samplerIndex = m_MatSamplerQueue.Grab();
 
 		m_MaterialSet->AddSamplerWrite(2, samplerIndex, EShaderResourceType::ESampler, sampler);
 		return samplerIndex;
 	}
 
 	void ShaderManager::ReleaseMatTextureIndex(uint32_t index) {
-
-		m_MatTextureQueue.ReleaseIndex(index);
+		m_MatTextureQueue.Release(index);
 	}
 
 	void ShaderManager::ReleaseMatSamplerIndex(uint32_t index) {
-
-		m_MatSamplerQueue.ReleaseIndex(index);
+		m_MatSamplerQueue.Release(index);
 	}
 
 	uint32_t ShaderManager::GetMatDataIndex() {
 
-		uint32_t index = m_MatDataQueue.GetFreeIndex();
+		uint32_t index = m_MatDataQueue.Grab();
 		MaterialData& data = GetMaterialData(index);
 
-		GFrameRenderer->PushToExecQueue([&data]() {
+		GFrameRenderer->SubmitToFrameQueue([&data]() {
 
 			for (int i = 0; i < 16; i++) {
 
@@ -214,8 +212,7 @@ namespace Spike {
 	}
 
 	void ShaderManager::ReleaseMatDataIndex(uint32_t index) {
-
-		m_MatDataQueue.ReleaseIndex(index);
+		m_MatDataQueue.Release(index);
 	}
 
 	void ShaderManager::UpdateMatData(uint32_t index) {
@@ -237,30 +234,6 @@ namespace Spike {
 		MaterialData* data = (MaterialData*)m_MaterialDataBuffer->GetMappedData();
 		return data[index];
 	}
-
-	uint32_t ShaderManager::FIFOIndexQueue::GetFreeIndex() {
-
-		uint32_t index = INVALID_SHADER_INDEX;
-
-		if (Queue.size() > 0) {
-
-			index = Queue.front();
-			Queue.pop_front();
-		}
-		else {
-
-			index = NextIndex;
-			NextIndex++;
-		}
-
-		return index;
-	}
-
-	void ShaderManager::FIFOIndexQueue::ReleaseIndex(uint32_t index) {
-
-		Queue.push_back(index);
-	}
-
 
 	void ShaderManager::FreeShaderCache() {
 

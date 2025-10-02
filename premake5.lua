@@ -16,7 +16,6 @@ outputDir = "%{cfg.build}-%{cfg.system}-%{cfg.architecture}"
 -- Dependencies
 include "Source/ThirdParty/imgui/Build.lua"
 include "Source/ThirdParty/vk-bootstrap/Build.lua"
-include "Source/ThirdParty/fastgltf/Build.lua"
 
 -- Core
 include "Source/EngineCore/Build.lua"

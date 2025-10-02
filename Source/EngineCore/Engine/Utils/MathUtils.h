@@ -2,6 +2,25 @@
 
 #include <Engine/Core/Core.h>
 
+using Quaternion = glm::quat;
+using Vec2 = glm::vec2;
+using Vec2Int = glm::ivec2;
+using Vec2Uint = glm::uvec2;
+using Vec3 = glm::vec3;
+using Vec3Int = glm::ivec3;
+using Vec3Uint = glm::uvec3;
+using Vec4 = glm::vec4;
+using Vec4Int = glm::ivec4;
+using Mat2x2 = glm::mat2;
+using Mat3x3 = glm::mat3;
+using Mat4x4 = glm::mat4;
+
+struct PackedHalf {
+
+	uint32_t A;
+	uint32_t B;
+};
+
 namespace Spike {
 
 	namespace MathUtils {
@@ -45,5 +64,13 @@ namespace Spike {
 		Vec4 LerpVec4(const Vec4& a, const Vec4& b, float t);
 		Vec4 LerpUnclampedVec4(const Vec4& a, const Vec4& b, float t);
 		Vec4 MoveTowardsVec4(const Vec4& current, const Vec4& target, float maxDistanceDelta);
+
+		void HashCombine(size_t& hash1, size_t hash2);
+
+		uint32_t PackUnsignedVec4ToUint(const Vec4& v);
+		Vec4 UnpackUintToUnsignedVec4(uint32_t packed);
+		PackedHalf PackSignedVec4ToHalf(const Vec4& v);
+		Vec4 UnpackHalfToSignedVec4(const PackedHalf& packed);
+		Mat4x4 GetInfinitePerspectiveMatrix(float fov, float aspect, float nearProj);
 	}
 }

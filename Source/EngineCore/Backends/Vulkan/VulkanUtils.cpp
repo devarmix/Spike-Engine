@@ -159,31 +159,30 @@ VkFormat Spike::VulkanUtils::TextureFormatToVulkan(ETextureFormat format) {
 	{
 	case Spike::ETextureFormat::ERGBA8U:
 		return VK_FORMAT_R8G8B8A8_UNORM;
-		break;
+	case Spike::ETextureFormat::EBGRA8U:
+		return VK_FORMAT_B8G8R8A8_UNORM;
 	case Spike::ETextureFormat::ERGBA16F:
 		return VK_FORMAT_R16G16B16A16_SFLOAT;
-		break;
 	case Spike::ETextureFormat::ERGBA32F:
 		return VK_FORMAT_R32G32B32A32_SFLOAT;
-		break;
 	case Spike::ETextureFormat::ED32F:
 		return VK_FORMAT_D32_SFLOAT;
-		break;
 	case Spike::ETextureFormat::ER32F:
 		return VK_FORMAT_R32_SFLOAT;
-		break;
 	case Spike::ETextureFormat::ERG16F:
 		return VK_FORMAT_R16G16_SFLOAT;
-		break;
 	case Spike::ETextureFormat::ERG8U:
 		return VK_FORMAT_R8G8_UNORM;
-		break;
 	case Spike::ETextureFormat::ER8U:
 		return VK_FORMAT_R8_UNORM;
-		break;
+	case Spike::ETextureFormat::ERGBABC3:
+		return VK_FORMAT_BC3_UNORM_BLOCK;
+	case Spike::ETextureFormat::ERGBABC6:
+		return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+	case Spike::ETextureFormat::ERGBC5:
+		return VK_FORMAT_BC5_UNORM_BLOCK;
 	default:
 		return VK_FORMAT_UNDEFINED;
-		break;
 	}
 }
 
@@ -251,6 +250,7 @@ VkBufferUsageFlags Spike::VulkanUtils::BufferUsageToVulkan(EBufferUsageFlags fla
 	if (EnumHasAllFlags(flags, EBufferUsageFlags::ECopySrc)) outFlags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	if (EnumHasAllFlags(flags, EBufferUsageFlags::EIndirect)) outFlags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
 	if (EnumHasAllFlags(flags, EBufferUsageFlags::EAddressable)) outFlags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+	if (EnumHasAllFlags(flags, EBufferUsageFlags::EIndex)) outFlags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 
 	return outFlags;
 }
@@ -261,16 +261,12 @@ VmaMemoryUsage Spike::VulkanUtils::BufferMemUsageToVulkan(EBufferMemUsage usage)
 	{
 	case Spike::EBufferMemUsage::ECPUToGPU:
 		return VMA_MEMORY_USAGE_CPU_TO_GPU;
-		break;
 	case Spike::EBufferMemUsage::ECPUOnly:
 		return VMA_MEMORY_USAGE_CPU_ONLY;
-		break;
 	case Spike::EBufferMemUsage::EGPUOnly:
 		return VMA_MEMORY_USAGE_GPU_ONLY;
-		break;
 	default:
 		return VMA_MEMORY_USAGE_UNKNOWN;
-		break;
 	}
 }
 
@@ -280,26 +276,19 @@ VkDescriptorType Spike::VulkanUtils::BindingTypeToVulkan(EShaderResourceType typ
 	{
 	case Spike::EShaderResourceType::ETextureSRV:
 		return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-		break;
 	case Spike::EShaderResourceType::ETextureUAV:
 		return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		break;
 	case Spike::EShaderResourceType::EBufferSRV:
 		return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		break;
 	case Spike::EShaderResourceType::EBufferUAV:
 		return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-		break;
 	case Spike::EShaderResourceType::EConstantBuffer:
 		return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		break;
 	case Spike::EShaderResourceType::ESampler:
 		return VK_DESCRIPTOR_TYPE_SAMPLER;
-		break;
 	default:
 		ENGINE_ERROR("Unspecified binding type! Undefined behaviour");
 		return (VkDescriptorType)0;
-		break;
 	}
 }
 
@@ -309,14 +298,11 @@ VkFrontFace Spike::VulkanUtils::FrontFaceToVulkan(EFrontFace face) {
 	{
 	case Spike::EFrontFace::EClockWise:
 		return VK_FRONT_FACE_CLOCKWISE;
-		break;
 	case Spike::EFrontFace::ECounterClockWise:
 		return VK_FRONT_FACE_COUNTER_CLOCKWISE;
-		break;
 	default:
 		ENGINE_ERROR("Unspecified front face type! Undefined behaviour");
 		return (VkFrontFace)0;
-		break;
 	}
 }
 
@@ -326,17 +312,13 @@ VkFilter Spike::VulkanUtils::SamplerFilterToVulkan(ESamplerFilter filter) {
 	{
 	case Spike::ESamplerFilter::EPoint:
 		return VK_FILTER_NEAREST;
-		break;
 	case Spike::ESamplerFilter::EBilinear:
 		return VK_FILTER_LINEAR;
-		break;
 	case Spike::ESamplerFilter::ETrilinear:
 		return VK_FILTER_LINEAR;
-		break;
 	default:
 		ENGINE_ERROR("Unspecified sampler filter! Undefined behaviour");
 		return (VkFilter)0;
-		break;
 	}
 }
 
@@ -346,17 +328,13 @@ VkSamplerMipmapMode Spike::VulkanUtils::SamplerMipMapModeToVulkan(ESamplerFilter
 	{
 	case Spike::ESamplerFilter::EPoint:
 		return VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		break;
 	case Spike::ESamplerFilter::EBilinear:
 		return VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		break;
 	case Spike::ESamplerFilter::ETrilinear:
 		return VK_SAMPLER_MIPMAP_MODE_LINEAR;
-		break;
 	default:
 		ENGINE_ERROR("Unspecified sampler filter! Undefined behaviour");
 		return (VkSamplerMipmapMode)0;
-		break;
 	}
 }
 
@@ -366,17 +344,13 @@ VkSamplerAddressMode Spike::VulkanUtils::SamplerAddressToVulkan(ESamplerAddress 
 	{
 	case Spike::ESamplerAddress::ERepeat:
 		return VK_SAMPLER_ADDRESS_MODE_REPEAT;
-		break;
 	case Spike::ESamplerAddress::EClamp:
 		return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		break;
 	case Spike::ESamplerAddress::EMirror:
 		return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
-		break;
 	default:
 		ENGINE_ERROR("Unspecified sampler address! Undefined behaviour");
 		return (VkSamplerAddressMode)0;
-		break;
 	}
 }
 
@@ -386,13 +360,10 @@ VkSamplerReductionMode Spike::VulkanUtils::SamplerReductionToVulkan(ESamplerRedu
 	{
 	case Spike::ESamplerReduction::EMinimum:
 		return VK_SAMPLER_REDUCTION_MODE_MIN;
-		break;
 	case Spike::ESamplerReduction::EMaximum:
 		return VK_SAMPLER_REDUCTION_MODE_MAX;
-		break;
 	default:
 		return VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE;
-		break;
 	}
 }
 
@@ -533,77 +504,6 @@ void Spike::VulkanUtils::BarrierImage(VkCommandBuffer cmd, VkImage image, VkImag
 
 	BarrierImage(cmd, image, imageAspectFlags, currentLayout, newLayout, VK_ACCESS_2_MEMORY_WRITE_BIT, VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT,
 	    VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT);
-}
-
-void Spike::VulkanUtils::GenerateMipmaps(VkCommandBuffer cmd, VkImage image, VkExtent2D imageSize) {
-
-	int mipLevels = int(std::floor(std::log2(std::max(imageSize.width, imageSize.height)))) + 1;
-	for (int mip = 0; mip < mipLevels; mip++) {
-
-		VkExtent2D halfSize = imageSize;
-		halfSize.width /= 2;
-		halfSize.height /= 2;
-
-		VkImageMemoryBarrier2 imageBarrier{ .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2, .pNext = nullptr };
-
-		imageBarrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-		imageBarrier.srcAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT;
-		imageBarrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
-		imageBarrier.dstAccessMask = VK_ACCESS_2_MEMORY_WRITE_BIT | VK_ACCESS_2_MEMORY_READ_BIT;
-
-		imageBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		imageBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-
-		VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		imageBarrier.subresourceRange = VulkanUtils::ImageSubresourceRange(aspectMask);
-		imageBarrier.subresourceRange.levelCount = 1;
-		imageBarrier.subresourceRange.baseMipLevel = mip;
-		imageBarrier.image = image;
-
-		VkDependencyInfo depInfo{ .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO, .pNext = nullptr };
-		depInfo.imageMemoryBarrierCount = 1;
-		depInfo.pImageMemoryBarriers = &imageBarrier;
-
-		vkCmdPipelineBarrier2(cmd, &depInfo);
-
-		if (mip < mipLevels - 1) {
-			VkImageBlit2 blitRegion{ .sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr };
-
-			blitRegion.srcOffsets[1].x = imageSize.width;
-			blitRegion.srcOffsets[1].y = imageSize.height;
-			blitRegion.srcOffsets[1].z = 1;
-
-			blitRegion.dstOffsets[1].x = halfSize.width;
-			blitRegion.dstOffsets[1].y = halfSize.height;
-			blitRegion.dstOffsets[1].z = 1;
-
-			blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			blitRegion.srcSubresource.baseArrayLayer = 0;
-			blitRegion.srcSubresource.layerCount = 1;
-			blitRegion.srcSubresource.mipLevel = mip;
-
-			blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-			blitRegion.dstSubresource.baseArrayLayer = 0;
-			blitRegion.dstSubresource.layerCount = 1;
-			blitRegion.dstSubresource.mipLevel = mip + 1;
-
-			VkBlitImageInfo2 blitInfo{ .sType = VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2, .pNext = nullptr };
-			blitInfo.dstImage = image;
-			blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-			blitInfo.srcImage = image;
-			blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			blitInfo.filter = VK_FILTER_LINEAR;
-			blitInfo.regionCount = 1;
-			blitInfo.pRegions = &blitRegion;
-
-			vkCmdBlitImage2(cmd, &blitInfo);
-
-			imageSize = halfSize;
-		}
-	}
-
-	// transition all mip levels into the final read_only layout
-	BarrierImage(cmd, image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void Spike::VulkanUtils::BarrierBuffer(VkCommandBuffer cmd, VkBuffer buffer, size_t size, size_t offset, VkAccessFlags2 srcAccess, VkAccessFlags2 dstAccess,

@@ -4,7 +4,6 @@
 #include <Engine/Renderer/GfxDevice.h>
 #include <Engine/Events/ApplicationEvents.h>
 #include <Engine/Core/LayerStack.h>
-#include <Engine/Layers/SceneLayer.h>
 #include <Engine/Layers/RenderLayer.h>
 #include <Engine/Core/Timestep.h>
 #include <Engine/Core/Core.h>
@@ -15,6 +14,7 @@ namespace Spike {
 
 		std::string Name;
 		bool UsingImGui;
+		bool UsingDocking;
 		WindowDesc WindowDesc;
 	};
 
@@ -30,46 +30,64 @@ namespace Spike {
 		void PushOverlay(Layer* layer);
 		void PopOverlay(Layer* layer);
 		// entry point
-		void Run();
+		void Tick();
 
 		// events
-		void OnEvent(const GenericEvent& event);
+		void EnqueueEvent(std::function<void()>&& event) {
+			m_EventQueue.Push(std::move(event));
+		}
+
+		template<typename T, typename... Args, bool DispatchImmediate = false>
+		void DispatchEvent(Args&&... args) {
+
+			std::shared_ptr<T> event = std::make_shared<T>(std::forward<Args>(args)...);
+			if constexpr (DispatchImmediate) {
+				OnEvent(*event);
+			}
+			else {
+				EnqueueEvent([event, this]() {
+					OnEvent(*event);
+					});
+			}
+		}
 
 		Window* GetMainWindow() { return m_Window; }
 		RenderLayer* GetRenderLayer() { return m_RenderLayer; }
 		RenderThread& GetRenderThread() { return m_RenderThread; }
 
 		bool IsUsingImGui() const { return m_UsingImGui; }
+		bool IsUsingDocking() const { return m_UsingDocking; }
 		void Destroy();
 
 	private:
 
+		void ProcessEvents();
+		void OnEvent(const GenericEvent& event);
+
+	private:
 		Window* m_Window;
 
 		LayerStack m_LayerStack;
 		RenderThread m_RenderThread;
 
-		//std::vector<GenericEvent> m_EventQueue;
-		//std::mutex m_EventQueueMutex;
-
-		//TaskScheduler m_TaskScheduler;
-		//SyncStructures m_SyncStructures;
+		ThreadSafeQueue<std::function<void()>> m_EventQueue;
+		//ThreadSafeQueue<std::function<void()>> m_DeletorsQueue;
 
 		bool m_Running = false;
 		bool m_Minimized = false;
 		bool m_UsingImGui = false;
+		bool m_UsingDocking = false;
 
-		SceneLayer* m_SceneLayer;
 		RenderLayer* m_RenderLayer;
 
 		Time m_Time;
 	};
 
 	// to be defined in client
-	Application* CreateApplication();
+	Application* CreateApplication(int argc, char* argv[]);
 
 	// global application pointer
 	extern Application* GApplication;
 }
 
-#define EXECUTE_ON_RENDER_THREAD(task) Spike::GApplication->GetRenderThread().PushTask(std::move(task));
+#define SUBMIT_RENDER_COMMAND(task) Spike::GApplication->GetRenderThread().PushTask(task);

@@ -5,8 +5,8 @@
 [[vk::binding(2, 0)]] Texture2D<float4> NormalMap;
 [[vk::binding(3, 0)]] Texture2D<float4> MaterialMap;
 [[vk::binding(4, 0)]] Texture2D<float> DepthMap;
-[[vk::binding(5, 0)]] TextureCube<float4> EnvMap;
-[[vk::binding(6, 0)]] TextureCube<float4> IrrMap;
+[[vk::binding(5, 0)]] TextureCube EnvMap;
+[[vk::binding(6, 0)]] TextureCube IrrMap;
 [[vk::binding(7, 0)]] Texture2D<float2> BRDFMap;
 [[vk::binding(8, 0)]] SamplerState TexSampler;
 [[vk::binding(9, 0)]] SamplerState EnvMapSampler;
@@ -96,9 +96,9 @@ float3 FresnelSchlick(PBRinfo pbrInfo) {
     return (pbrInfo.Reflectance0 + (pbrInfo.Reflectance90 - pbrInfo.Reflectance0) * pow(1.0f - pbrInfo.VdotH, 5.0f));
 }
 
-float3 CalculateDirLight(SceneLightGPUData light, float3 normal, float3 view, Material material, PBRinfo pbrInfo) {
+float3 CalculateSunLight(float3 normal, float3 view, Material material, PBRinfo pbrInfo) {
 
-    float3 lightDir = normalize(-light.Direction.xyz);
+    float3 lightDir = normalize(-SceneDataBuffer.SunDirection.xyz);
     float3 halfway = normalize(view + lightDir);
 
     {
@@ -107,7 +107,7 @@ float3 CalculateDirLight(SceneLightGPUData light, float3 normal, float3 view, Ma
         pbrInfo.VdotH = max(dot(halfway, view), 0.0);
     }
 
-    float3 inRadiance = light.Intensity * light.Color.rgb;
+    float3 inRadiance = SceneDataBuffer.SunIntensity * SceneDataBuffer.SunColor.rgb;
 
     // Cook-torrance brdf
     float3 F = FresnelSchlick(pbrInfo);
@@ -132,7 +132,7 @@ float3 CalculateDirLight(SceneLightGPUData light, float3 normal, float3 view, Ma
 float3 CalculatePointLight(SceneLightGPUData light, float3 normal, float3 view, Material material, PBRinfo pbrInfo, float3 position) {
 
     float distance = length(light.Position.xyz - position);
-    if (distance > light.Radius) return float3(0.f, 0.f, 0.f);
+    if (distance > light.Range) return float3(0.f, 0.f, 0.f);
 
     float3 lightDir = normalize(light.Position.xyz - position);
     float3 halfway = normalize(view + lightDir);
@@ -242,17 +242,11 @@ float4 PSMain(VSOutput input) : SV_TARGET0 {
     }
 
     float3 color = GetIBLcontribution(pbrInfo, iblInfo, material);
+    color += CalculateSunLight(normal, view, material, pbrInfo);
     for (uint i = 0u; i < SceneDataBuffer.LightsCount; i++) {
 
         SceneLightGPUData light = LightsBuffer[i];
-
-        if (light.Type == 0) {
-
-            color += CalculateDirLight(light, normal, view, material, pbrInfo);
-        } else {
-
-            color += CalculatePointLight(light, normal, view, material, pbrInfo, position);
-        }
+        color += CalculatePointLight(light, normal, view, material, pbrInfo, position);
     }
 
     color = material.AO * color;

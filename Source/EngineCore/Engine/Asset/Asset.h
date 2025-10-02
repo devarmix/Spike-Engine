@@ -1,35 +1,49 @@
 #pragma once
 
-#include <Engine/Asset/GUID.h>
-#include <string>
+#include <Engine/Asset/UUID.h>
+#include <Engine/Core/Core.h>
+#include <Engine/Utils/Misc.h>
+#include <Engine/Serialization/FileStream.h>
+
+#define ASSET_CLASS_TYPE(type)                                                 \
+static Spike::EAssetType GetStaticType() { return type; }                      \
+virtual Spike::EAssetType GetType() const override { return GetStaticType(); }
 
 namespace Spike {
 
-	enum AssetType : uint8_t {
+	enum class EAssetType : uint8_t {
 
-		EAssetNone = 0,
+		ENone = 0,
 
-		EAssetTexture2D,
-		EAssetCubeTexture,
-		EAssetMaterial,
-		EAssetMaterialInstance,
-		EAssetMesh
+		ETexture2D,
+		ECubeTexture,
+		EMaterial,
+		EMesh
 	};
 
-#define ASSET_CORE_DESTROY()
-
-#define ASSET_CLASS_TYPE(type)                                                          \
-        static Spike::AssetType GetStaticType() { return Spike::AssetType::type; }      \
-        virtual Spike::AssetType GetType() const override { return GetStaticType(); }
-
-	class Asset {
+	class Asset : public RefCounted {
 	public:
-
 		virtual ~Asset() = default;
-		//virtual AssetType GetType() const = 0;
+		virtual EAssetType GetType() const = 0;
 
-	public:
+		UUID GetUUID() const { return m_ID; }
+		virtual void AddRef() const override final;
+		virtual void Release() const override final;
 
-		AssetID Guid;
+	protected:
+		UUID m_ID;
 	};
+
+	class AssetRegistry {
+	public:
+		virtual ~AssetRegistry() = default;
+
+		virtual Ref<Asset> LoadAsset(UUID id) = 0;
+		virtual void UnloadAsset(UUID id) = 0;
+		virtual void Save() = 0;
+		virtual void Deserialize() = 0;
+	};
+
+	// registry of current loaded project / game
+	extern AssetRegistry* GRegistry;
 }

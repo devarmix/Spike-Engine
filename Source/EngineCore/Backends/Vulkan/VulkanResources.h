@@ -1,136 +1,49 @@
 #pragma once
 
-#include <Engine/Renderer/TextureBase.h>
-#include <Engine/Renderer/Buffer.h>
-#include <Engine/Renderer/GfxDevice.h>
-#include <Engine/Renderer/Shader.h>
 #include <Backends/Vulkan/VulkanCommon.h>
 
 namespace Spike {
 
-	class VulkanRHITexture : public RHIData {
-	public:
-		VulkanRHITexture() {}
-		virtual ~VulkanRHITexture() override {}
+	struct VulkanRHITexture {
 
-		virtual void* GetNativeData() override { return (void*)&NativeData; }
-
-	public:
-
-		struct Data {
-
-			VkImage Image = nullptr;
-			VmaAllocation Allocation = nullptr;
-		} NativeData;
+		VkImage Image = nullptr;
+		VmaAllocation Allocation = nullptr;
 	};
 
-	class VulkanRHITextureView : public RHIData {
-	public:
-		VulkanRHITextureView() {}
-		virtual ~VulkanRHITextureView() {}
-
-		virtual void* GetNativeData() override { return (void*)&NativeData; }
-
-	public:
-
-		struct Data {
-
-			VkImageView View = nullptr;
-		} NativeData;
+	struct VulkanRHITextureView {
+		VkImageView View = nullptr;
 	};
 
-	class VulkanRHISampler : public RHIData {
-	public:
-		VulkanRHISampler() {}
-		virtual ~VulkanRHISampler() {}
-
-		virtual void* GetNativeData() override { return (void*)&NativeData; }
-
-	public:
-
-		struct Data {
-
-			VkSampler Sampler = nullptr;
-		} NativeData;
+	struct VulkanRHISampler {
+		VkSampler Sampler = nullptr;
 	};
 
-	class VulkanRHIBuffer : public RHIData {
-	public:
-		VulkanRHIBuffer() {}
-		virtual ~VulkanRHIBuffer() {}
+	struct VulkanRHIBuffer {
 
-		virtual void* GetNativeData() override { return (void*)&NativeData; }
-
-	public:
-
-		struct Data {
-
-			VkBuffer Buffer = nullptr;
-			VmaAllocation Allocation = nullptr;
-			VmaAllocationInfo AllocationInfo;
-		} NativeData;
+		VkBuffer Buffer = nullptr;
+		VmaAllocation Allocation = nullptr;
+		VmaAllocationInfo AllocationInfo;
 	};
 
-	class VulkanRHICommandBuffer : public RHIData {
-	public:
-		VulkanRHICommandBuffer() {}
-		virtual ~VulkanRHICommandBuffer() {}
+	struct VulkanRHICommandBuffer {
 
-		virtual void* GetNativeData() override { return (void*)&NativeData; }
-
-	public:
-
-		struct Data {
-
-			VkCommandBuffer Cmd = nullptr;
-			VkCommandPool Pool = nullptr;
-		} NativeData;
+		VkCommandBuffer Cmd = nullptr;
+		VkCommandPool Pool = nullptr;
 	};
 
-	class VulkanRHIShader : public RHIData {
-	public:
-		VulkanRHIShader() {}
-		virtual ~VulkanRHIShader() {}
+	struct VulkanRHIShader {
 
-		virtual void* GetNativeData() override { return (void*)&NativeData; }
-
-	public:
-
-		struct Data {
-
-			VkPipeline Pipeline = nullptr;
-			VkPipelineLayout PipelineLayout = nullptr;
-		} NativeData;
+		VkPipeline Pipeline = nullptr;
+		VkPipelineLayout PipelineLayout = nullptr;
 	};
 
-	class VulkanRHIBindingSetLayout : public RHIData {
-	public:
-		VulkanRHIBindingSetLayout() {}
-		virtual ~VulkanRHIBindingSetLayout() {}
-
-		virtual void* GetNativeData() override { return (void*)&NativeData; }
-
-	public:
-
-		struct Data {
-
-			VkDescriptorSetLayout Layout = nullptr;
-		} NativeData;
+	struct VulkanRHIBindingSetLayout {
+		VkDescriptorSetLayout Layout = nullptr;
 	};
 
-	class VulkanRHIBindingSet : public RHIData {
-	public:
-		VulkanRHIBindingSet() {}
-		virtual ~VulkanRHIBindingSet() override {}
+	struct VulkanRHIBindingSet {
 
-		virtual void* GetNativeData() override { return (void*)&NativeData; }
-
-	public:
-
-		struct Data {
-
-			VkDescriptorSet Set = nullptr;
-			VkDescriptorPool AllocatedPool = nullptr;
-		} NativeData;
+		VkDescriptorSet Set = nullptr;
+		VkDescriptorPool AllocatedPool = nullptr;
 	};
 }

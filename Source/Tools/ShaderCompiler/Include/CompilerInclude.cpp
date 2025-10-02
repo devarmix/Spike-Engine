@@ -3,11 +3,11 @@
 
 bool ShaderCompiler::ValidateBinary(std::ifstream& stream) {
 
-	const uint32_t MAGIC_ID = 'SCBF';
+	const char MAGIC_ID[4] = { 'S', 'C', 'B', 'F' };
 
-	uint32_t magicID = 0;
-	stream.read((char*)&magicID, sizeof(uint32_t));
-	return magicID == MAGIC_ID;
+	char magicID[4] = {};
+	stream.read((char*)&magicID, sizeof(char) * 4);
+	return memcmp(magicID, MAGIC_ID, sizeof(char) * 4) == 0;
 }
 
 namespace ShaderCompiler {

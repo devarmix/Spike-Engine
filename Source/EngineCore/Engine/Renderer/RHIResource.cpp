@@ -8,7 +8,7 @@ void Spike::SafeRHIResourceInit(RHIResource* resource) {
 
 	if (resource) {
 
-		EXECUTE_ON_RENDER_THREAD([resource]() {
+		SUBMIT_RENDER_COMMAND([resource]() {
 			resource->InitRHI();
 			});
 	}
@@ -18,7 +18,7 @@ void Spike::SafeRHIResourceRelease(RHIResource* resource) {
 
 	if (resource) {
 
-		EXECUTE_ON_RENDER_THREAD([resource]() {
+		SUBMIT_RENDER_COMMAND([resource]() {
 
 			resource->ReleaseRHI();
 			delete resource;

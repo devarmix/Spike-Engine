@@ -1,6 +1,6 @@
 #include "ShaderCommon.hlsli"
 
-[[vk::binding(0, 0)]] TextureCube<float4> SkyboxMap;
+[[vk::binding(0, 0)]] TextureCube SkyboxMap;
 [[vk::binding(1, 0)]] SamplerState TexSampler;
 [[vk::binding(2, 0)]] ConstantBuffer<SceneGPUData> SceneDataBuffer;
 

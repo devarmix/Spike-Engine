@@ -23,7 +23,7 @@ namespace Spike {
 
 	void RHIBuffer::ReleaseRHI() {
 
-		GFrameRenderer->PushToExecQueue([data = m_RHIData]() {
+		GFrameRenderer->SubmitToFrameQueue([data = m_RHIData]() {
 			GRHIDevice->DestroyBufferRHI(data);
 			});
 	}

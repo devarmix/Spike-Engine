@@ -56,6 +56,8 @@ namespace Spike {
 		void ReleaseResource();
 		void CreateResource(EMaterialSurfaceType surfaceType, const ShaderDesc& shaderDesc);
 
+		ASSET_CLASS_TYPE(EAssetType::ECubeTexture);
+
 	private:
 
 		RHIMaterial* m_RHIResource;

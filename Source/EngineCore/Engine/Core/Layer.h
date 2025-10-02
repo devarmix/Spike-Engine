@@ -10,7 +10,7 @@ namespace Spike {
 		Layer(const std::string& name = "New Layer");
 		virtual ~Layer() = default;
 
-		virtual void OnUpdate(float deltaTime) {}
+		virtual void Tick(float deltaTime) {}
 		virtual void OnAttach() {}
 		virtual void OnDetach() {}
 

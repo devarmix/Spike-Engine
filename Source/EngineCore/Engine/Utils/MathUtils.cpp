@@ -258,3 +258,62 @@ Vec4 Spike::MathUtils::MoveTowardsVec4(const Vec4& current, const Vec4& target, 
 	float num6 = std::sqrt(num5);
 	return Vec4(current.x + num / num6 * maxDistanceDelta, current.y + num2 / num6 * maxDistanceDelta, current.z + num3 / num6 * maxDistanceDelta, current.w + num4 / num6 * maxDistanceDelta);
 }
+
+void Spike::MathUtils::HashCombine(size_t& hash1, size_t hash2) {
+
+	hash1 ^= hash2 + 0x9e3779b9 + (hash1 << 6) + (hash1 >> 2);
+}
+
+uint32_t Spike::MathUtils::PackUnsignedVec4ToUint(const Vec4& v) {
+
+	uint8_t r = uint8_t(v.r * 255.f + 0.5f);
+	uint8_t g = uint8_t(v.g * 255.f + 0.5f);
+	uint8_t b = uint8_t(v.b * 255.f + 0.5f);
+	uint8_t a = uint8_t(v.a * 255.f + 0.5f);
+
+	return (r << 0) | (g << 8) | (b << 16) | (a << 24);
+}
+
+Vec4 Spike::MathUtils::UnpackUintToUnsignedVec4(uint32_t packed) {
+
+	float r = float((packed & 0x000000ff) >> 0) / 255.f;
+	float g = float((packed & 0x0000ff00) >> 8) / 255.f;
+	float b = float((packed & 0x00ff0000) >> 16) / 255.f;
+	float a = float((packed & 0xff000000) >> 24) / 255.f;
+
+	return glm::vec4(r, g, b, a);
+}
+
+PackedHalf Spike::MathUtils::PackSignedVec4ToHalf(const Vec4& v) {
+
+	uint16_t x = uint16_t((v.x + 1.f) * 32767.5f + 0.5f);
+	uint16_t y = uint16_t((v.y + 1.f) * 32767.5f + 0.5f);
+	uint16_t z = uint16_t((v.z + 1.f) * 32767.5f + 0.5f);
+	uint16_t w = uint16_t((v.w + 1.f) * 32767.5f + 0.5f);
+
+	PackedHalf out{};
+	out.A = (x << 0) | (y << 16);
+	out.B = (z << 0) | (w << 16);
+
+	return out;
+}
+
+Vec4 Spike::MathUtils::UnpackHalfToSignedVec4(const PackedHalf& packed) {
+
+	float x = (float((packed.A & 0x0000ffff) >> 0) / 65535.f) * 2.f - 1.f;
+	float y = (float((packed.A & 0xffff0000) >> 16) / 65535.f) * 2.f - 1.f;
+	float z = (float((packed.B & 0x0000ffff) >> 0) / 65535.f) * 2.f - 1.f;
+	float w = (float((packed.B & 0xffff0000) >> 16) / 65535.f) * 2.f - 1.f;
+
+	return glm::vec4(x, y, z, w);
+}
+
+Mat4x4 Spike::MathUtils::GetInfinitePerspectiveMatrix(float fov, float aspect, float nearProj) {
+
+	float f = 1.0f / tanf(fov / 2.0f);
+	return Mat4x4(
+		f / aspect, 0.0f, 0.0f, 0.0f,
+		0.0f, -f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, -1.0f,
+		0.0f, 0.0f, nearProj, 0.0f);
+}

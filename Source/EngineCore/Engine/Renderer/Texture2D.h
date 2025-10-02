@@ -5,9 +5,6 @@
 
 namespace Spike {
 
-	// utility function
-	uint32_t GetNumTextureMips(uint32_t width, uint32_t height);
-
 	struct Texture2DDesc {
 
 		uint32_t Width;
@@ -16,9 +13,7 @@ namespace Spike {
 		ETextureFormat Format;
 		ETextureUsageFlags UsageFlags;
 
-		bool NeedCPUData = false;
 		bool AutoCreateSampler = true;
-		void* PixelData = nullptr;
 
 		SamplerDesc SamplerDesc;
 		RHISampler* Sampler = nullptr;
@@ -29,16 +24,28 @@ namespace Spike {
 				&& Height == other.Height
 				&& NumMips == other.NumMips
 				&& Format == other.Format
-				&& UsageFlags == other.UsageFlags
-				&& NeedCPUData == other.NeedCPUData)) return false;
+				&& UsageFlags == other.UsageFlags)) return false;
 
 			if (AutoCreateSampler) {
-
 				if (!other.AutoCreateSampler || SamplerDesc != other.SamplerDesc) return false;
 			}
 
 			return true;
 		}
+	};
+
+	constexpr char TEXTURE_2D_MAGIC[4] = { 'S', 'E', 'T', '2' };
+	struct Texture2DHeader {
+
+		uint32_t Width;
+		uint32_t Height;
+		ETextureFormat Format;
+
+		ESamplerFilter Filter;
+		ESamplerAddress AddressU;
+		ESamplerAddress AddressV;
+
+		size_t ByteSize;
 	};
 
 	class RHITexture2D : public RHITexture {
@@ -59,8 +66,6 @@ namespace Spike {
 
 		const Texture2DDesc& GetDesc() { return m_Desc; }
 
-		void DeletePixelData();
-
 	private:
 
 		Texture2DDesc m_Desc;
@@ -68,11 +73,10 @@ namespace Spike {
 
 	class Texture2D : public Asset {
 	public:
-		Texture2D(const Texture2DDesc& desc);
+		Texture2D(const Texture2DDesc& desc, UUID id);
 		virtual ~Texture2D() override;
 
-		static Ref<Texture2D> Create(const char* filePath, const SamplerDesc& samplerDesc, ETextureFormat format = ETextureFormat::ERGBA8U);
-		static Ref<Texture2D> Create(const Texture2DDesc& desc);
+		static Ref<Texture2D> Create(BinaryReadStream& stream, UUID id);
 
 		RHITexture2D* GetResource() { return m_RHIResource; }
 		void ReleaseResource();
@@ -83,10 +87,9 @@ namespace Spike {
 		uint32_t GetNumMips() const { return m_RHIResource->GetNumMips(); }
 		bool IsMipmapped() const { return m_RHIResource->IsMipmaped(); }
 
-		//ASSET_CLASS_TYPE(Texture2DAsset)
+		ASSET_CLASS_TYPE(EAssetType::ETexture2D);
 
 	private:
-
 		RHITexture2D* m_RHIResource;
 	};
 }

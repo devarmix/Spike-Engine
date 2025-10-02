@@ -1,10 +1,9 @@
 #pragma once
 
 #include <thread>
-#include <vector>
 #include <functional>
-#include <mutex>
 #include <semaphore>
+#include <mutex>
 
 namespace Spike {
 
@@ -17,24 +16,21 @@ namespace Spike {
 		void Terminate();
 
 		using Func = std::function<void()>;
-		void PushTask(Func&& func);
+		void PushTask(Func&& func) { m_Queue.push_back(std::move(func)); }
 
 		void WaitTillDone();
 		void Process();
 
-		using ThreadID = std::thread::id;
-		ThreadID GetID() const { return m_Thread.get_id(); }
+		std::thread::id GetID() const { return m_Thread.get_id(); }
 
 	private:
-
 		void RenderThreadLoop();
 
 	private:
-
 		std::thread m_Thread;
-
 		std::vector<Func> m_Queue;
-		std::mutex m_QueueMutex;
+		std::vector<Func> m_RTQueue;
+		//std::mutex m_Mutex;
 
 		std::binary_semaphore m_BlockSemaphore{ 0 };
 		std::binary_semaphore m_WaitSemaphore{ 1 };

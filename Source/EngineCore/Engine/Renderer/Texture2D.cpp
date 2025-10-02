@@ -1,20 +1,14 @@
 #include <Engine/Renderer/Texture2D.h>
 #include <Engine/Renderer/GfxDevice.h>
 #include <Engine/Renderer/FrameRenderer.h>
+#include <Engine/Core/Application.h>
 #include <Engine/Core/Log.h>
-
-#include <stb_image.h>
-
-uint32_t Spike::GetNumTextureMips(uint32_t width, uint32_t height) {
-
-	return uint32_t(std::floor(std::log2(std::max(width, height)))) + 1;
-}
 
 namespace Spike {
 
 	RHITexture2D::RHITexture2D(const Texture2DDesc& desc) : m_Desc(desc) {
 
-		m_RHIData = nullptr;
+		m_RHIData = 0;
 
 		TextureViewDesc viewDesc{};
 		viewDesc.BaseMip = 0;
@@ -34,11 +28,6 @@ namespace Spike {
 			m_Desc.Sampler = GSamplerCache->Get(m_Desc.SamplerDesc);
 		}
 
-		if (!m_Desc.NeedCPUData) {
-
-			DeletePixelData();
-		}
-
 		m_TextureView->InitRHI();
 	}
 
@@ -48,7 +37,6 @@ namespace Spike {
 		delete m_TextureView;
 
 		GRHIDevice->DestroyTexture2DRHI(m_RHIData);
-		DeletePixelData();
 	}
 
 	void RHITexture2D::ReleaseRHI() {
@@ -56,32 +44,18 @@ namespace Spike {
 		m_TextureView->ReleaseRHI();
 		delete m_TextureView;
 
-		GFrameRenderer->PushToExecQueue([data = m_RHIData]() {
+		GFrameRenderer->SubmitToFrameQueue([data = m_RHIData]() {
 			GRHIDevice->DestroyTexture2DRHI(data);
 			});
-
-		DeletePixelData();
 	}
 
-	void RHITexture2D::DeletePixelData() {
-
-		if (m_Desc.PixelData) {
-
-			free(m_Desc.PixelData);
-			m_Desc.PixelData = nullptr;
-		}
-	}
-
-
-	Texture2D::Texture2D(const Texture2DDesc& desc) {
-
+	Texture2D::Texture2D(const Texture2DDesc& desc, UUID id) {
+		m_ID = id;
 		CreateResource(desc);
 	}
 
 	Texture2D::~Texture2D() {
-
 		ReleaseResource();
-		ASSET_CORE_DESTROY();
 	}
 
 	void Texture2D::CreateResource(const Texture2DDesc& desc) {
@@ -96,49 +70,51 @@ namespace Spike {
 		m_RHIResource = nullptr;
 	}
 
-	Ref<Texture2D> Texture2D::Create(const char* filePath, const SamplerDesc& samplerDesc, ETextureFormat format) {
+	Ref<Texture2D> Texture2D::Create(BinaryReadStream& stream, UUID id) {
 
-		int width, height, nrChannels;
+		char magic[4] = {};
+		stream >> magic;
 
-		Ref<Texture2D> texture = nullptr;
-		void* data = nullptr;
-
-		if (format == ETextureFormat::ERGBA32F) {
-			data = stbi_loadf(filePath, &width, &height, &nrChannels, 4);
-		}
-		else {
-			data = stbi_load(filePath, &width, &height, &nrChannels, 4);
-		}
-		
-		if (data) {
-
-			//texture = Create(data, imagesize, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_SAMPLED_BIT, true);
-
-			Texture2DDesc newDesc{};
-			newDesc.Width = width;
-			newDesc.Height = height;
-			newDesc.NumMips = GetNumTextureMips(width, height);
-			newDesc.Format = format;
-			newDesc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopySrc | ETextureUsageFlags::ECopyDst;
-			newDesc.SamplerDesc = samplerDesc;
-			newDesc.PixelData = data;
-			newDesc.NeedCPUData = false;
-
-			texture = Create(newDesc);
-		}
-		else {
-
-			ENGINE_ERROR("Failed to load texture from path: {}", filePath);
-
-			// in case of fail, return default error texture, to prevent crash
-			return GRHIDevice->DefErrorTexture2D;
+		if (memcmp(magic, TEXTURE_2D_MAGIC, sizeof(char) * 4) != 0) {
+			ENGINE_ERROR("Corrupted texture 2D asset file: {}", (uint64_t)id);
+			return nullptr;
 		}
 
-		return texture;
-	}
+		Texture2DHeader header{};
+		std::vector<size_t> mipSizes{};
+		stream >> header >> mipSizes;
 
-	Ref<Texture2D> Texture2D::Create(const Texture2DDesc& desc) {
+		Texture2DDesc desc{};
+		desc.Width = header.Width;
+		desc.Height = header.Height;
+		desc.Format = header.Format;
+		desc.NumMips = (uint32_t)mipSizes.size();
+		desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
+		desc.SamplerDesc.Filter = header.Filter;
+		desc.SamplerDesc.AddressU = header.AddressU;
+		desc.SamplerDesc.AddressV = header.AddressV;
+		desc.SamplerDesc.AddressW = ESamplerAddress::EClamp;
 
-		return CreateRef<Texture2D>(desc);
+		uint8_t* buff = new uint8_t[header.ByteSize];
+		stream.ReadRaw(buff, header.ByteSize);
+
+		Ref<Texture2D> tex = CreateRef<Texture2D>(desc, id);
+		SUBMIT_RENDER_COMMAND(([rhi = tex->GetResource(), sizes = std::move(mipSizes), copySize = header.ByteSize, buff]() {
+
+			size_t offset = 0;
+			std::vector<RHIDevice::SubResourceCopyRegion> regions{};
+			for (uint32_t m = 0; m < rhi->GetNumMips(); m++) {
+
+				RHIDevice::SubResourceCopyRegion& region = regions.emplace_back(RHIDevice::SubResourceCopyRegion{});
+				region.ArrayLayer = 0;
+				region.DataOffset = offset;
+				region.MipLevel = m;
+				offset += sizes[m];
+			}
+			GRHIDevice->CopyDataToTexture(buff, 0, rhi, EGPUAccessFlags::ENone, EGPUAccessFlags::ESRV, regions, copySize);
+			delete[] buff;
+			}));
+
+		return tex;
 	}
 }

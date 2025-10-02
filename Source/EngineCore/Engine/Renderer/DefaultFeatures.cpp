@@ -43,10 +43,7 @@ namespace Spike {
 
 	GBufferFeature::~GBufferFeature() {}
 
-	void GBufferFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
-
-		FrameData& frameData = GFrameRenderer->GetFrameData();
-		FrameData& prevFrameData = GFrameRenderer->GetPrevFrameData();
+	void GBufferFeature::BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) {
 
 		SamplerDesc samplerDesc{};
 		samplerDesc.Filter = ESamplerFilter::EBilinear;
@@ -73,10 +70,16 @@ namespace Spike {
 		RDGHandle depthTex = graphBuilder->CreateRDGTexture2D("GBuffer-Depth", texDesc);
 
 		BufferDesc uboDesc{};
-		uboDesc.Size = sizeof(SceneGPUData);
+		uboDesc.Size = sizeof(WorldGPUData);
 		uboDesc.UsageFlags = EBufferUsageFlags::EConstant;
 		uboDesc.MemUsage = EBufferMemUsage::ECPUToGPU;
 		RDGHandle sceneUBO = graphBuilder->CreateRDGBuffer("Scene-UBO", uboDesc);
+
+		BufferDesc batchSSBODesc{};
+		batchSSBODesc.Size = sizeof(uint32_t) * MAX_SHADERS_PER_WORLD;
+		batchSSBODesc.UsageFlags = EBufferUsageFlags::EStorage;
+		batchSSBODesc.MemUsage = EBufferMemUsage::ECPUToGPU;
+		RDGHandle batchSSBO = graphBuilder->CreateRDGBuffer("Batch-SSBO", batchSSBODesc);
 
 		auto roundUpToPowerOfTwo = [](float value) {
 
@@ -108,83 +111,83 @@ namespace Spike {
 
 		RDGHandle hzbTex = graphBuilder->CreateRDGTexture2D("GBuffer-Hzb", hzbDesc);
 
-		graphBuilder->RegisterExternalBuffer(frameData.SceneObjectsBuffer);
-		graphBuilder->RegisterExternalBuffer(frameData.DrawCommandsBuffer);
-		graphBuilder->RegisterExternalBuffer(frameData.DrawCountsBuffer);
-		graphBuilder->RegisterExternalBuffer(frameData.BatchOffsetsBuffer);
-		graphBuilder->RegisterExternalBuffer(frameData.VisibilityBuffer);
-		graphBuilder->RegisterExternalBuffer(prevFrameData.VisibilityBuffer);
+		graphBuilder->RegisterExternalBuffer(proxy->ObjectsBuffer);
+		graphBuilder->RegisterExternalBuffer(proxy->DrawCommandsBuffer);
+		graphBuilder->RegisterExternalBuffer(proxy->DrawCountsBuffer);
+		//graphBuilder->RegisterExternalBuffer(proxy->BatchOffsetsBuffer);
+		graphBuilder->RegisterExternalBuffer(proxy->VisibilityBuffer);
 
 		graphBuilder->AddPass(
 			{ albedoTex, normalTex, materialTex, depthTex, hzbTex },
-			{ sceneUBO }, 
+			{ sceneUBO, batchSSBO }, 
 			ERendererStage::EOpaqueRender, 
 			[=, this](RHICommandBuffer* cmd) {
 
 				RHIBuffer* ubo = graphBuilder->GetBufferResource(sceneUBO);
 				{
-					ENGINE_INFO("{0}, {1}, {2}", scene->CameraData.Position.x, scene->CameraData.Position.y, scene->CameraData.Position.z);
+					WorldGPUData& worldData = *(WorldGPUData*)ubo->GetMappedData();
+					worldData.View = cameraData->View;
+					worldData.Proj = cameraData->Proj;
+					worldData.ViewProj = cameraData->Proj * cameraData->View;
+					worldData.InverseProj = glm::inverse(cameraData->Proj);
+					worldData.InverseView = glm::inverse(cameraData->View);
+					worldData.CameraPos = Vec4(cameraData->Position, 1.f);
 
-					SceneGPUData* sceneData = (SceneGPUData*)ubo->GetMappedData();
-					sceneData[0].View = scene->CameraData.View;
-					sceneData[0].Proj = scene->CameraData.Proj;
-					sceneData[0].ViewProj = scene->CameraData.Proj * scene->CameraData.View;
-					sceneData[0].InverseProj = glm::inverse(scene->CameraData.Proj);
-					sceneData[0].InverseView = glm::inverse(scene->CameraData.View);
-					sceneData[0].CameraPos = scene->CameraData.Position;
-
-					glm::mat4& vp = sceneData[0].ViewProj;
-					sceneData[0].FrustumPlanes[0] = glm::vec4(
+					glm::mat4& vp = worldData.ViewProj;
+					worldData.FrustumPlanes[0] = glm::vec4(
 						vp[0][3] + vp[0][0], vp[1][3] + vp[1][0],
 						vp[2][3] + vp[2][0], vp[3][3] + vp[3][0]);
-					sceneData[0].FrustumPlanes[1] = glm::vec4(
+					worldData.FrustumPlanes[1] = glm::vec4(
 						vp[0][3] - vp[0][0], vp[1][3] - vp[1][0],
 						vp[2][3] - vp[2][0], vp[3][3] - vp[3][0]);
-					sceneData[0].FrustumPlanes[2] = glm::vec4(
+					worldData.FrustumPlanes[2] = glm::vec4(
 						vp[0][3] + vp[0][1], vp[1][3] + vp[1][1],
 						vp[2][3] + vp[2][1], vp[3][3] + vp[3][1]);
-					sceneData[0].FrustumPlanes[3] = glm::vec4(
+					worldData.FrustumPlanes[3] = glm::vec4(
 						vp[0][3] - vp[0][1], vp[1][3] - vp[1][1],
 						vp[2][3] - vp[2][1], vp[3][3] - vp[3][1]);
-					sceneData[0].FrustumPlanes[4] = glm::vec4(
+					worldData.FrustumPlanes[4] = glm::vec4(
 						vp[0][3] + vp[0][2], vp[1][3] + vp[1][2],
 						vp[2][3] + vp[2][2], vp[3][3] + vp[3][2]);
-					sceneData[0].FrustumPlanes[5] = glm::vec4(
+					worldData.FrustumPlanes[5] = glm::vec4(
 						vp[0][3] - vp[0][2], vp[1][3] - vp[1][2],
 						vp[2][3] - vp[2][2], vp[3][3] - vp[3][2]);
 
 					for (int i = 0; i < 6; i++) {
-
-						float length = glm::length(glm::vec3(sceneData[0].FrustumPlanes[i]));
-						sceneData[0].FrustumPlanes[i] /= length;
+						float length = glm::length(glm::vec3(worldData.FrustumPlanes[i]));
+						worldData.FrustumPlanes[i] /= length;
 					}
 
-					sceneData[0].P00 = sceneData[0].Proj[0][0];
-					sceneData[0].P11 = sceneData[0].Proj[1][1];
-					sceneData[0].NearProj = scene->CameraData.NearProj;
-					sceneData[0].FarProj = scene->CameraData.FarProj;
-					sceneData[0].LightsCount = (uint32_t)scene->Lights.size();
-					sceneData[0].ObjectsCount = (uint32_t)scene->Objects.size();
+					worldData.P00 = worldData.Proj[0][0];
+					worldData.P11 = worldData.Proj[1][1];
+					worldData.NearProj = cameraData->NearProj;
+					worldData.FarProj = cameraData->FarProj;
+					worldData.LightsCount = proxy->LightsVB.Size();
+					worldData.ObjectsCount = proxy->ObjectsVB.Size();
+
+					// TODO: Make serializable and changeble in world settings
+					worldData.SunColor = { 1.0f, 0.7f, 0.6f, 1.0f };
+					worldData.SunIntensity = 15;
+
+					// should probably be normalized on cpu
+					worldData.SunDirection = Vec4(-58.823f, -588.235f, 735.394f, 0.0f);
 				}
 
-				memcpy((SceneObjectGPUData*)frameData.SceneObjectsBuffer->GetMappedData() + frameData.ObjectsOffset, 
-					scene->Objects.data(), sizeof(SceneObjectGPUData) * scene->Objects.size());
-
 				std::vector<uint32_t> batchOffsets;
-				batchOffsets.resize(scene->Batches.size());
+				RHIBuffer* bSSBO = graphBuilder->GetBufferResource(batchSSBO);
+				batchOffsets.resize(proxy->Batches.size());
 				{
-					uint32_t* offsetsBuffer = (uint32_t*)frameData.BatchOffsetsBuffer->GetMappedData();
-
-					for (int i = 0; i < scene->Batches.size(); i++) {
+					uint32_t* offsetsBuffer = (uint32_t*)bSSBO->GetMappedData();
+					for (int i = 0; i < proxy->Batches.size(); i++) {
 
 						if (i > 0) {
-							batchOffsets[i] = scene->Batches[i - 1].CommandsCount + batchOffsets[i - 1];
+							batchOffsets[i] = proxy->Batches[i - 1].CommandsCount + batchOffsets[i - 1];
 						}
 						else {
 							batchOffsets[i] = 0;
 						}
 
-						offsetsBuffer[frameData.DrawCountOffset + i] = batchOffsets[i];
+						offsetsBuffer[i] = batchOffsets[i];
 					}
 				}
 
@@ -211,21 +214,21 @@ namespace Spike {
 
 				RHIBindingSet* cullSet = GRDGPool->GetOrCreateBindingSet(m_CullShader->GetLayouts()[0]);
 				{
-					cullSet->AddBufferWrite(0, 0, EShaderResourceType::EBufferUAV, frameData.DrawCommandsBuffer,
-						sizeof(DrawIndirectCommand) * scene->Objects.size(), sizeof(DrawIndirectCommand) * frameData.ObjectsOffset);
-					cullSet->AddBufferWrite(1, 0, EShaderResourceType::EBufferUAV, frameData.DrawCountsBuffer,
-						sizeof(uint32_t) * scene->Batches.size(), sizeof(uint32_t) * frameData.DrawCountOffset);
-					cullSet->AddBufferWrite(2, 0, EShaderResourceType::EBufferSRV, frameData.BatchOffsetsBuffer,
-						sizeof(uint32_t) * scene->Batches.size(), sizeof(uint32_t) * frameData.DrawCountOffset);
-					cullSet->AddBufferWrite(3, 0, EShaderResourceType::EBufferSRV, prevFrameData.VisibilityBuffer,
-						prevFrameData.VisibilityBuffer->GetSize(), 0);
-					cullSet->AddBufferWrite(4, 0, EShaderResourceType::EBufferUAV, frameData.VisibilityBuffer,
-						sizeof(uint32_t) * scene->Objects.size(), sizeof(uint32_t) * frameData.ObjectsOffset);
-					cullSet->AddTextureWrite(5, 0, EShaderResourceType::ETextureSRV, hzb->GetTextureView(), EGPUAccessFlags::ESRVCompute);
-					cullSet->AddSamplerWrite(6, 0, EShaderResourceType::ESampler, hzb->GetSampler());
-					cullSet->AddBufferWrite(7, 0, EShaderResourceType::EBufferSRV, frameData.SceneObjectsBuffer,
-						sizeof(SceneObjectGPUData) * scene->Objects.size(), sizeof(SceneObjectGPUData) * frameData.ObjectsOffset);
-					cullSet->AddBufferWrite(8, 0, EShaderResourceType::EConstantBuffer, ubo, ubo->GetSize(), 0);
+					cullSet->AddBufferWrite(0, 0, EShaderResourceType::EBufferUAV, proxy->DrawCommandsBuffer,
+						proxy->DrawCommandsBuffer->GetSize(), 0);
+					cullSet->AddBufferWrite(1, 0, EShaderResourceType::EBufferUAV, proxy->DrawCountsBuffer,
+						proxy->DrawCountsBuffer->GetSize(), 0);
+					cullSet->AddBufferWrite(2, 0, EShaderResourceType::EBufferSRV, bSSBO,
+						bSSBO->GetSize(), 0);
+					cullSet->AddBufferWrite(3, 0, EShaderResourceType::EBufferSRV, proxy->VisibilityBuffer,
+						proxy->VisibilityBuffer->GetSize(), 0);
+					//cullSet->AddBufferWrite(4, 0, EShaderResourceType::EBufferUAV, frameData.VisibilityBuffer,
+					//	sizeof(uint32_t) * scene->Objects.size(), sizeof(uint32_t) * frameData.ObjectsOffset);
+					cullSet->AddTextureWrite(4, 0, EShaderResourceType::ETextureSRV, hzb->GetTextureView(), EGPUAccessFlags::ESRVCompute);
+					cullSet->AddSamplerWrite(5, 0, EShaderResourceType::ESampler, hzb->GetSampler());
+					cullSet->AddBufferWrite(6, 0, EShaderResourceType::EBufferSRV, proxy->ObjectsBuffer,
+						proxy->ObjectsBuffer->GetSize(), 0);
+					cullSet->AddBufferWrite(7, 0, EShaderResourceType::EConstantBuffer, ubo, ubo->GetSize(), 0);
 				}
 
 				auto cullGeometry = [=, this](bool prepass) {
@@ -236,25 +239,25 @@ namespace Spike {
 					if (!prepass) {
 
 						pushData.PyramidSize = hzbSize;
-						pushData.CullZNear = scene->CameraData.Proj[3][2]; 
+						pushData.CullZNear = cameraData->Proj[3][2]; 
 					}
 
 					GRHIDevice->BindShader(cmd, m_CullShader, {cullSet}, &pushData);
 
-					uint32_t groupSize = uint32_t((scene->Objects.size() / 256) + 1);
+					uint32_t groupSize = uint32_t((proxy->ObjectsVB.Size() / 256) + 1);
 					GRHIDevice->DispatchCompute(cmd, groupSize, 1, 1);
 
-					graphBuilder->BarrierRDGBuffer(cmd, frameData.DrawCommandsBuffer, sizeof(DrawIndirectCommand) * scene->Objects.size(),
-						sizeof(DrawIndirectCommand) * frameData.ObjectsOffset, EGPUAccessFlags::EIndirectArgs);
-					graphBuilder->BarrierRDGBuffer(cmd, frameData.DrawCountsBuffer, sizeof(uint32_t) * scene->Batches.size(),
-						sizeof(uint32_t) * frameData.DrawCountOffset, EGPUAccessFlags::EIndirectArgs);
+					graphBuilder->BarrierRDGBuffer(cmd, proxy->DrawCommandsBuffer, 
+						proxy->DrawCommandsBuffer->GetSize(), 0, EGPUAccessFlags::EIndirectArgs);
+					graphBuilder->BarrierRDGBuffer(cmd, proxy->DrawCountsBuffer, 
+						sizeof(uint32_t) * proxy->Batches.size(), 0, EGPUAccessFlags::EIndirectArgs);
 					};
 
 				RHIBindingSet* meshDrawSet = GRDGPool->GetOrCreateBindingSet(GShaderManager->GetMeshDrawLayout());
 				{
-					meshDrawSet->AddBufferWrite(0, 0, EShaderResourceType::EConstantBuffer, ubo, sizeof(SceneGPUData), 0);
-					meshDrawSet->AddBufferWrite(1, 0, EShaderResourceType::EBufferSRV, frameData.SceneObjectsBuffer,
-						sizeof(SceneObjectGPUData)* scene->Objects.size(), sizeof(SceneObjectGPUData)* frameData.ObjectsOffset);
+					meshDrawSet->AddBufferWrite(0, 0, EShaderResourceType::EConstantBuffer, ubo, sizeof(WorldGPUData), 0);
+					meshDrawSet->AddBufferWrite(1, 0, EShaderResourceType::EBufferSRV, proxy->ObjectsBuffer,
+						proxy->ObjectsBuffer->GetSize(), 0);
 				}
 
 				auto drawGeometry = [=](bool prepass) {
@@ -271,17 +274,17 @@ namespace Spike {
 
 					GRHIDevice->BeginRendering(cmd, info);
 
-					for (int i = 0; i < scene->Batches.size(); i++) {
+					for (int i = 0; i < proxy->Batches.size(); i++) {
 
-						DrawBatch currBatch = scene->Batches[i];
+						WorldDrawBatch currBatch = proxy->Batches[i];
 						GRHIDevice->BindShader(cmd, currBatch.Shader, {meshDrawSet, GShaderManager->GetMaterialSet()});
 
 						uint32_t stride = sizeof(DrawIndirectCommand);
-						uint64_t commandOffset = frameData.ObjectsOffset + batchOffsets[i];
-						uint64_t countOffset = frameData.DrawCountOffset + i;
+						uint64_t commandOffset = batchOffsets[i];
+						uint64_t countOffset = i;
 
-						GRHIDevice->DrawIndirectCount(cmd, frameData.DrawCommandsBuffer, stride * commandOffset, frameData.DrawCountsBuffer,
-							sizeof(uint32_t) * countOffset, (uint32_t)scene->Objects.size(), stride);
+						GRHIDevice->DrawIndirectCount(cmd, proxy->DrawCommandsBuffer, stride * commandOffset, proxy->DrawCountsBuffer,
+							sizeof(uint32_t) * countOffset, proxy->ObjectsVB.Size(), stride);
 					}
 
 					GRHIDevice->EndRendering(cmd);
@@ -336,15 +339,13 @@ namespace Spike {
 
 				// second cull pass
 				{
-					graphBuilder->FillRDGBuffer(cmd, frameData.DrawCountsBuffer, sizeof(uint32_t) * scene->Batches.size(),
-						sizeof(uint32_t) * frameData.DrawCountOffset, 0, EGPUAccessFlags::EUAVCompute);
-					graphBuilder->BarrierRDGBuffer(cmd, frameData.DrawCommandsBuffer, sizeof(DrawIndirectCommand) * scene->Objects.size(),
-						sizeof(DrawIndirectCommand) * frameData.ObjectsOffset, EGPUAccessFlags::EUAVCompute);
+					graphBuilder->FillRDGBuffer(cmd, proxy->DrawCountsBuffer, 
+						sizeof(uint32_t) * proxy->Batches.size(), 0, 0, EGPUAccessFlags::EUAVCompute);
+					graphBuilder->BarrierRDGBuffer(cmd, proxy->DrawCommandsBuffer, 
+						proxy->DrawCommandsBuffer->GetSize(), 0, EGPUAccessFlags::EUAVCompute);
 
 					cullGeometry(false);
-
 					graphBuilder->BarrierRDGTexture2D(cmd, depth, EGPUAccessFlags::EDepthTarget);
-
 					drawGeometry(false);
 				}
 
@@ -368,9 +369,7 @@ namespace Spike {
 
 	DeferredLightingFeature::~DeferredLightingFeature() {}
 
-	void DeferredLightingFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
-
-		FrameData& frameData = GFrameRenderer->GetFrameData();
+	void DeferredLightingFeature::BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) {
 
 		RDGHandle albedoTex = graphBuilder->FindRDGTexture2D("GBuffer-Albedo");
 		RDGHandle normalTex = graphBuilder->FindRDGTexture2D("GBuffer-Normal");
@@ -379,16 +378,13 @@ namespace Spike {
 		RDGHandle sceneUBO = graphBuilder->FindRDGBuffer("Scene-UBO");
 
 		graphBuilder->RegisterExternalTexture2D(context.OutTexture);
-		graphBuilder->RegisterExternalBuffer(frameData.LightsBuffer);
+		graphBuilder->RegisterExternalBuffer(proxy->LightsBuffer);
 
 		graphBuilder->AddPass(
 			{albedoTex, normalTex, materialTex, depthTex},
 			{sceneUBO},
 			ERendererStage::ELightsRender,
 			[=, this](RHICommandBuffer* cmd) {
-
-				memcpy((SceneLightGPUData*)frameData.LightsBuffer->GetMappedData() + frameData.LightsOffset, scene->Lights.data(),
-					sizeof(SceneLightGPUData) * scene->Lights.size());
 
 				RHITexture2D* albedo = graphBuilder->GetTextureResource(albedoTex);
 				RHITexture2D* normal = graphBuilder->GetTextureResource(normalTex);
@@ -411,7 +407,7 @@ namespace Spike {
 					lightingSet->AddTextureWrite(7, 0, EShaderResourceType::ETextureSRV, brdf->GetTextureView(), EGPUAccessFlags::ESRV);
 					lightingSet->AddSamplerWrite(8, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
 					lightingSet->AddSamplerWrite(9, 0, EShaderResourceType::ESampler, context.EnvironmentTexture->GetSampler());
-					lightingSet->AddBufferWrite(10, 0, EShaderResourceType::EBufferSRV, frameData.LightsBuffer, sizeof(SceneLightGPUData) * scene->Lights.size(), frameData.LightsOffset);
+					lightingSet->AddBufferWrite(10, 0, EShaderResourceType::EBufferSRV, proxy->LightsBuffer, proxy->LightsBuffer->GetSize(), 0);
 				}
 
 				DeferredLightingPushData pushData{};
@@ -449,7 +445,7 @@ namespace Spike {
 
 	SkyboxFeature::~SkyboxFeature() {}
 
-	void SkyboxFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
+	void SkyboxFeature::BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) {
 
 		RDGHandle depthTex = graphBuilder->FindRDGTexture2D("GBuffer-Depth");
 		RDGHandle sceneUBO = graphBuilder->FindRDGBuffer("Scene-UBO");
@@ -514,12 +510,12 @@ namespace Spike {
 			std::uniform_real_distribution<float> randomFloats(0.0f, 1.0f);
 			std::default_random_engine generator;
 
-			Vec4* ssaoNoise = (Vec4*)malloc(sizeof(Vec4) * 16);
+			Vec4* ssaoNoise = new Vec4[16];
 
 			for (int i = 0; i < 16; i++)
 			{
 				glm::vec3 noise(randomFloats(generator) * 2.0f - 1.0, randomFloats(generator) * 2.0f - 1.0f, 0.0f);
-				ssaoNoise[i] = glm::vec4(noise, 1.0f);
+				ssaoNoise[i] = Vec4(noise, 1.0f);
 			}
 
 			SamplerDesc samplerDesc{};
@@ -535,10 +531,14 @@ namespace Spike {
 			desc.NumMips = 1;
 			desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
 			desc.SamplerDesc = samplerDesc;
-			desc.PixelData = ssaoNoise;
 
 			m_NoiseTexture = new RHITexture2D(desc);
 			m_NoiseTexture->InitRHI();
+			{
+				RHIDevice::SubResourceCopyRegion region{ 0, 0, 0 };
+				GRHIDevice->CopyDataToTexture(ssaoNoise, 0, m_NoiseTexture, EGPUAccessFlags::ENone, EGPUAccessFlags::ESRV, { region }, sizeof(Vec4) * 16);
+				delete[] ssaoNoise;
+			}
 		}
 		{
 			std::uniform_real_distribution<float> randomFloats(0.0, 1.0); 
@@ -577,9 +577,7 @@ namespace Spike {
 		delete m_KernelBuffer;
 	}
 
-	void SSAOFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
-
-		FrameData& frameData = GFrameRenderer->GetFrameData();
+	void SSAOFeature::BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) {
 
 		RDGHandle normalTex = graphBuilder->FindRDGTexture2D("GBuffer-Normal");
 		RDGHandle depthTex = graphBuilder->FindRDGTexture2D("GBuffer-Depth");
@@ -711,7 +709,7 @@ namespace Spike {
 
 	BloomFeature::~BloomFeature() {}
 
-	void BloomFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
+	void BloomFeature::BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) {
 
 		SamplerDesc samplerDesc{};
 		samplerDesc.Filter = ESamplerFilter::EBilinear;
@@ -919,7 +917,7 @@ namespace Spike {
 
 	ToneMapFeature::~ToneMapFeature() {}
 
-	void ToneMapFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
+	void ToneMapFeature::BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) {
 
 		uint32_t outWidth = context.OutTexture->GetSizeXYZ().x;
 		uint32_t outHeight = context.OutTexture->GetSizeXYZ().y;
@@ -998,10 +996,17 @@ namespace Spike {
 			desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
 			desc.NumMips = 1;
 			desc.AutoCreateSampler = false;
-			desc.PixelData = RenderUtils::LoadSMAA_AreaTex();
+			//desc.PixelData = RenderUtils::LoadSMAA_AreaTex();
 
 			m_AreaTex = new RHITexture2D(desc);
 			m_AreaTex->InitRHI();
+			{
+				RHIDevice::SubResourceCopyRegion region{ 0, 0, 0 };
+
+				uint8_t* data = RenderUtils::LoadSMAA_AreaTex();
+				GRHIDevice->CopyDataToTexture(data, 0, m_AreaTex, EGPUAccessFlags::ENone, EGPUAccessFlags::ESRV, { region }, 179200);
+				delete[] data;
+			}
 		}
 		{
 			Texture2DDesc desc{};
@@ -1011,10 +1016,17 @@ namespace Spike {
 			desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
 			desc.NumMips = 1;
 			desc.AutoCreateSampler = false;
-			desc.PixelData = RenderUtils::LoadSMAA_SearchTex();
+			//desc.PixelData = RenderUtils::LoadSMAA_SearchTex();
 
 			m_SearchTex = new RHITexture2D(desc);
 			m_SearchTex->InitRHI();
+			{
+				RHIDevice::SubResourceCopyRegion region{ 0, 0, 0 };
+
+				uint8_t* data = RenderUtils::LoadSMAA_SearchTex();
+				GRHIDevice->CopyDataToTexture(RenderUtils::LoadSMAA_SearchTex(), 0, m_SearchTex, EGPUAccessFlags::ENone, EGPUAccessFlags::ESRV, { region }, 1024);
+				delete[] data;
+			}
 		}
 		{
 			ShaderDesc desc{};
@@ -1048,7 +1060,7 @@ namespace Spike {
 		delete m_SearchTex;
 	}
 
-	void SMAAFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
+	void SMAAFeature::BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) {
 
 		uint32_t outWidth = context.OutTexture->GetSizeXYZ().x;
 		uint32_t outHeight = context.OutTexture->GetSizeXYZ().y;
@@ -1072,7 +1084,7 @@ namespace Spike {
 		graphBuilder->AddPass(
 			{ edgesTex, weightsTex, smaaCompositeTex, depthTex },
 			{},
-			ERendererStage::EAfterPostProcessingRender,
+			ERendererStage::EPostProcessingRender,
 			[=, this](RHICommandBuffer* cmd) {
 
 				RHITexture2D* edges = graphBuilder->GetTextureResource(edgesTex);
@@ -1189,7 +1201,7 @@ namespace Spike {
 
 	FXAAFeature::~FXAAFeature() {}
 
-	void FXAAFeature::BuildGraph(RDGBuilder* graphBuilder, const SceneRenderProxy* scene, RenderContext context) {
+	void FXAAFeature::BuildGraph(RDGBuilder* graphBuilder, const RHIWorldProxy* proxy, RenderContext context, const CameraDrawData* cameraData) {
 
 		uint32_t outWidth = context.OutTexture->GetSizeXYZ().x;
 		uint32_t outHeight = context.OutTexture->GetSizeXYZ().y;
