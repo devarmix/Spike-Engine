@@ -34,6 +34,7 @@ namespace Spike {
 		RHICubeTexture* IrradianceTexture;
 	};
 
+	enum class EFeatureType : uint8_t;
 	class RenderFeature {
 	public:
 		virtual ~RenderFeature() = default;
@@ -45,14 +46,15 @@ namespace Spike {
 		FrameRenderer();
 		~FrameRenderer();
 
-		void RenderWorld(RHIWorldProxy* proxy, RenderContext context, const CameraDrawData& cameraData, std::vector<RenderFeature*>& features);
+		void RenderWorld(RHIWorldProxy* proxy, RenderContext context, const CameraDrawData& cameraData, const std::vector<RenderFeature*>& features);
 		void RenderSwapchain(uint32_t width, uint32_t height, RHITexture2D* fillTexture = nullptr);
 		void BeginFrame();
 
 		uint32_t GetFrameCount() const { return m_FrameCount; }
 		RHITexture2D* GetBRDFLut() { return m_BRDFLut; }
 
-		void SubmitToFrameQueue(std::function<void()>&& func) { m_FrameQueues[m_FrameCount % 2].Push(std::move(func)); }
+		void SubmitToFrameQueue(std::function<void()>&& func);
+		RenderFeature* LoadFeature(EFeatureType type);
 
 	private:
 		void FlushFrameQueue(uint32_t idx);
@@ -62,11 +64,18 @@ namespace Spike {
 		RHICommandBuffer* m_CommandBuffers[2];
 		RHIDevice::ImGuiRTState m_GuiRTStates[2];
 
-		ThreadSafeQueue<std::function<void()>> m_FrameQueues[2];
+		std::vector<std::function<void()>> m_FrameQueues[2];
 
 		RHITexture2D* m_BRDFLut;
 		RHITexture2D* m_GuiFontTexture;
 		uint32_t m_FrameCount;
+
+		struct FeatureState {
+			uint32_t LastUsedFrame;
+			EFeatureType Type;
+			RenderFeature* Ptr;
+		};
+		std::vector<FeatureState> m_FeatureStates;
 	};
 
 	// global frame renderer pointer

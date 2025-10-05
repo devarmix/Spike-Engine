@@ -94,8 +94,8 @@ namespace Spike {
 
 			size_t offset = 0;
 			std::vector<RHIDevice::SubResourceCopyRegion> regions{};
-			for (uint32_t f = 0; f < 6; f++) {
-				for (uint32_t m = 0; m < rhi->GetNumMips(); m++) {
+			for (uint32_t m = 0; m < rhi->GetNumMips(); m++) {
+				for (int f = 0; f < 6; f++) {
 
 					RHIDevice::SubResourceCopyRegion& region = regions.emplace_back(RHIDevice::SubResourceCopyRegion{});
 					region.ArrayLayer = f;

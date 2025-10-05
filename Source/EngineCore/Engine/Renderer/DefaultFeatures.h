@@ -4,6 +4,19 @@
 
 namespace Spike {
 
+	enum class EFeatureType : uint8_t {
+		ENone = 0,
+
+		EGBuffer,
+		EDeferredLightning,
+		ESkybox,
+		ESSAO,
+		EFXAA,
+		ESMAA,
+		EBloom,
+		EToneMap
+	};
+
 	class GBufferFeature : public RenderFeature {
 	public:
 		GBufferFeature();

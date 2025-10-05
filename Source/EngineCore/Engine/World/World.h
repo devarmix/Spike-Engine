@@ -108,7 +108,7 @@ namespace Spike {
 		IndexQueue VisibilityQueue;
 	};
 
-	class World {
+	class World : public Asset {
 	public:
 		World();
 		~World();
@@ -116,8 +116,12 @@ namespace Spike {
 		void Tick();
 		RHIWorldProxy* GetProxy() { return m_Proxy; }
 
-	private:
+		static Ref<World> Create();
+		static Ref<World> GetWorld() { return s_Current; }
 
+		ASSET_CLASS_TYPE(EAssetType::EWorld)
+	private:
+		static World* s_Current;
 		entt::registry m_Registry;
 		//std::vector<Entity> m_RootEntities;
 

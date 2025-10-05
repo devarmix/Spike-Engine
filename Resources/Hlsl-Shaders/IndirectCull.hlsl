@@ -118,7 +118,7 @@ void CSMain(uint3 threadID : SV_DispatchThreadID) {
         uint lastVisibility = VisibilityBuffer[objectData.VisibilityIdx];
         bool drawMesh = prepass ? visible : visible && lastVisibility == 0;
 
-        if (drawMesh) {
+        if (true) {
             uint batchOffset = BatchOffsetsBuffer[objectData.DrawBatchID];
 
             uint localIndex;

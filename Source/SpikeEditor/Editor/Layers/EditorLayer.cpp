@@ -9,8 +9,12 @@
 
 namespace Spike {
 
+	EditorLayer::EditorLayer() : Layer("Editor Layer") {
+		
+	}
+
 	EditorLayer::~EditorLayer() {
-		delete GRegistry;
+		//delete GRegistry;
 	}
 
 	void EditorLayer::Tick(float deltaTime) {
@@ -56,7 +60,7 @@ namespace Spike {
 				ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 			ImGui::Begin("DockSpace", &dockOpen, window_flags);
 			if (!opt_padding)
-				ImGui::PopStyleVar();
+				ImGui::PopStyleVar(); 
 
 			if (opt_fullscreen)
 				ImGui::PopStyleVar(2);
@@ -67,6 +71,7 @@ namespace Spike {
 
 		m_WorldViewport.Tick(deltaTime);
 
+
 		// end dockspace
 		{
 			ImGui::End();
@@ -74,9 +79,6 @@ namespace Spike {
 	}
 
 	void EditorLayer::OnAttach() {
-		GRegistry = new EditorRegistry();
-		GRegistry->Deserialize();
-
 		ConfigImGui();
 	}
 
@@ -105,6 +107,14 @@ namespace Spike {
 		style.ScrollbarRounding = 6.0f;
 		style.GrabRounding = 6.0f;
 		style.TabRounding = 6.0f;
+
+		{
+			EditorUI::FontDesc desc{};
+			desc.Path = "C:\\Users\\Artem\\Desktop\\Spike-Engine\\Resources\\Renderer\\Fonts\\Roboto-Medium.ttf";
+			desc.Size = 16;
+
+			EditorUI::AddFont("Default", desc);
+		}
 
 		// Colors
 		colors[ImGuiCol_Text] = ImVec4(0.95f, 0.96f, 0.98f, 1.00f);

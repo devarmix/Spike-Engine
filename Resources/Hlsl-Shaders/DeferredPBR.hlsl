@@ -30,7 +30,7 @@ VSOutput VSMain(VSInput input) {
     SceneObjectGPUData objectData = ObjectsBuffer[input.InstanceID];
 
     uint vIndex = vk::RawBufferLoad<uint>(objectData.IndexBufferAddress + ((input.VertexIndex + objectData.FirstIndex) * sizeof(uint)), 4);
-    Vertex v = vk::RawBufferLoad<Vertex>(objectData.VertexBufferAddress + (vIndex * sizeof(Vertex)), 16);
+    Vertex v = vk::RawBufferLoad<Vertex>(objectData.VertexBufferAddress + (vIndex * sizeof(Vertex)), 8);
 
     VSOutput output;
 
@@ -65,7 +65,7 @@ struct PSOutput {
 PSOutput PSMain(VSOutput input) {
 
     //float4 albedo = SampleMaterialTexture(input.MaterialDataIndex, AlbedoMap, input.TexCoord);
-    float3 normalSample = SampleMaterialTexture(input.MaterialDataIndex, NormalMap, input.TexCoord).rgb;
+    //float3 normalSample = SampleMaterialTexture(input.MaterialDataIndex, NormalMap, input.TexCoord).rgb;
 
     //float ao = SampleMaterialTexture(input.MaterialDataIndex, AOMap, input.TexCoord).r;
     //float metallic = SampleMaterialTexture(input.MaterialDataIndex, MettalicMap, input.TexCoord).r;

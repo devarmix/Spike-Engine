@@ -20,6 +20,7 @@ namespace Spike {
 		ERGBA8U,
 		EBGRA8U,
 		ERGBA16F,
+		ERGBA16U,
 		ERGBA32F,
 		ERGBBC1,
 		ERGBABC3,
@@ -28,6 +29,8 @@ namespace Spike {
 		ED32F,
 		ER32F,
 		ERG16F,
+		ERG16U,
+		ERG32F,
 		ERG8U,
 		ER8U
 	};

@@ -11,6 +11,8 @@ uint32_t Spike::TextureFormatToSize(ETextureFormat format) {
 	{
 	case Spike::ETextureFormat::ERGBBC1:
 	case Spike::ETextureFormat::ERGBA16F:
+	case Spike::ETextureFormat::ERGBA16U:
+	case Spike::ETextureFormat::ERG32F:
 		return 8;
 	case Spike::ETextureFormat::ERGBA32F:
 	case Spike::ETextureFormat::ERGBABC3:
@@ -21,6 +23,7 @@ uint32_t Spike::TextureFormatToSize(ETextureFormat format) {
 	case Spike::ETextureFormat::ED32F:
 	case Spike::ETextureFormat::ER32F:
 	case Spike::ETextureFormat::ERG16F:
+	case Spike::ETextureFormat::ERG16U:
 		return 4;
 	case Spike::ETextureFormat::ERG8U:
 		return 2;

@@ -1,4 +1,4 @@
-#include <Engine/Renderer/FrameRenderer.h>
+#include <Engine/Renderer/DefaultFeatures.h>
 #include <Engine/Core/Application.h>
 #include <Engine/Renderer/Shader.h>
 #include <Engine/Renderer/GfxDevice.h>
@@ -13,12 +13,23 @@ Spike::FrameRenderer* Spike::GFrameRenderer = nullptr;
 namespace Spike {
 
 	void FrameRenderer::FlushFrameQueue(uint32_t idx) {
-
-		std::vector<std::function<void()>> queue{};
-		m_FrameQueues[idx].PopAll(queue);
-
-		for (auto& func : queue) {
+		for (auto& func : m_FrameQueues[m_FrameCount % 2]) {
 			func();
+		}
+
+		m_FrameQueues[m_FrameCount % 2].clear();
+	}
+
+	void FrameRenderer::SubmitToFrameQueue(std::function<void()>&& func) {
+
+		// we are on render thread
+		if (std::this_thread::get_id() == GApplication->GetRenderThread().GetID()) {
+			m_FrameQueues[m_FrameCount % 2].push_back(std::move(func));
+		}
+		else {
+			SUBMIT_RENDER_COMMAND(([f = std::move(func), this]() {
+				m_FrameQueues[m_FrameCount % 2].push_back(std::move(f));
+				}));
 		}
 	}
 
@@ -97,6 +108,10 @@ namespace Spike {
 
 	FrameRenderer::~FrameRenderer() {
 
+		for (auto& state : m_FeatureStates) {
+			delete state.Ptr;
+		}
+
 		for (int i = 0; i < 2; i++) {
 
 			FlushFrameQueue(i);
@@ -118,7 +133,7 @@ namespace Spike {
 		}
 	}
 
-	void FrameRenderer::RenderWorld(RHIWorldProxy* proxy, RenderContext context, const CameraDrawData& cameraData, std::vector<RenderFeature*>& features) {
+	void FrameRenderer::RenderWorld(RHIWorldProxy* proxy, RenderContext context, const CameraDrawData& cameraData, const std::vector<RenderFeature*>& features) {
 
 		RDGBuilder builder = RDGBuilder();
 		uint32_t frameIndex = m_FrameCount % 2;
@@ -216,7 +231,7 @@ namespace Spike {
 	}
 
 	void FrameRenderer::BeginFrame() {
-		
+
 		RHITexture2D* oldFontsTex = m_GuiFontTexture;
 		uint8_t* newFontsData = nullptr;
 
@@ -225,6 +240,22 @@ namespace Spike {
 
 			ImGui_ImplSDL2_NewFrame();
 			ImGui::NewFrame();
+		}
+
+		// cleanup unused render features
+		{
+			uint32_t idx = 0;
+			while (idx < m_FeatureStates.size()) {
+				const uint32_t framesBeforeDel = 10;
+
+				if (m_FeatureStates[idx].LastUsedFrame + framesBeforeDel < m_FrameCount) {
+					delete m_FeatureStates[idx].Ptr;
+					SwapDelete(m_FeatureStates, idx);
+				}
+				else {
+					idx++;
+				}
+			}
 		}
 
 		SUBMIT_RENDER_COMMAND(([=, this]() {
@@ -246,5 +277,55 @@ namespace Spike {
 					(size_t)m_GuiFontTexture->GetSizeXYZ().x * m_GuiFontTexture->GetSizeXYZ().y * TextureFormatToSize(m_GuiFontTexture->GetFormat()));
 			}
 			}));
+	}
+
+	RenderFeature* FrameRenderer::LoadFeature(EFeatureType type) {
+
+		auto it = std::find_if(m_FeatureStates.begin(), m_FeatureStates.end(), [&](const auto& state) {
+			return state.Type == type;
+			});
+
+		if (it != m_FeatureStates.end()) {
+			it->LastUsedFrame = m_FrameCount;
+			return it->Ptr;
+		}
+		else {
+			FeatureState& state = m_FeatureStates.emplace_back(FeatureState{});
+			state.Type = type;
+			state.LastUsedFrame = m_FrameCount;
+
+			switch (type)
+			{
+			case Spike::EFeatureType::EGBuffer:
+				state.Ptr = new GBufferFeature();
+				break;
+			case Spike::EFeatureType::EDeferredLightning:
+				state.Ptr = new DeferredLightingFeature();
+				break;
+			case Spike::EFeatureType::ESkybox:
+				state.Ptr = new SkyboxFeature();
+				break;
+			case Spike::EFeatureType::ESSAO:
+				state.Ptr = new SSAOFeature();
+				break;
+			case Spike::EFeatureType::EFXAA:
+				state.Ptr = new FXAAFeature();
+				break;
+			case Spike::EFeatureType::ESMAA:
+				state.Ptr = new SMAAFeature();
+				break;
+			case Spike::EFeatureType::EBloom:
+				state.Ptr = new BloomFeature();
+				break;
+			case Spike::EFeatureType::EToneMap:
+				state.Ptr = new ToneMapFeature();
+				break;
+			default:
+				ENGINE_ERROR("Invalid feature type!");
+				return nullptr;
+			}
+
+			return state.Ptr;
+		}
 	}
 }

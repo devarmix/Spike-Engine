@@ -9,7 +9,7 @@ namespace Spike {
 	void EditorCamera::Tick(float deltaTime) {
 
 		{
-			if (m_ViewportHovered) {
+			if (m_ViewportHovered && GInput->GetMouseButtonDown(2)) {
 				SDL_SetRelativeMouseMode(SDL_TRUE);
 				SDL_ShowCursor(SDL_DISABLE);
 
@@ -71,7 +71,7 @@ namespace Spike {
 			}
 
 			m_Yaw += GInput->GetMouseDeltaX() / 200.f;
-			m_Pitch += GInput->GetMouseDeltaY() / 200.f;
+			m_Pitch += -GInput->GetMouseDeltaY() / 200.f;
 			m_Rotation = Vec3(m_Pitch, m_Yaw, 0.f);
 		}
 

@@ -7,7 +7,7 @@ namespace Spike {
 
 	class EditorLayer : public Layer {
 	public:
-		EditorLayer() : Layer("Editor Layer") {}
+		EditorLayer();
 		~EditorLayer() override;
 
 		virtual void Tick(float deltaTime) override;

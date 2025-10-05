@@ -729,12 +729,7 @@ void CSMain(uint3 groupID : SV_GroupID,
 	SrcTexture.GetDimensions(dim.x, dim.y);
 	uint2 block_dim = (dim + 3) / 4;
 
-	[branch]
-	if (any(blockCoord >= block_dim))
-		return;
-
 	float2 TextureSizeRcp = rcp(dim);
-
 	if (all(blockCoord < block_dim))
 	{
 		// Gather texels for current 4x4 block
@@ -778,7 +773,8 @@ void CSMain(uint3 groupID : SV_GroupID,
 		texels[14] = float3(block3X.x, block3Y.x, block3Z.x);
 		texels[15] = float3(block3X.y, block3Y.y, block3Z.y);
 
-        uint dataOffset = dispatchThreadID.x + dispatchThreadID.y * block_dim.x;
+		uint globalOffset = block_dim.x * block_dim.y * dispatchThreadID.z;
+        uint dataOffset = (dispatchThreadID.x + dispatchThreadID.y * block_dim.x) + globalOffset;
         Output[dataOffset] = CompressBC6H(texels);
 	}
 }

@@ -6,7 +6,7 @@
 
 namespace Spike {
 
-	StaticMeshProxy::StaticMeshProxy(RHIWorldProxy* wProxy) : m_WorldProxy(wProxy) {}
+	StaticMeshProxy::StaticMeshProxy(RHIWorldProxy* wProxy, const Mat4x4& transform) : m_WorldProxy(wProxy), m_LastTransform(transform) {}
 
 	StaticMeshProxy::~StaticMeshProxy() {
 		for (int i = 0; i < m_DataIndices.size(); i++) {
@@ -20,8 +20,8 @@ namespace Spike {
 		}
 	}
 
-	void StaticMeshProxy::OnTransformChange(Mat4x4&& newTransform) {
-		m_LastTransform = std::move(newTransform);
+	void StaticMeshProxy::OnTransformChange(const Mat4x4& newTransform) {
+		m_LastTransform = newTransform;
 
 		for (auto idx : m_DataIndices) {
 
@@ -115,7 +115,7 @@ namespace Spike {
 			if (m_Materials.size() > i) {
 				RemoveFromBatch(m_Materials[i].second);
 			}
-		}
+		} 
 
 		// add missing sub-mesh proxies
 		for (int i = m_DataIndices.size(); i < mesh->GetDesc().SubMeshes.size(); i++) {
@@ -130,7 +130,7 @@ namespace Spike {
 				}
 			}
 		}
-
+		 
 		for (int i = 0; i < mesh->GetDesc().SubMeshes.size(); i++) {
 			const SubMesh& sMesh = mesh->GetDesc().SubMeshes[i];
 
@@ -148,22 +148,18 @@ namespace Spike {
 	}
 
 	StaticMeshComponent::StaticMeshComponent(Entity* entity) : BaseEntityComponent(entity), m_Mesh(nullptr) {
-		m_Proxy = new StaticMeshProxy(entity->GetWorld()->GetProxy());
+		m_Proxy = new StaticMeshProxy(entity->GetWorld()->GetProxy(), entity->GetTransform());
 		m_CallBackID = entity->AddTransformCallBack([this](const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& mat) {
 
-			SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, mat]() mutable {
-				GFrameRenderer->SubmitToFrameQueue([=, transform = std::move(mat)]() mutable {
-					proxy->OnTransformChange(std::move(transform));
-					});
-				}));
+			GFrameRenderer->SubmitToFrameQueue([=, proxy = m_Proxy]() {
+				proxy->OnTransformChange(mat);
+				});
 			});
 	}
 
 	StaticMeshComponent::~StaticMeshComponent() {
-		SUBMIT_RENDER_COMMAND([proxy = m_Proxy] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				delete proxy;
-				});
+		GFrameRenderer->SubmitToFrameQueue([proxy = m_Proxy]() {
+			delete proxy;
 			});
 		m_Entity->RemoveTransformCallBack(m_CallBackID);
 	}
@@ -171,41 +167,33 @@ namespace Spike {
 	void StaticMeshComponent::SetMesh(Ref<Mesh> mesh) {
 		RHIMesh* rhiMesh = mesh->GetResource();
 
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, rhiMesh] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetMesh(rhiMesh);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([rhiMesh, proxy = m_Proxy]() {
+			proxy->SetMesh(rhiMesh);
+			});
 		m_Mesh = mesh;
 	}
 
 	void StaticMeshComponent::SetMaterial(Ref<Material> mat, uint32_t index) {
 		RHIMaterial* rhiMat = mat->GetResource();
 
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, rhiMat, index] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetMaterial(rhiMat, index);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([rhiMat, index, proxy = m_Proxy]() {
+			proxy->SetMaterial(rhiMat, index);
+			});
 		m_Materials[index] = mat;
 	}
 
 	void StaticMeshComponent::PushMaterial(Ref<Material> mat) {
 		RHIMaterial* rhiMat = mat->GetResource();
 		
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, rhiMat]() {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->PushMaterial(rhiMat);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([rhiMat, proxy = m_Proxy]() {
+			proxy->PushMaterial(rhiMat);
+			});
 		m_Materials.push_back(mat);
 	}
 
 	void StaticMeshComponent::PopMaterial() {
-		SUBMIT_RENDER_COMMAND([proxy = m_Proxy] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->PopMaterial();
-				});
+		GFrameRenderer->SubmitToFrameQueue([proxy = m_Proxy]() {
+			proxy->PopMaterial();
 			});
 		m_Materials.pop_back();
 	}
@@ -267,100 +255,76 @@ namespace Spike {
 		m_Proxy = new LightProxy(entity->GetWorld()->GetProxy());
 		m_CallBackID = entity->AddTransformCallBack([this](const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& mat) {
 
-			SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, pos]() mutable {
-				GFrameRenderer->SubmitToFrameQueue([=, value = std::move(pos)]() {
-					proxy->OnPositionChange(pos);
-					});
-				}));
+			GFrameRenderer->SubmitToFrameQueue([pos, proxy = m_Proxy]() {
+				proxy->OnPositionChange(pos);
+				});
 			});
 	}
 
 	LightComponent::~LightComponent() {
-		SUBMIT_RENDER_COMMAND([proxy = m_Proxy]() {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				delete proxy;
-				});
+		GFrameRenderer->SubmitToFrameQueue([proxy = m_Proxy]() {
+			delete proxy;
 			});
 		m_Entity->RemoveTransformCallBack(m_CallBackID);
 	}
 
 	void LightComponent::SetIntensity(float value) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, value] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetIntensity(value);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
+			proxy->SetIntensity(value);
+			});
 	}
 
 	void LightComponent::SetRange(float value) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, value] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetRange(value);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
+			proxy->SetRange(value);
+			});
 	}
 
 	void LightComponent::SetColor(const Vec4& value) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, value]() {
-			GFrameRenderer->SubmitToFrameQueue([=, color = std::move(value)]() {
-				proxy->SetColor(color);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
+			proxy->SetColor(value);
+			});
 	}
 
 	void LightComponent::SetDirection(const Vec3& value) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, value] {
-			GFrameRenderer->SubmitToFrameQueue([=, dir = std::move(value)]() {
-				proxy->SetDirection(dir);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
+			proxy->SetDirection(value);
+			});
 	}
 
 	void LightComponent::SetLightLinear(float value) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, value] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetLightLinear(value);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
+			proxy->SetLightLinear(value);
+			});
 	}
 
 	void LightComponent::SetLightConstant(float value) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, value] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetLightConstant(value);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
+			proxy->SetLightConstant(value);
+			});
 	}
 
 	void LightComponent::SetLightQuadratic(float value) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, value] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetLightQuadratic(value);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
+			proxy->SetLightQuadratic(value);
+			});
 	}
 
 	void LightComponent::SetType(ELightType type) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, type] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetType((uint8_t)type);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([type, proxy = m_Proxy]() {
+			proxy->SetType((uint8_t)type);
+			});
 	}
 
 	void LightComponent::SetInnerConeCos(float value) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, value] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetInnerConeCos(value);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
+			proxy->SetInnerConeCos(value);
+			});
 	}
 
 	void LightComponent::SetOuterConeCos(float value) {
-		SUBMIT_RENDER_COMMAND(([proxy = m_Proxy, value] {
-			GFrameRenderer->SubmitToFrameQueue([=]() {
-				proxy->SetOuterConeCos(value);
-				});
-			}));
+		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
+			proxy->SetOuterConeCos(value);
+			});
 	}
 }

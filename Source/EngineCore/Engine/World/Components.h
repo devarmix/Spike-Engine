@@ -18,10 +18,10 @@ namespace Spike {
 
 	class StaticMeshProxy {
 	public:
-		StaticMeshProxy(RHIWorldProxy* wProxy);
+		StaticMeshProxy(RHIWorldProxy* wProxy, const Mat4x4& transform);
 		~StaticMeshProxy();
 
-		void OnTransformChange(Mat4x4&& newTransform);
+		void OnTransformChange(const Mat4x4& newTransform);
 		void SetMaterial(RHIMaterial* mat, uint32_t index, bool isNew = false);
 		void PushMaterial(RHIMaterial* mat);
 		void PopMaterial();

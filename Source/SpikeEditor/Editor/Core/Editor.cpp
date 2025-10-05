@@ -1,4 +1,5 @@
 #include <Editor/Core/Editor.h>
+#include <Editor/Project/Project.h>
 
 // main file
 #include <Engine/Core/Main.h>
@@ -34,9 +35,12 @@ namespace Spike {
 	SpikeEditor::SpikeEditor(const Spike::ApplicationDesc& desc, const std::filesystem::path& projectPath) : Application(desc), m_ProjectPath(projectPath) {
 		GEditor = this;
 
+		GRegistry = new EditorRegistry();
+		GRegistry->Deserialize();
+
 		m_EditorLayer = new EditorLayer();
 		PushLayer(m_EditorLayer);
 	}
 
-	SpikeEditor::~SpikeEditor() { Destroy(); }
+	SpikeEditor::~SpikeEditor() { Destroy(); delete GRegistry; }
 }

@@ -18,7 +18,8 @@ namespace Spike {
 		ETexture2D,
 		ECubeTexture,
 		EMaterial,
-		EMesh
+		EMesh,
+		EWorld
 	};
 
 	class Asset : public RefCounted {

@@ -250,7 +250,7 @@ namespace Spike {
 					graphBuilder->BarrierRDGBuffer(cmd, proxy->DrawCommandsBuffer, 
 						proxy->DrawCommandsBuffer->GetSize(), 0, EGPUAccessFlags::EIndirectArgs);
 					graphBuilder->BarrierRDGBuffer(cmd, proxy->DrawCountsBuffer, 
-						sizeof(uint32_t) * proxy->Batches.size(), 0, EGPUAccessFlags::EIndirectArgs);
+						proxy->DrawCountsBuffer->GetSize(), 0, EGPUAccessFlags::EIndirectArgs);
 					};
 
 				RHIBindingSet* meshDrawSet = GRDGPool->GetOrCreateBindingSet(GShaderManager->GetMeshDrawLayout());
@@ -287,7 +287,7 @@ namespace Spike {
 							sizeof(uint32_t) * countOffset, proxy->ObjectsVB.Size(), stride);
 					}
 
-					GRHIDevice->EndRendering(cmd);
+					GRHIDevice->EndRendering(cmd); 
 					};
 
 				// first cull pass
@@ -340,7 +340,7 @@ namespace Spike {
 				// second cull pass
 				{
 					graphBuilder->FillRDGBuffer(cmd, proxy->DrawCountsBuffer, 
-						sizeof(uint32_t) * proxy->Batches.size(), 0, 0, EGPUAccessFlags::EUAVCompute);
+						proxy->DrawCountsBuffer->GetSize(), 0, 0, EGPUAccessFlags::EUAVCompute);
 					graphBuilder->BarrierRDGBuffer(cmd, proxy->DrawCommandsBuffer, 
 						proxy->DrawCommandsBuffer->GetSize(), 0, EGPUAccessFlags::EUAVCompute);
 

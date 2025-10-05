@@ -46,7 +46,28 @@ namespace Spike {
 			: m_Nodes(nullptr), m_FreeHead(INVALID_IDX), m_Tail(INVALID_IDX), m_NextNode(0), m_Size(0), m_Ptr(nullptr) {}
 		DenseBuffer(T* ptr, uint32_t maxSize)
 			: m_Nodes(new Node[maxSize]), m_FreeHead(INVALID_IDX), m_Tail(INVALID_IDX), m_NextNode(0), m_Size(0), m_Ptr(ptr) {}
+		DenseBuffer(const DenseBuffer& copy) = delete;
+
+		DenseBuffer(DenseBuffer&& move) noexcept {
+			m_Nodes = move.m_Nodes;
+			m_Ptr = move.m_Ptr;
+			m_FreeHead = move.m_FreeHead;
+			m_NextNode = move.m_NextNode;
+			m_Size = move.m_Size;
+			m_Tail = move.m_Tail;
+		}
 		~DenseBuffer() { if (m_Nodes) delete[] m_Nodes; }
+
+		void Make(T* ptr, uint32_t maxSize) {
+			if (m_Nodes) delete[] m_Nodes;
+
+			m_Nodes = new Node[maxSize];
+			m_Ptr = ptr;
+			m_FreeHead = INVALID_IDX;
+			m_Tail = INVALID_IDX;
+			m_NextNode = 0;
+			m_Size = 0;
+		}
 
 		uint32_t Push(T&& element) {
 			uint32_t offset = 0;
@@ -236,7 +257,7 @@ namespace Spike {
 		template<typename CopyT>
 		Ref& operator=(const Ref<CopyT>& other) {
 			T* old = m_Ptr;
-			m_Ptr = other.Get();
+			m_Ptr = (T*)other.Get();
 
 			if (m_Ptr) {
 				m_Ptr->AddRef();

@@ -2,6 +2,8 @@
 #include <Engine/Renderer/FrameRenderer.h>
 #include <Engine/Core/Application.h>
 
+Spike::World* Spike::World::s_Current = nullptr;
+
 namespace Spike {
 
 	RHIWorldProxy::RHIWorldProxy() {
@@ -56,33 +58,43 @@ namespace Spike {
 		ObjectsBuffer->InitRHI();
 		VisibilityBuffer->InitRHI();
 
-		ObjectsVB = DenseBuffer((ObjectGPUData*)ObjectsBuffer->GetMappedData(), (uint32_t)ObjectsBuffer->GetSize());
-		LightsVB = DenseBuffer((LightGPUData*)LightsBuffer->GetMappedData(), (uint32_t)LightsBuffer->GetSize());
+		ObjectsVB.Make((ObjectGPUData*)ObjectsBuffer->GetMappedData(), MAX_DRAW_OBJECTS_PER_WORLD);
+		LightsVB.Make((LightGPUData*)LightsBuffer->GetMappedData(), MAX_LIGHTS_PER_WORLD);
 	}
 
 	void RHIWorldProxy::ReleaseRHI() {
 
-		GFrameRenderer->SubmitToFrameQueue([this]() {
-			LightsBuffer->ReleaseRHIImmediate();
-			delete LightsBuffer;
-			DrawCommandsBuffer->ReleaseRHIImmediate();
-			delete DrawCommandsBuffer;
-			DrawCountsBuffer->ReleaseRHIImmediate();
-			delete DrawCountsBuffer;
-			ObjectsBuffer->ReleaseRHIImmediate();
-			delete ObjectsBuffer;
-			VisibilityBuffer->ReleaseRHIImmediate();
-			delete VisibilityBuffer;
-			});
+		LightsBuffer->ReleaseRHIImmediate();
+		delete LightsBuffer;
+		DrawCommandsBuffer->ReleaseRHIImmediate();
+		delete DrawCommandsBuffer;
+		DrawCountsBuffer->ReleaseRHIImmediate();
+		delete DrawCountsBuffer;
+		ObjectsBuffer->ReleaseRHIImmediate();
+		delete ObjectsBuffer;
+		VisibilityBuffer->ReleaseRHIImmediate();
+		delete VisibilityBuffer;
 	}
 
 	World::World() {
 		m_Proxy = new RHIWorldProxy();
+
+		// FIXME make world an actual asset
+		m_ID = 0;
 		SafeRHIResourceInit(m_Proxy);
 	}
 
 	World::~World() {
-		SafeRHIResourceRelease(m_Proxy);
+		GFrameRenderer->SubmitToFrameQueue([proxy = m_Proxy]() {
+			proxy->ReleaseRHI();
+			delete proxy;
+			});
+	}
+
+	Ref<World> World::Create() {
+		Ref<World> w = CreateRef<World>();
+		s_Current = w.Get();
+		return w;
 	}
 
 	void World::Tick() {

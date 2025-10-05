@@ -17,7 +17,7 @@ struct FilteringConstants {
 
 #define PI 3.1415926536
 #define NUM_RADIANCE_SAMPLES 1024u
-#define IRRADIANCE_SAMPLE_DELTA 0.01f
+#define IRRADIANCE_SAMPLE_DELTA 0.005f
 
 // glsl style mod
 float mod(float a, float b) {

@@ -38,6 +38,12 @@ namespace Spike {
 			m_MouseX = event.motion.x;
 			m_MouseY = event.motion.y;
 			break;
+		case SDL_MOUSEBUTTONDOWN:
+			m_MouseButtons[event.button.button - 1] = { true, true, false };
+			break;
+		case SDL_MOUSEBUTTONUP:
+			m_MouseButtons[event.button.button - 1] = { false, false, true };
+			break;
 		case SDL_MOUSEWHEEL:
 			m_MouseScroll = event.wheel.y;
 			break;
@@ -66,6 +72,6 @@ namespace Spike {
 		m_MouseScroll = 0;
 
 		m_Released.clear();
-		m_Released.clear();
+		m_Pressed.clear();
 	}
 }

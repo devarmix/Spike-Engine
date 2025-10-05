@@ -328,18 +328,13 @@ void Spike::AssetImporter::ImportTexture2D(const std::filesystem::path& sourcePa
 		rawData = stbi_load(sourcePath.string().c_str(), &width, &height, &numChannels, 4);
 		stagingFormat = ETextureFormat::ERGBA8U;
 		break;
-	case ETextureFormat::ERGBA16F:
-		rawData = stbi_load_16(sourcePath.string().c_str(), &width, &height, &numChannels, 4);
-		stagingFormat = ETextureFormat::ERGBA16F;
-		break;
 	case ETextureFormat::ERGBA32F:
 		rawData = stbi_loadf(sourcePath.string().c_str(), &width, &height, &numChannels, 4);
 		stagingFormat = ETextureFormat::ERGBA32F;
 		break;
 	case ETextureFormat::ERGBC5:
-	case ETextureFormat::ERG16F:
-		rawData = stbi_load_16(sourcePath.string().c_str(), &width, &height, &numChannels, 2);
-		stagingFormat = ETextureFormat::ERG16F;
+		rawData = stbi_loadf(sourcePath.string().c_str(), &width, &height, &numChannels, 2);
+		stagingFormat = ETextureFormat::ERG32F;
 		break;
 	default:
 		ENGINE_ERROR("Unsupported texture format for import!");
@@ -477,17 +472,7 @@ static void ImportCubeTextureInternal(RHITexture* sampledTexture, const std::fil
 	stagingTexDesc.NumMips = numMips;
 	stagingTexDesc.UsageFlags = ETextureUsageFlags::ECopyDst | ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopySrc;
 	stagingTexDesc.Sampler = sampledTexture->GetSampler();
-
-	switch (desc.Format)
-	{
-	case ETextureFormat::ERGBA16F:
-	case ETextureFormat::ERGBABC6:
-		stagingTexDesc.Format = ETextureFormat::ERGBA16F;
-		break;
-	default:
-		stagingTexDesc.Format = ETextureFormat::ERGBA32F;
-		break;
-	}
+	stagingTexDesc.Format = ETextureFormat::ERGBA32F;
 
 	RHICubeTexture* stagingTex = new RHICubeTexture(stagingTexDesc);
 	stagingTex->InitRHI();
@@ -664,12 +649,8 @@ void Spike::AssetImporter::ImportCubeTexture(const std::filesystem::path& source
 
 	switch (desc.Format)
 	{
-	case ETextureFormat::ERGBA16F:
-	case ETextureFormat::ERGBABC6:
-		stagingFormat = ETextureFormat::ERGBA16F;
-		rawData = stbi_load_16(sourcePath.string().c_str(), &width, &height, &numChannels, 4);
-		break;
 	case ETextureFormat::ERGBA32F:
+	case ETextureFormat::ERGBABC6:
 		stagingFormat = ETextureFormat::ERGBA32F;
 		rawData = stbi_loadf(sourcePath.string().c_str(), &width, &height, &numChannels, 4);
 		break;
@@ -704,6 +685,7 @@ void Spike::AssetImporter::ImportCubeTexture(const std::filesystem::path& source
 
 			GRHIDevice->CopyDataToTexture(rawData, 0, sampledTex, EGPUAccessFlags::ENone, EGPUAccessFlags::ESRV, {region}, 
 				(size_t)texDesc.Width * texDesc.Height * TextureFormatToSize(texDesc.Format));
+			stbi_image_free(rawData);
 		}
 
 		ImportCubeTextureInternal(sampledTex, assetPath, desc);

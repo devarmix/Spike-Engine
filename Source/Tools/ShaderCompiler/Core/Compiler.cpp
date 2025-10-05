@@ -487,6 +487,9 @@ namespace ShaderCompiler {
 			wincludePath.c_str(),
 			L"-P",
 			wfilePath.c_str()
+#ifdef ENGINE_BUILD_DEBUG
+			, L"-fspv-preserve-interface"
+#endif
 		};
 
 		HRESULT hres{};

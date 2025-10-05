@@ -163,6 +163,8 @@ VkFormat Spike::VulkanUtils::TextureFormatToVulkan(ETextureFormat format) {
 		return VK_FORMAT_B8G8R8A8_UNORM;
 	case Spike::ETextureFormat::ERGBA16F:
 		return VK_FORMAT_R16G16B16A16_SFLOAT;
+	case Spike::ETextureFormat::ERGBA16U:
+		return VK_FORMAT_R16G16B16A16_UNORM;
 	case Spike::ETextureFormat::ERGBA32F:
 		return VK_FORMAT_R32G32B32A32_SFLOAT;
 	case Spike::ETextureFormat::ED32F:
@@ -171,6 +173,8 @@ VkFormat Spike::VulkanUtils::TextureFormatToVulkan(ETextureFormat format) {
 		return VK_FORMAT_R32_SFLOAT;
 	case Spike::ETextureFormat::ERG16F:
 		return VK_FORMAT_R16G16_SFLOAT;
+	case Spike::ETextureFormat::ERG16U:
+		return VK_FORMAT_R16G16_UNORM;
 	case Spike::ETextureFormat::ERG8U:
 		return VK_FORMAT_R8G8_UNORM;
 	case Spike::ETextureFormat::ER8U:
@@ -178,9 +182,11 @@ VkFormat Spike::VulkanUtils::TextureFormatToVulkan(ETextureFormat format) {
 	case Spike::ETextureFormat::ERGBABC3:
 		return VK_FORMAT_BC3_UNORM_BLOCK;
 	case Spike::ETextureFormat::ERGBABC6:
-		return VK_FORMAT_BC6H_SFLOAT_BLOCK;
+		return VK_FORMAT_BC6H_UFLOAT_BLOCK;
 	case Spike::ETextureFormat::ERGBC5:
 		return VK_FORMAT_BC5_UNORM_BLOCK;
+	case Spike::ETextureFormat::ERG32F:
+		return VK_FORMAT_R32G32_SFLOAT;
 	default:
 		return VK_FORMAT_UNDEFINED;
 	}
