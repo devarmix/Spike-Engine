@@ -45,7 +45,7 @@ namespace Spike {
 	void RenderLayer::OnEvent(const GenericEvent& event) {
 		EventHandler handler(event);
 
-		if (GApplication->IsUsingImGui()) {
+		if (Application::Get().IsUsingImGui()) {
 
 			handler.Handle<SDLEvent>([this](const SDLEvent& e) {
 				ImGui_ImplSDL2_ProcessEvent(&e.GetEvent());

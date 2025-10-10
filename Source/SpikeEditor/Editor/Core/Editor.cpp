@@ -28,12 +28,12 @@ Spike::Application* Spike::CreateApplication(int argc, char* argv[]) {
 	return new Spike::SpikeEditor(appDesc, "C:/Users/Artem/Documents/Spike-Projects/Test");
 }
 
-Spike::SpikeEditor* Spike::GEditor = nullptr;
+Spike::SpikeEditor* Spike::SpikeEditor::s_Instance = nullptr;
 
 namespace Spike {
 
 	SpikeEditor::SpikeEditor(const Spike::ApplicationDesc& desc, const std::filesystem::path& projectPath) : Application(desc), m_ProjectPath(projectPath) {
-		GEditor = this;
+		s_Instance = this;
 
 		GRegistry = new EditorRegistry();
 		GRegistry->Deserialize();

@@ -4,7 +4,7 @@
 
 #include <Engine/Core/Stats.h>
 
-Spike::Application* Spike::GApplication = nullptr;
+Spike::Application* Spike::Application::s_Instance = nullptr;
 
 namespace Spike {
 
@@ -17,7 +17,7 @@ namespace Spike {
 		m_UsingDocking = desc.UsingDocking;
 
 		// initialize core globals
-		GApplication = this;
+		s_Instance = this;
 		RHIDevice::Create(m_Window, m_UsingImGui);
 
 		ENGINE_WARN("Created an application: " + desc.Name);

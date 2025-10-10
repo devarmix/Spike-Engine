@@ -59,6 +59,9 @@ namespace Spike {
 		bool IsUsingDocking() const { return m_UsingDocking; }
 		void Destroy();
 
+		bool Closing() const { return !m_Running; }
+		static Application& Get() { assert(s_Instance); return *s_Instance; };
+
 	private:
 
 		void ProcessEvents();
@@ -81,13 +84,12 @@ namespace Spike {
 		RenderLayer* m_RenderLayer;
 
 		Time m_Time;
+
+		static Application* s_Instance;
 	};
 
 	// to be defined in client
 	Application* CreateApplication(int argc, char* argv[]);
-
-	// global application pointer
-	extern Application* GApplication;
 }
 
-#define SUBMIT_RENDER_COMMAND(task) Spike::GApplication->GetRenderThread().PushTask(task);
+#define SUBMIT_RENDER_COMMAND(task) Spike::Application::Get().GetRenderThread().PushTask(task);

@@ -6,8 +6,6 @@
 
 namespace Spike {
 
-	class Entity;
-
 	struct alignas(16) ObjectGPUData {
 
 		Vec4 BoundsOrigin; // w - bounds radius
@@ -70,8 +68,8 @@ namespace Spike {
 		float Padding0[5];
 	};
 
-	constexpr uint32_t MAX_DRAW_OBJECTS_PER_WORLD = 100000;
-	constexpr uint32_t MAX_LIGHTS_PER_WORLD = 500;
+	constexpr uint32_t MAX_DRAW_OBJECTS_PER_WORLD = 200000;
+	constexpr uint32_t MAX_LIGHTS_PER_WORLD = 5000;
 	constexpr uint32_t MAX_SHADERS_PER_WORLD = 100;
 
 	struct WorldDrawBatch {
@@ -108,6 +106,8 @@ namespace Spike {
 		IndexQueue VisibilityQueue;
 	};
 
+	class Entity;
+
 	class World : public Asset {
 	public:
 		World();
@@ -119,16 +119,40 @@ namespace Spike {
 		static Ref<World> Create();
 		static Ref<World> GetWorld() { return s_Current; }
 
+		Entity CreateEntity(const std::string& name = "New Entity");
+		void DestroyEntity(Entity entity);
+		void SetEntityRoot(Entity entity);
+		void UnSetEntityRoot(Entity entity);
+
+		template<typename T, typename... Args>
+		T& RegisterEntityComponent(entt::entity handle, Args&&... args) {
+			return m_Registry.emplace<T>(handle, std::forward<Args>(args)...);
+		}
+
+		template<typename T>
+		bool EntityHasComponent(entt::entity handle) {
+			return m_Registry.all_of<T>(handle);
+		}
+
+		template<typename T>
+		T& GetEntityComponent(entt::entity handle) {
+			return m_Registry.get<T>(handle);
+		}
+
+		template<typename T>
+		void DestroyEntityComponent(entt::entity handle) {
+			m_Registry.remove<T>(handle);
+		}
+
+
 		ASSET_CLASS_TYPE(EAssetType::EWorld)
 	private:
 		static World* s_Current;
 		entt::registry m_Registry;
-		//std::vector<Entity> m_RootEntities;
 
-		//std::vector<std::pair<RHIMesh*, >> m_DirtyRenderables;
-		//std::vector<Entity> m_DirtyLightObjects;
+		std::vector<Entity> m_RootEntities;
+		std::vector<Entity> m_Entities;
 
 		RHIWorldProxy* m_Proxy;
-		friend class Entity;
 	};
 }

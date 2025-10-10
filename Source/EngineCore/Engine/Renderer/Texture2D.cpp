@@ -84,16 +84,20 @@ namespace Spike {
 		std::vector<size_t> mipSizes{};
 		stream >> header >> mipSizes;
 
+		SamplerDesc samplDesc{};
+		samplDesc.Filter = header.Filter;
+		samplDesc.AddressU = header.AddressU;
+		samplDesc.AddressV = header.AddressV;
+		samplDesc.AddressW = ESamplerAddress::EClamp;
+		samplDesc.MaxLOD = (uint32_t)mipSizes.size();
+
 		Texture2DDesc desc{};
 		desc.Width = header.Width;
 		desc.Height = header.Height;
 		desc.Format = header.Format;
 		desc.NumMips = (uint32_t)mipSizes.size();
 		desc.UsageFlags = ETextureUsageFlags::ESampled | ETextureUsageFlags::ECopyDst;
-		desc.SamplerDesc.Filter = header.Filter;
-		desc.SamplerDesc.AddressU = header.AddressU;
-		desc.SamplerDesc.AddressV = header.AddressV;
-		desc.SamplerDesc.AddressW = ESamplerAddress::EClamp;
+		desc.SamplerDesc = samplDesc;
 
 		uint8_t* buff = new uint8_t[header.ByteSize];
 		stream.ReadRaw(buff, header.ByteSize);

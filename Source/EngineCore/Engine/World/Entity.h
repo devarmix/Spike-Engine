@@ -2,64 +2,57 @@
 
 #include <Engine/Core/Core.h>
 #include <Engine/Core/Log.h>
-#include <Engine/World/World.h>
 #include <Engine/Asset/UUID.h>
+#include <Engine/World/World.h>
 
 namespace Spike {
 
-	using EntityHandle = entt::entity;
+	class TransformComponent;
+	class HierarchyComponent;
 
 	class Entity {
 	public:
-		Entity(World* world);
-		~Entity();
+		Entity() : m_World(nullptr), m_Handle(entt::null) {}
+		Entity(World* world, entt::entity handle) : m_World(world), m_Handle(handle) {}
+		~Entity() {}
 
-		Vec3 GetPosition() const { return m_Position; }
-		Quaternion GetRotation() const { return m_Rotation; }
-		Vec3 GetScale() const { return m_Scale; }
-		const Mat4x4& GetTransform() const { return m_WorldTransform; }
-
-		void SetScale(const Vec3& scale);
-		void SetPosition(const Vec3& pos);
-		void SetRotation(const Vec3& rot);
-
-		using TransformCallBack = std::function<void(const Vec3&, const Vec3&, const Vec3&, const Mat4x4&)>;
-		uint8_t AddTransformCallBack(TransformCallBack&& func);
-		void RemoveTransformCallBack(uint8_t id);
-		void DispatchTransformCallBack();
-
-		Entity* GetParent() const { return m_Parent; }
-		void SetParent(Entity* parent);
-		const std::vector<Entity*>& GetChildren() const { return m_Children; }
-		UUID GetID() const { return m_ID; }
 		World* GetWorld() { return m_World; }
+		entt::entity GetHandle() const { return m_Handle; }
+		void Destroy() { m_World->DestroyEntity(*this); }
 
 		template<typename T>
 		bool HasComponent() {
-			return m_World->m_Registry.all_of<T>(m_Handle);
+			return m_World->EntityHasComponent<T>(m_Handle);
 		}
 
 		template<typename T, typename... Args>
 		T& AddComponent(Args&&... args) {
+			if (HasComponent<T>()) ENGINE_ERROR("Entity already has the component!");
 
-			if (HasComponent<T>()) ENGINE_ERROR("Gameobject already has the component!");
-			T& component = m_World->m_Registry.emplace<T>(m_Handle, std::forward<Args>(args)..., this);
-			component.m_Entity = this;
+			T& component = m_World->RegisterEntityComponent<T>(m_Handle, *this, std::forward<Args>(args)...);
 			return component;
 		}
 
 		template<typename T>
 		T& GetComponent() {
-
-			if (!HasComponent<T>()) ENGINE_ERROR("Gameobject does not have the component to get!");
-			return m_World->m_Registry.get<T>(m_Handle);
+			if (!HasComponent<T>()) ENGINE_ERROR("Entity does not have the component to get!");
+			return m_World->GetEntityComponent<T>(m_Handle);
 		}
 
 		template<typename T>
 		void DestroyComponent() {
+			if (!HasComponent<T>()) ENGINE_ERROR("Entity does not have the component to destroy!");
+			m_World->DestroyEntityComponent<T>(m_Handle);
+		}
 
-			if (!HasComponent<T>()) ENGINE_ERROR("Gameobject does not have the component to destroy!");
-			m_World->m_Registry.remove<T>(m_Handle);
+		template<>
+		void DestroyComponent<TransformComponent>() {
+			assert(false && "Destuction forbidden!");
+		}
+
+		template<>
+		void DestroyComponent<HierarchyComponent>() {
+			assert(false && "Destuction forbidden!");
 		}
 
 		bool operator==(const Entity& other) const {
@@ -70,22 +63,12 @@ namespace Spike {
 			return !(*this == other);
 		}
 
-	private:
-		void UpdateWorldTransform();
+		operator bool() const {
+			return m_World != nullptr && m_Handle != entt::null;
+		}
 
 	private:
-
-		Entity* m_Parent;
-		std::vector<Entity*> m_Children;
-		std::vector<TransformCallBack> m_TransformCallbacks;
-
-		Vec3 m_Position;
-		Vec3 m_Rotation;
-		Vec3 m_Scale;
-		Mat4x4 m_WorldTransform;
-
 		World* m_World;
-		UUID m_ID;
-		EntityHandle m_Handle;
+		entt::entity m_Handle;
  	};
 }

@@ -46,6 +46,5 @@ namespace Spike {
 		Ref<CubeTexture> m_Skybox;
 
 		EditorCamera m_Camera;
-		Entity* m_Entity;
 	};
 }

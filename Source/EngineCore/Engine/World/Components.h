@@ -8,12 +8,68 @@ namespace Spike {
 
 	class BaseEntityComponent {
 	public:
-		BaseEntityComponent(Entity* entity) : m_Entity(entity) {}
+		BaseEntityComponent(Entity entity) : m_Self(entity) {}
 		virtual ~BaseEntityComponent() = default;
 
+		virtual void OnEntityMove(const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& world) {}
+
 	protected:
-		Entity* m_Entity;
-		friend class Entity;
+		Entity m_Self;
+	};
+
+	class HierarchyComponent : public BaseEntityComponent {
+	public:
+		HierarchyComponent(Entity self, World* owner)
+			: BaseEntityComponent(self), m_Owner(owner), m_LayerMask(0) {}
+		virtual ~HierarchyComponent() override;
+
+		void SetName(const std::string& value) { m_Name = value; }
+		const std::string& GetName() const { return m_Name; }
+
+		uint32_t GetLayerMask() const { return m_LayerMask; }
+		void AddLayer(uint32_t layer) { m_LayerMask |= layer; }
+		void RemoveLayer(uint32_t layer) { m_LayerMask &= ~layer; }
+
+		Entity GetParent() const { return m_Parent; }
+		void SetParent(Entity parent);
+
+		const std::vector<Entity>& GetChildren() const { return m_Children; }
+		World* GetOwnerWorld() { return m_Owner; }
+
+	private:
+		std::string m_Name;
+		uint32_t m_LayerMask;
+
+		Entity m_Parent;
+		std::vector<Entity> m_Children;  
+
+		World* m_Owner;
+	};
+
+	class TransformComponent : public BaseEntityComponent {
+	public:
+		TransformComponent(Entity self);
+		virtual ~TransformComponent() override {}
+
+		const Vec3& GetPosition() const { return m_Position; }
+		const Vec3& GetRotation() const { return m_Rotation; }
+		const Vec3& GetScale() const { return m_Scale; }
+		const Mat4x4& GetWorldTranform() const { return m_WorldTransform; }
+
+		void SetPosition(const Vec3& value);
+		void SetRotation(const Vec3& value);
+		void SetScale(const Vec3& value);
+
+		void UpdateParentTransform(const Mat4x4& mat);
+
+	private:
+		void UpdateTransformMatrix(const Mat4x4* parentMat = nullptr);
+
+    private:
+		Vec3 m_Position;
+		Vec3 m_Rotation;
+		Vec3 m_Scale;
+		Mat4x4 m_WorldTransform;
 	};
 
 	class StaticMeshProxy {
@@ -40,7 +96,7 @@ namespace Spike {
 
 	class StaticMeshComponent : public BaseEntityComponent {
 	public:
-		StaticMeshComponent(Entity* entity);
+		StaticMeshComponent(Entity entity);
 		virtual ~StaticMeshComponent() override;
 
 		void SetMesh(Ref<Mesh> mesh);
@@ -48,13 +104,13 @@ namespace Spike {
 		void PushMaterial(Ref<Material> mat);
 		void PopMaterial();
 
+		virtual void OnEntityMove(const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& world) override;
+
 	private:
 
 		Ref<Mesh> m_Mesh;
 		std::vector<Ref<Material>> m_Materials;
 		StaticMeshProxy* m_Proxy;
-
-		uint8_t m_CallBackID;
 	};
 
 	class LightProxy {
@@ -62,17 +118,19 @@ namespace Spike {
 		LightProxy(RHIWorldProxy* wProxy);
 		~LightProxy();
 
+		void Init(const Vec3& pos, const Vec3& rot);
+
 		void SetIntensity(float value);
 		void SetRange(float value);
 		void SetColor(const Vec4& value);
 		void SetDirection(const Vec3& dir);
+		void SetPosition(const Vec3& pos);
 		void SetLightLinear(float value);
 		void SetLightConstant(float value);
 		void SetLightQuadratic(float value);
 		void SetType(uint32_t type);
 		void SetInnerConeCos(float value);
 		void SetOuterConeCos(float value);
-		void OnPositionChange(const Vec3& pos);
 
 	private:
 		uint32_t m_DataIndex;
@@ -88,13 +146,12 @@ namespace Spike {
 
 	class LightComponent : public BaseEntityComponent {
 	public:
-		LightComponent(Entity* entity);
+		LightComponent(Entity entity);
 		virtual ~LightComponent() override;
 
 		void SetIntensity(float value);
 		void SetRange(float value);
 		void SetColor(const Vec4& value);
-		void SetDirection(const Vec3& value);
 		void SetLightLinear(float value);
 		void SetLightConstant(float value);
 		void SetLightQuadratic(float value);
@@ -102,9 +159,10 @@ namespace Spike {
 		void SetInnerConeCos(float value);
 		void SetOuterConeCos(float value);
 
+		virtual void OnEntityMove(const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& world) override;
+
 	private:
 		LightProxy* m_Proxy;
-		uint8_t m_CallBackID;
 	};
 
 	class CameraComponent : public BaseEntityComponent {

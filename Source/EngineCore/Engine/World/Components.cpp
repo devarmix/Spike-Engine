@@ -6,6 +6,104 @@
 
 namespace Spike {
 
+	void HierarchyComponent::SetParent(Entity parent) {
+		assert(m_Self != parent && "Trying to parent entity to self, which is forbidden!");
+
+		if (m_Parent) {
+			auto& parentComp = m_Parent.GetComponent<HierarchyComponent>();
+
+			for (int i = 0; i < parentComp.m_Children.size(); i++) {
+				auto& child = parentComp.m_Children[i];
+
+				if (child == m_Self) {
+					SwapDelete(parentComp.m_Children, i);
+					break;
+				}
+			}
+
+			if (!parent) {
+				m_Owner->SetEntityRoot(m_Self);
+			}
+		}
+
+		m_Parent = parent;
+		if (parent) {
+			auto& parentComp = parent.GetComponent<HierarchyComponent>();
+			parentComp.m_Children.push_back(m_Self);
+
+			auto& parentTransform = parent.GetComponent<TransformComponent>();
+			m_Self.GetComponent<TransformComponent>().UpdateParentTransform(parentTransform.GetWorldTranform());
+		}
+		else {
+			m_Self.GetComponent<TransformComponent>().UpdateParentTransform(Mat4x4(1.f));
+		}
+	}
+
+	HierarchyComponent::~HierarchyComponent() {
+		for (auto& c : m_Children) {
+			c.Destroy();
+		}
+	}
+
+	TransformComponent::TransformComponent(Entity self) : 
+		BaseEntityComponent(self),
+		m_Position(0.f, 0.f, 0.f),
+	    m_Rotation(0.f, 0.f, 0.f),
+	    m_Scale(1.f, 1.f, 1.f) 
+	{
+		UpdateTransformMatrix();
+	}
+
+	void TransformComponent::SetPosition(const Vec3& value) {
+		m_Position = value;
+		UpdateTransformMatrix();
+	}
+
+	void TransformComponent::SetRotation(const Vec3& value) {
+		m_Rotation = value;
+		UpdateTransformMatrix();
+	}
+
+	void TransformComponent::SetScale(const Vec3& value) {
+		m_Scale = value;
+		UpdateTransformMatrix();
+	}
+
+	void TransformComponent::UpdateTransformMatrix(const Mat4x4* parentMat) {
+
+		Mat4x4 T = glm::translate(Mat4x4(1.0f), m_Position);
+
+		Quaternion pitchRotation = glm::angleAxis(m_Rotation.x, Vec3{ 1.f, 0.f, 0.f });
+		Quaternion yawRotation = glm::angleAxis(m_Rotation.y, Vec3{ 0.f, 1.f, 0.f });
+		Quaternion rollRotation = glm::angleAxis(m_Rotation.z, Vec3{ 0.f, 0.f, 1.f });
+
+		Mat4x4 R = glm::toMat4(yawRotation * pitchRotation * rollRotation);
+		Mat4x4 S = glm::scale(glm::mat4(1.0f), m_Scale);
+
+		m_WorldTransform = T * R * S;
+		if (parentMat) {
+			m_WorldTransform *= *parentMat;
+		}
+
+		// call callbacks on change
+		{
+			if (m_Self.HasComponent<StaticMeshComponent>()) {
+				auto& comp = m_Self.GetComponent<StaticMeshComponent>();
+				comp.OnEntityMove(m_Position, m_Rotation, m_Scale, m_WorldTransform);
+			}
+
+			if (m_Self.HasComponent<LightComponent>()) {
+				auto& comp = m_Self.GetComponent<LightComponent>();
+				comp.OnEntityMove(m_Position, m_Rotation, m_Scale, m_WorldTransform);
+			}
+		}
+	}
+
+	void TransformComponent::UpdateParentTransform(const Mat4x4& mat) {
+		UpdateTransformMatrix(&mat);
+	}
+
+
 	StaticMeshProxy::StaticMeshProxy(RHIWorldProxy* wProxy, const Mat4x4& transform) : m_WorldProxy(wProxy), m_LastTransform(transform) {}
 
 	StaticMeshProxy::~StaticMeshProxy() {
@@ -147,21 +245,21 @@ namespace Spike {
 		}
 	}
 
-	StaticMeshComponent::StaticMeshComponent(Entity* entity) : BaseEntityComponent(entity), m_Mesh(nullptr) {
-		m_Proxy = new StaticMeshProxy(entity->GetWorld()->GetProxy(), entity->GetTransform());
-		m_CallBackID = entity->AddTransformCallBack([this](const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& mat) {
-
-			GFrameRenderer->SubmitToFrameQueue([=, proxy = m_Proxy]() {
-				proxy->OnTransformChange(mat);
-				});
-			});
+	StaticMeshComponent::StaticMeshComponent(Entity entity) : BaseEntityComponent(entity), m_Mesh(nullptr) {
+		m_Proxy = new StaticMeshProxy(entity.GetWorld()->GetProxy(), 
+		    entity.GetComponent<TransformComponent>().GetWorldTranform());
 	}
 
 	StaticMeshComponent::~StaticMeshComponent() {
 		GFrameRenderer->SubmitToFrameQueue([proxy = m_Proxy]() {
 			delete proxy;
 			});
-		m_Entity->RemoveTransformCallBack(m_CallBackID);
+	}
+
+	void StaticMeshComponent::OnEntityMove(const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& world) {
+		GFrameRenderer->SubmitToFrameQueue([=, proxy = m_Proxy]() {
+			proxy->OnTransformChange(world);
+			});
 	}
 
 	void StaticMeshComponent::SetMesh(Ref<Mesh> mesh) {
@@ -199,12 +297,16 @@ namespace Spike {
 	}
 
 
-	LightProxy::LightProxy(RHIWorldProxy* wProxy) : m_WorldProxy(wProxy) {
-		m_DataIndex = wProxy->LightsVB.Push({});
-	}
+	LightProxy::LightProxy(RHIWorldProxy* wProxy) 
+		: m_WorldProxy(wProxy), m_DataIndex(~0u) {}
 
 	LightProxy::~LightProxy() {
 		m_WorldProxy->LightsVB.Pop(m_DataIndex);
+	}
+
+	void LightProxy::Init(const Vec3& pos, const Vec3& rot) {
+		m_DataIndex = m_WorldProxy->LightsVB.Push(
+			LightGPUData{.Position = Vec4(pos, 1.0f), .Direction = Vec4(rot, 1.0f)});
 	}
 
 	void LightProxy::SetIntensity(float value) {
@@ -247,17 +349,18 @@ namespace Spike {
 		m_WorldProxy->LightsVB[m_DataIndex].OuterConeCos = value;
 	}
 
-	void LightProxy::OnPositionChange(const Vec3& pos) {
+	void LightProxy::SetPosition(const Vec3& pos) {
 		m_WorldProxy->LightsVB[m_DataIndex].Position = Vec4(pos, 1.0f);
 	}
 
-	LightComponent::LightComponent(Entity* entity) : BaseEntityComponent(entity) {
-		m_Proxy = new LightProxy(entity->GetWorld()->GetProxy());
-		m_CallBackID = entity->AddTransformCallBack([this](const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& mat) {
+	LightComponent::LightComponent(Entity entity) : BaseEntityComponent(entity) {
+		m_Proxy = new LightProxy(entity.GetWorld()->GetProxy());
 
-			GFrameRenderer->SubmitToFrameQueue([pos, proxy = m_Proxy]() {
-				proxy->OnPositionChange(pos);
-				});
+		Vec3 pos = m_Self.GetComponent<TransformComponent>().GetPosition();
+		Vec3 rot = m_Self.GetComponent<TransformComponent>().GetRotation();
+
+		GFrameRenderer->SubmitToFrameQueue([proxy = m_Proxy, pos, rot]() {
+			proxy->Init(pos, rot);
 			});
 	}
 
@@ -265,7 +368,13 @@ namespace Spike {
 		GFrameRenderer->SubmitToFrameQueue([proxy = m_Proxy]() {
 			delete proxy;
 			});
-		m_Entity->RemoveTransformCallBack(m_CallBackID);
+	}
+
+	void LightComponent::OnEntityMove(const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& world) {
+		GFrameRenderer->SubmitToFrameQueue([pos, rot, proxy = m_Proxy]() {
+			proxy->SetPosition(pos);
+			proxy->SetDirection(rot);
+			});
 	}
 
 	void LightComponent::SetIntensity(float value) {
@@ -283,12 +392,6 @@ namespace Spike {
 	void LightComponent::SetColor(const Vec4& value) {
 		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
 			proxy->SetColor(value);
-			});
-	}
-
-	void LightComponent::SetDirection(const Vec3& value) {
-		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
-			proxy->SetDirection(value);
 			});
 	}
 

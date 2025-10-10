@@ -4,6 +4,9 @@
 #include <Engine/Core/Application.h>
 #include <Engine/Renderer/DefaultFeatures.h>
 #include <Engine/World/Components.h>
+#include <Generated/DeferredPBR.h>
+
+#include <random>
 #include <imgui/imgui.h>
 
 inline static std::map<std::string, ImFont*> s_Fonts;
@@ -29,32 +32,41 @@ namespace Spike {
 		m_IrrMap = GRegistry->LoadAsset(UUID(17015075508748921218));
 
 		m_World = World::Create();
+		// cube -  10020809986100263309
 
-		Ref<Mesh> mesh = GRegistry->LoadAsset(UUID(10020809986100263309)).As<Mesh>();
+		Ref<Mesh> meshes[1] = {
+			GRegistry->LoadAsset(UUID(4277593723248069016)).As<Mesh>(),
+			//GRegistry->LoadAsset(UUID(17952529003848048510)).As<Mesh>(),
+			//GRegistry->LoadAsset(UUID(11465955512769156728)).As<Mesh>(),
+			//GRegistry->LoadAsset(UUID(2728495303558564767)).As<Mesh>()
+		};
 
-		m_Entity = new Entity(m_World);
-		auto& c = m_Entity->AddComponent<StaticMeshComponent>();
+		ShaderDesc desc{};
+		desc.Type = EShaderType::EGraphics;
+		desc.Name = "DeferredPBR";
+		desc.ColorTargetFormats = { ETextureFormat::ERGBA16F, ETextureFormat::ERGBA16F, ETextureFormat::ERGBA8U };
+		desc.EnableDepthTest = true;
+		desc.EnableDepthWrite = true;
+		desc.CullBackFaces = true;
+		desc.FrontFace = EFrontFace::ECounterClockWise;
 
+		Ref<Material> mat = Material::Create(EMaterialSurfaceType::EOpaque, desc);
 		{
-			ShaderDesc desc{};
-			desc.Type = EShaderType::EGraphics;
-			desc.Name = "DeferredPBR";
-			desc.ColorTargetFormats = {ETextureFormat::ERGBA16F, ETextureFormat::ERGBA16F, ETextureFormat::ERGBA8U};
-			desc.EnableDepthTest = true;
-			desc.EnableDepthWrite = true;
-			//desc.CullBackFaces = true;
-			desc.FrontFace = EFrontFace::EClockWise;
+			Ref<Texture2D> tex = GRegistry->LoadAsset(UUID(17935795566627736296)).As<Texture2D>();
+			mat->SetTextureSRV(DeferredPBRMaterialResources.AlbedoMap, tex);
+		} 
 
-			Ref<Material> mat = Material::Create(EMaterialSurfaceType::EOpaque, desc);
-			c.PushMaterial(mat);
-		}
+		auto entity = m_World->CreateEntity();
+		auto& mc = entity.AddComponent<StaticMeshComponent>();
+		mc.PushMaterial(mat);
+		mc.SetMesh(meshes[0]);
 
-		c.SetMesh(mesh); //PROBLEM
+		auto& tc = entity.GetComponent<TransformComponent>();
+		tc.SetScale({ 0.05f, 0.05f, 0.05f });
 	}
 
 	WorldViewportWidget::~WorldViewportWidget() {
 		SafeRHIResourceRelease(m_Output);
-		delete m_Entity;
 	}
 
 	void WorldViewportWidget::Tick(float deltaTime) {
@@ -106,14 +118,14 @@ namespace Spike {
 
 			RHIWorldProxy* proxy = m_World->GetProxy();
 			SUBMIT_RENDER_COMMAND(([=]() {
-				std::vector<RenderFeature*> features{
-					GFrameRenderer->LoadFeature(EFeatureType::EGBuffer),
-					GFrameRenderer->LoadFeature(EFeatureType::EDeferredLightning),
-					GFrameRenderer->LoadFeature(EFeatureType::ESkybox),
-					GFrameRenderer->LoadFeature(EFeatureType::ESSAO),
-					GFrameRenderer->LoadFeature(EFeatureType::ESMAA),
-					GFrameRenderer->LoadFeature(EFeatureType::EBloom),
-					GFrameRenderer->LoadFeature(EFeatureType::EToneMap)
+				std::vector<EFeatureType> features{
+					EFeatureType::EGBuffer,
+					EFeatureType::EDeferredLightning,
+					EFeatureType::ESkybox,
+					//GFrameRenderer->LoadFeature(EFeatureType::ESSAO),
+					EFeatureType::ESMAA,
+					EFeatureType::EBloom,
+					EFeatureType::EToneMap
 				};
 
 				GFrameRenderer->RenderWorld(proxy, context, camData, features);

@@ -23,7 +23,7 @@ namespace Spike {
 	void FrameRenderer::SubmitToFrameQueue(std::function<void()>&& func) {
 
 		// we are on render thread
-		if (std::this_thread::get_id() == GApplication->GetRenderThread().GetID()) {
+		if (std::this_thread::get_id() == Application::Get().GetRenderThread().GetID()) {
 			m_FrameQueues[m_FrameCount % 2].push_back(std::move(func));
 		}
 		else {
@@ -37,13 +37,13 @@ namespace Spike {
 		m_BRDFLut(nullptr), m_GuiFontTexture(nullptr),
 		m_CommandBuffers{nullptr, nullptr} 
 	{
-		if (GApplication->IsUsingImGui()) {
+		if (Application::Get().IsUsingImGui()) {
 			ImGui::CreateContext();
 
 			// TODO: change in future
-			ImGui_ImplSDL2_InitForVulkan((SDL_Window*)GApplication->GetMainWindow()->GetNativeWindow());
+			ImGui_ImplSDL2_InitForVulkan((SDL_Window*)Application::Get().GetMainWindow()->GetNativeWindow());
 
-			if (GApplication->IsUsingDocking()) {
+			if (Application::Get().IsUsingDocking()) {
 				ImGuiIO& io = ImGui::GetIO();
 				io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 			}
@@ -127,31 +127,34 @@ namespace Spike {
 			delete m_GuiFontTexture;
 		}
 
-		if (GApplication->IsUsingImGui()) {
+		if (Application::Get().IsUsingImGui()) {
 			ImGui_ImplSDL2_Shutdown();
 			ImGui::DestroyContext();
 		}
 	}
 
-	void FrameRenderer::RenderWorld(RHIWorldProxy* proxy, RenderContext context, const CameraDrawData& cameraData, const std::vector<RenderFeature*>& features) {
+	void FrameRenderer::RenderWorld(RHIWorldProxy* proxy, RenderContext context, const CameraDrawData& cameraData, const std::vector<EFeatureType>& features) {
+		if (!Application::Get().Closing()) {
 
-		RDGBuilder builder = RDGBuilder();
-		uint32_t frameIndex = m_FrameCount % 2;
+			RDGBuilder builder = RDGBuilder();
+			uint32_t frameIndex = m_FrameCount % 2;
 
-		// reset draw counts buffer
-		GRHIDevice->FillBuffer(m_CommandBuffers[frameIndex], proxy->DrawCountsBuffer, proxy->DrawCountsBuffer->GetSize(), 0, 0, EGPUAccessFlags::EIndirectArgs, EGPUAccessFlags::EUAVCompute);
+			// reset draw counts buffer
+			GRHIDevice->FillBuffer(m_CommandBuffers[frameIndex], proxy->DrawCountsBuffer, proxy->DrawCountsBuffer->GetSize(), 0, 0, EGPUAccessFlags::EIndirectArgs, EGPUAccessFlags::EUAVCompute);
 
-		for (auto& feature : features) {
-			feature->BuildGraph(&builder, proxy, context, &cameraData);
+			for (auto& feature : features) {
+				auto f = LoadFeature(feature);
+				f->BuildGraph(&builder, proxy, context, &cameraData);
+			}
+
+			builder.Execute(m_CommandBuffers[frameIndex]);
 		}
-
-		builder.Execute(m_CommandBuffers[frameIndex]);
 	}
 
 	void FrameRenderer::RenderSwapchain(uint32_t width, uint32_t height, RHITexture2D* fillTexture) {
 
 		RHIDevice::ImGuiRTState* guiState = nullptr;
-		if (GApplication->IsUsingImGui()) {
+		if (Application::Get().IsUsingImGui()) {
 			ImGui::EndFrame();
 			ImGui::Render();
 
@@ -195,7 +198,7 @@ namespace Spike {
 			GRHIDevice->DrawSwapchain(m_CommandBuffers[m_FrameCount % 2], width, height, guiState, fillTexture);
 			}));
 
-		GApplication->EnqueueEvent([this]() {
+		Application::Get().EnqueueEvent([this]() {
 			m_FrameCount++;
 			});
 	}
@@ -235,7 +238,7 @@ namespace Spike {
 		RHITexture2D* oldFontsTex = m_GuiFontTexture;
 		uint8_t* newFontsData = nullptr;
 
-		if (GApplication->IsUsingImGui()) {
+		if (Application::Get().IsUsingImGui()) {
 			UpdateFontTexture(&newFontsData);
 
 			ImGui_ImplSDL2_NewFrame();

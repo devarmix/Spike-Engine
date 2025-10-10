@@ -77,9 +77,13 @@ namespace Spike {
 		ESamplerAddress AddressW;
 	};
 
+	struct MeshImportDesc {
+		bool FlipUV;
+	};
+
 	namespace AssetImporter {
 
-		void ImportMesh(const std::filesystem::path& sourcePath, const std::filesystem::path& assetPath);
+		void ImportMesh(const std::filesystem::path& sourcePath, const std::filesystem::path& assetPath, MeshImportDesc desc);
 		void ImportTexture2D(const std::filesystem::path& sourcePath, const std::filesystem::path& assetPath, Texture2DImportDesc desc);
 		void ImportCubeTexture(const std::filesystem::path& sourcePath, const std::filesystem::path& assetPath, CubeTextureImportDesc desc);
 

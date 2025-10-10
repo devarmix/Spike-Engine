@@ -29,7 +29,7 @@ namespace Spike {
 			auto it = m_Registry.find(id);
 			if (it != m_Registry.end()) {
 
-				BinaryReadStream stream(GEditor->GetProjectPath()/it->second.Path);
+				BinaryReadStream stream(SpikeEditor::Get().GetProjectPath()/it->second.Path);
 				if (!stream.IsOpen()) {
 					ENGINE_ERROR("Failed to open asset binary from: {}", it->second.Path.string());
 					return nullptr;
@@ -83,8 +83,8 @@ namespace Spike {
 
 	void EditorRegistry::Save() {
 
-		std::filesystem::create_directories(GEditor->GetProjectPath());
-		BinaryWriteStream stream(GEditor->GetProjectPath()/"Registry.db");
+		std::filesystem::create_directories(SpikeEditor::Get().GetProjectPath());
+		BinaryWriteStream stream(SpikeEditor::Get().GetProjectPath()/"Registry.db");
 		if (!stream.IsOpen()) {
 			ENGINE_ERROR("Failed to create registry bin file!");
 		}
@@ -95,7 +95,7 @@ namespace Spike {
 
 	void EditorRegistry::Deserialize() {
 
-		BinaryReadStream stream(GEditor->GetProjectPath() / "Registry.db");
+		BinaryReadStream stream(SpikeEditor::Get().GetProjectPath() / "Registry.db");
 		if (!stream.IsOpen()) {
 			ENGINE_WARN("Failed to open registry bin file! Ignore this if project was just created");
 		}
@@ -107,8 +107,8 @@ namespace Spike {
 
 
 // utility
-static void ProcessAssimpNode(aiNode* node, const aiScene* scene, const std::filesystem::path& path) {
-	MeshDesc desc{};
+static void ProcessAssimpNode(aiNode* node, const aiScene* scene, const std::filesystem::path& path, MeshImportDesc desc) {
+	MeshDesc meshDesc{};
 
 	for (uint32_t s = 0; s < node->mNumMeshes; s++) {
 
@@ -132,11 +132,19 @@ static void ProcessAssimpNode(aiNode* node, const aiScene* scene, const std::fil
 				if (sMesh->mTextureCoords[0]) {
 					v.UV0.x = sMesh->mTextureCoords[0][i].x;
 					v.UV0.y = sMesh->mTextureCoords[0][i].y;
+
+					if (desc.FlipUV) {
+						v.UV0.y = 1.0f - v.UV0.y;
+					}
 				}
 
 				if (sMesh->mTextureCoords[1]) {
 					v.UV1.x = sMesh->mTextureCoords[1][i].x;
 					v.UV1.y = sMesh->mTextureCoords[1][i].y;
+
+					if (desc.FlipUV) {
+						v.UV1.y = 1.0f - v.UV1.y;
+					}
 				}
 
 				if (sMesh->mColors[0]) {
@@ -146,25 +154,25 @@ static void ProcessAssimpNode(aiNode* node, const aiScene* scene, const std::fil
 					v.Color = MathUtils::PackUnsignedVec4ToUint(Vec4(0.f));
 				}
 
-				desc.Vertices.push_back(std::move(v));
+				meshDesc.Vertices.push_back(std::move(v));
 			}
 
-			subMesh.FirstIndex = (uint32_t)desc.Indices.size();
+			subMesh.FirstIndex = (uint32_t)meshDesc.Indices.size();
 			for (uint32_t i = 0; i < sMesh->mNumFaces; i++) {
 
 				aiFace face = sMesh->mFaces[i];
-				for (uint32_t f = 0; f < face.mNumIndices; f++) {
-					desc.Indices.push_back(face.mIndices[f]);
-					subMesh.IndexCount++;
+				for (uint32_t f = 0; f < face.mNumIndices; f++) { 
+					meshDesc.Indices.push_back(face.mIndices[f]);
+					subMesh.IndexCount++; 
 				}
 			}
 		}
 
-		desc.SubMeshes.push_back(std::move(subMesh));
+		meshDesc.SubMeshes.push_back(std::move(subMesh));
 	}
 
 	// import a mesh asset
-	if (desc.Vertices.size() > 0 && desc.Indices.size() > 0 && desc.SubMeshes.size() > 0) {
+	if (meshDesc.Vertices.size() > 0 && meshDesc.Indices.size() > 0 && meshDesc.SubMeshes.size() > 0) {
 		EditorRegistry::AssetInfo info{};
 		info.Type = EAssetType::EMesh;
 
@@ -173,7 +181,7 @@ static void ProcessAssimpNode(aiNode* node, const aiScene* scene, const std::fil
 
 		info.Path = std::filesystem::path(path / name);
 
-		std::filesystem::path fullPath = GEditor->GetProjectPath() / info.Path;
+		std::filesystem::path fullPath = SpikeEditor::Get().GetProjectPath() / info.Path;
 		std::filesystem::create_directories(fullPath.parent_path());
 		BinaryWriteStream stream(fullPath);
 
@@ -181,16 +189,16 @@ static void ProcessAssimpNode(aiNode* node, const aiScene* scene, const std::fil
 			ENGINE_ERROR("Failed to create mesh asset stream! Path: {}", fullPath.string());
 			return;
 		}
-		stream << MESH_MAGIC << desc.Vertices << desc.Indices << desc.SubMeshes;
-		GApplication->DispatchEvent<AssetImportedEvent>(info);
+		stream << MESH_MAGIC << meshDesc.Vertices << meshDesc.Indices << meshDesc.SubMeshes;
+		Application::Get().DispatchEvent<AssetImportedEvent>(info);
 	}
 
 	for (uint32_t i = 0; i < node->mNumChildren; i++) {
-		ProcessAssimpNode(node->mChildren[i], scene, path);
+		ProcessAssimpNode(node->mChildren[i], scene, path, desc);
 	}
 }
 
-void Spike::AssetImporter::ImportMesh(const std::filesystem::path& sourcePath, const std::filesystem::path& assetPath) {
+void Spike::AssetImporter::ImportMesh(const std::filesystem::path& sourcePath, const std::filesystem::path& assetPath, MeshImportDesc desc) {
 
 	Assimp::Importer importer;
 	const aiScene* scene = importer.ReadFile(sourcePath.string(), aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_CalcTangentSpace);
@@ -199,7 +207,7 @@ void Spike::AssetImporter::ImportMesh(const std::filesystem::path& sourcePath, c
 		ENGINE_ERROR("Failed to import mesh from: {0}, with error: {1}", sourcePath.string(), importer.GetErrorString());
 		return;
 	}
-	ProcessAssimpNode(scene->mRootNode, scene, assetPath);
+	ProcessAssimpNode(scene->mRootNode, scene, assetPath, desc);
 }
 
 // utility
@@ -429,7 +437,7 @@ void Spike::AssetImporter::ImportTexture2D(const std::filesystem::path& sourcePa
 
 		// output processed texture onto bin asset file
 		{
-			std::filesystem::path fullPath = GEditor->GetProjectPath() / assetPath;
+			std::filesystem::path fullPath = SpikeEditor::Get().GetProjectPath() / assetPath;
 
 			std::filesystem::create_directories(fullPath.parent_path());
 			BinaryWriteStream stream(fullPath);
@@ -446,7 +454,7 @@ void Spike::AssetImporter::ImportTexture2D(const std::filesystem::path& sourcePa
 			info.Type = EAssetType::ETexture2D;
 			info.Path = assetPath;
 
-			GApplication->DispatchEvent<AssetImportedEvent>(info);
+			Application::Get().DispatchEvent<AssetImportedEvent>(info);
 		}
 
 		mipBuffer->ReleaseRHIImmediate();
@@ -617,7 +625,7 @@ static void ImportCubeTextureInternal(RHITexture* sampledTexture, const std::fil
 
 	// output processed texture onto bin asset file
 	{
-		std::filesystem::path fullPath = GEditor->GetProjectPath() / assetPath;
+		std::filesystem::path fullPath = SpikeEditor::Get().GetProjectPath() / assetPath;
 
 		std::filesystem::create_directories(fullPath.parent_path());
 		BinaryWriteStream stream(fullPath);
@@ -634,7 +642,7 @@ static void ImportCubeTextureInternal(RHITexture* sampledTexture, const std::fil
 		info.Type = EAssetType::ECubeTexture;
 		info.Path = assetPath;
 
-		GApplication->DispatchEvent<AssetImportedEvent>(info);
+		Application::Get().DispatchEvent<AssetImportedEvent>(info);
 	}
 
 	mipBuffer->ReleaseRHIImmediate();
@@ -687,9 +695,10 @@ void Spike::AssetImporter::ImportCubeTexture(const std::filesystem::path& source
 				(size_t)texDesc.Width * texDesc.Height * TextureFormatToSize(texDesc.Format));
 			stbi_image_free(rawData);
 		}
-
 		ImportCubeTextureInternal(sampledTex, assetPath, desc);
+
 		sampledTex->ReleaseRHIImmediate();
+		delete sampledTex;
 		});
 }
 

@@ -31,7 +31,7 @@ namespace Spike {
 			else if (m_ViewportHovered) {
 				float distance = GInput->GetMouseScroll() * m_ScrollSpeed;
 
-				if (distance > 0) {
+				if (distance != 0) {
 					Mat4x4 cameraRotation = GetRotationMatrix();
 					m_Position += Vec3(cameraRotation * Vec4(0.f, 0.f, -distance, 0.f));
 				}

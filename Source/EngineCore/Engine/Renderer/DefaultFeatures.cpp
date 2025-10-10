@@ -125,52 +125,52 @@ namespace Spike {
 
 				RHIBuffer* ubo = graphBuilder->GetBufferResource(sceneUBO);
 				{
-					WorldGPUData& worldData = *(WorldGPUData*)ubo->GetMappedData();
-					worldData.View = cameraData->View;
-					worldData.Proj = cameraData->Proj;
-					worldData.ViewProj = cameraData->Proj * cameraData->View;
-					worldData.InverseProj = glm::inverse(cameraData->Proj);
-					worldData.InverseView = glm::inverse(cameraData->View);
-					worldData.CameraPos = Vec4(cameraData->Position, 1.f);
+					WorldGPUData* worldData = (WorldGPUData*)ubo->GetMappedData();
+					worldData->View = cameraData->View;
+					worldData->Proj = cameraData->Proj;
+					worldData->ViewProj = cameraData->Proj * cameraData->View;
+					worldData->InverseProj = glm::inverse(cameraData->Proj);
+					worldData->InverseView = glm::inverse(cameraData->View);
+					worldData->CameraPos = Vec4(cameraData->Position, 1.f);
 
-					glm::mat4& vp = worldData.ViewProj;
-					worldData.FrustumPlanes[0] = glm::vec4(
+					glm::mat4& vp = worldData->ViewProj;
+					worldData->FrustumPlanes[0] = glm::vec4(
 						vp[0][3] + vp[0][0], vp[1][3] + vp[1][0],
 						vp[2][3] + vp[2][0], vp[3][3] + vp[3][0]);
-					worldData.FrustumPlanes[1] = glm::vec4(
+					worldData->FrustumPlanes[1] = glm::vec4(
 						vp[0][3] - vp[0][0], vp[1][3] - vp[1][0],
 						vp[2][3] - vp[2][0], vp[3][3] - vp[3][0]);
-					worldData.FrustumPlanes[2] = glm::vec4(
+					worldData->FrustumPlanes[2] = glm::vec4(
 						vp[0][3] + vp[0][1], vp[1][3] + vp[1][1],
 						vp[2][3] + vp[2][1], vp[3][3] + vp[3][1]);
-					worldData.FrustumPlanes[3] = glm::vec4(
+					worldData->FrustumPlanes[3] = glm::vec4(
 						vp[0][3] - vp[0][1], vp[1][3] - vp[1][1],
 						vp[2][3] - vp[2][1], vp[3][3] - vp[3][1]);
-					worldData.FrustumPlanes[4] = glm::vec4(
+					worldData->FrustumPlanes[4] = glm::vec4(
 						vp[0][3] + vp[0][2], vp[1][3] + vp[1][2],
 						vp[2][3] + vp[2][2], vp[3][3] + vp[3][2]);
-					worldData.FrustumPlanes[5] = glm::vec4(
+					worldData->FrustumPlanes[5] = glm::vec4(
 						vp[0][3] - vp[0][2], vp[1][3] - vp[1][2],
 						vp[2][3] - vp[2][2], vp[3][3] - vp[3][2]);
 
 					for (int i = 0; i < 6; i++) {
-						float length = glm::length(glm::vec3(worldData.FrustumPlanes[i]));
-						worldData.FrustumPlanes[i] /= length;
+						float length = glm::length(glm::vec3(worldData->FrustumPlanes[i]));
+						worldData->FrustumPlanes[i] /= length;
 					}
 
-					worldData.P00 = worldData.Proj[0][0];
-					worldData.P11 = worldData.Proj[1][1];
-					worldData.NearProj = cameraData->NearProj;
-					worldData.FarProj = cameraData->FarProj;
-					worldData.LightsCount = proxy->LightsVB.Size();
-					worldData.ObjectsCount = proxy->ObjectsVB.Size();
+					worldData->P00 = worldData->Proj[0][0];
+					worldData->P11 = worldData->Proj[1][1];
+					worldData->NearProj = cameraData->NearProj;
+					worldData->FarProj = cameraData->FarProj;
+					worldData->LightsCount = proxy->LightsVB.Size();
+					worldData->ObjectsCount = proxy->ObjectsVB.Size();
 
 					// TODO: Make serializable and changeble in world settings
-					worldData.SunColor = { 1.0f, 0.7f, 0.6f, 1.0f };
-					worldData.SunIntensity = 15;
+					worldData->SunColor = { 1.0f, 0.7f, 0.6f, 1.0f };
+					worldData->SunIntensity = 15;
 
 					// should probably be normalized on cpu
-					worldData.SunDirection = Vec4(-58.823f, -588.235f, 735.394f, 0.0f);
+					worldData->SunDirection = Vec4(-58.823f, -588.235f, 735.394f, 0.0f);
 				}
 
 				std::vector<uint32_t> batchOffsets;
@@ -408,7 +408,7 @@ namespace Spike {
 					lightingSet->AddSamplerWrite(8, 0, EShaderResourceType::ESampler, context.OutTexture->GetSampler());
 					lightingSet->AddSamplerWrite(9, 0, EShaderResourceType::ESampler, context.EnvironmentTexture->GetSampler());
 					lightingSet->AddBufferWrite(10, 0, EShaderResourceType::EBufferSRV, proxy->LightsBuffer, proxy->LightsBuffer->GetSize(), 0);
-				}
+				} 
 
 				DeferredLightingPushData pushData{};
 				pushData.EnvMapNumMips = context.EnvironmentTexture->GetNumMips();
@@ -429,7 +429,7 @@ namespace Spike {
 
 				graphBuilder->BarrierRDGTexture2D(cmd, context.OutTexture, EGPUAccessFlags::ESRV);
 			});
-	}
+	} 
 
 
 	SkyboxFeature::SkyboxFeature() {

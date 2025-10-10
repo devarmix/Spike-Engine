@@ -1,6 +1,8 @@
 #include <Engine/World/World.h>
 #include <Engine/Renderer/FrameRenderer.h>
 #include <Engine/Core/Application.h>
+#include <Engine/World/Entity.h>
+#include <Engine/World/Components.h>
 
 Spike::World* Spike::World::s_Current = nullptr;
 
@@ -85,6 +87,8 @@ namespace Spike {
 	}
 
 	World::~World() {
+		m_Registry.clear();
+
 		GFrameRenderer->SubmitToFrameQueue([proxy = m_Proxy]() {
 			proxy->ReleaseRHI();
 			delete proxy;
@@ -104,4 +108,37 @@ namespace Spike {
 
 		}
 	}
+
+	Entity World::CreateEntity(const std::string& name) {
+		entt::entity handle = m_Registry.create();
+		Entity entt(this, handle);
+
+		entt.AddComponent<TransformComponent>();
+		auto& h = entt.AddComponent<HierarchyComponent>(this);
+		h.SetName(name);
+
+		m_Entities.push_back(entt);
+		m_RootEntities.push_back(entt);
+
+		return entt;
+	}
+
+	void World::DestroyEntity(Entity entity) {
+		m_Registry.destroy(entity.GetHandle());
+	}
+
+	void World::SetEntityRoot(Entity entity) {
+		m_RootEntities.push_back(entity);
+	}
+
+	void World::UnSetEntityRoot(Entity entity) {
+		for (uint32_t i = 0; i < m_RootEntities.size(); i++) {
+			auto& e = m_RootEntities[i];
+
+			if (e == entity) {
+				SwapDelete(m_RootEntities, i);
+				break;
+			}
+		}
+	} 
 }

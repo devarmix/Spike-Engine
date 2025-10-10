@@ -46,7 +46,7 @@ namespace Spike {
 		FrameRenderer();
 		~FrameRenderer();
 
-		void RenderWorld(RHIWorldProxy* proxy, RenderContext context, const CameraDrawData& cameraData, const std::vector<RenderFeature*>& features);
+		void RenderWorld(RHIWorldProxy* proxy, RenderContext context, const CameraDrawData& cameraData, const std::vector<EFeatureType>& features);
 		void RenderSwapchain(uint32_t width, uint32_t height, RHITexture2D* fillTexture = nullptr);
 		void BeginFrame();
 
@@ -54,11 +54,11 @@ namespace Spike {
 		RHITexture2D* GetBRDFLut() { return m_BRDFLut; }
 
 		void SubmitToFrameQueue(std::function<void()>&& func);
-		RenderFeature* LoadFeature(EFeatureType type);
 
 	private:
 		void FlushFrameQueue(uint32_t idx);
 		void UpdateFontTexture(uint8_t** outData);
+		RenderFeature* LoadFeature(EFeatureType type);
 
 	private:
 		RHICommandBuffer* m_CommandBuffers[2];

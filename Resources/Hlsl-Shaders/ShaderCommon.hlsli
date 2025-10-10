@@ -26,7 +26,7 @@ struct SceneGPUData {
 struct SceneObjectGPUData {
 
 	float4 BoundsOrigin; // w - bounds radius
-	float4 BoundsExtents;
+	//float4 BoundsExtents;
 	float4x4 GlobalTransform;
     float4x4 InverseTransform;
 
@@ -39,7 +39,7 @@ struct SceneObjectGPUData {
 	uint MaterialBufferIndex;
 	uint DrawBatchID;
 
-	int VisibilityIdx;
+	uint VisibilityIdx;
     float Padding0[3];
 };
 
@@ -69,16 +69,11 @@ float4 UnpackUintToUnsignedVec4(uint packed) {
     return float4(r, g, b, a);
 }
 
-struct PackedHalf {
-    uint A;
-    uint B;
-};
-
-float4 UnpackHalfToSignedVec4(PackedHalf packed) {
-	float x = (float((packed.A & 0x0000ffff) >> 0) / 65535.f) * 2.f - 1.f;
-	float y = (float((packed.A & 0xffff0000) >> 16) / 65535.f) * 2.f - 1.f;
-	float z = (float((packed.B & 0x0000ffff) >> 0) / 65535.f) * 2.f - 1.f;
-	float w = (float((packed.B & 0xffff0000) >> 16) / 65535.f) * 2.f - 1.f;
+float4 UnpackHalfToSignedVec4(uint2 packed) {
+	float x = (float((packed.x & 0x0000ffff) >> 0) / 65535.f) * 2.f - 1.f;
+	float y = (float((packed.x & 0xffff0000) >> 16) / 65535.f) * 2.f - 1.f;
+	float z = (float((packed.y & 0x0000ffff) >> 0) / 65535.f) * 2.f - 1.f;
+	float w = (float((packed.y & 0xffff0000) >> 16) / 65535.f) * 2.f - 1.f;
 
 	return float4(x, y, z, w);
 }
@@ -104,8 +99,8 @@ struct Vertex {
     float2 UV0;
     float2 UV1;
 
-    PackedHalf Tangent;
-    PackedHalf Normal;
+    uint2 Tangent;
+    uint2 Normal;
 };
 
 struct MaterialData {

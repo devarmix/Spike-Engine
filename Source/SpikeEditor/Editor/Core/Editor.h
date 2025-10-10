@@ -11,11 +11,12 @@ namespace Spike {
 		virtual ~SpikeEditor() override;
 
 		const std::filesystem::path& GetProjectPath() const { return m_ProjectPath; }
+		static SpikeEditor& Get() { assert(s_Instance); return *s_Instance; }
+
 	private:
 		EditorLayer* m_EditorLayer;
 		std::filesystem::path m_ProjectPath;
-	};
 
-	// global editor pointer
-	extern SpikeEditor* GEditor;
+		static SpikeEditor* s_Instance;
+	};
 }
