@@ -3,6 +3,7 @@
 #include <entt/entt.hpp>
 #include <Engine/Utils/MathUtils.h>
 #include <Engine/Renderer/Shader.h>
+#include <Engine/Asset/UUID.h>
 
 namespace Spike {
 
@@ -116,8 +117,8 @@ namespace Spike {
 		void Tick();
 		RHIWorldProxy* GetProxy() { return m_Proxy; }
 
-		static Ref<World> Create();
-		static Ref<World> GetWorld() { return s_Current; }
+		static Ref<World> Create(BinaryReadStream& stream);
+		void SaveAs(const std::filesystem::path& path);
 
 		Entity CreateEntity(const std::string& name = "New Entity");
 		void DestroyEntity(Entity entity);
@@ -147,11 +148,11 @@ namespace Spike {
 
 		ASSET_CLASS_TYPE(EAssetType::EWorld)
 	private:
-		static World* s_Current;
 		entt::registry m_Registry;
 
 		std::vector<Entity> m_RootEntities;
 		std::vector<Entity> m_Entities;
+		std::unordered_map<UUID, Entity> m_EntityMap;
 
 		RHIWorldProxy* m_Proxy;
 	};

@@ -6,7 +6,7 @@
 
 namespace Spike {
 
-	void HierarchyComponent::SetParent(Entity parent) {
+	void HierarchyComponent::SetParent(Entity parent, bool inLocalSpace) {
 		assert(m_Self != parent && "Trying to parent entity to self, which is forbidden!");
 
 		if (m_Parent) {
@@ -32,7 +32,9 @@ namespace Spike {
 			parentComp.m_Children.push_back(m_Self);
 
 			auto& parentTransform = parent.GetComponent<TransformComponent>();
-			m_Self.GetComponent<TransformComponent>().UpdateParentTransform(parentTransform.GetWorldTranform());
+
+			if (!inLocalSpace)
+			    m_Self.GetComponent<TransformComponent>().UpdateParentTransform(parentTransform.GetWorldTranform());
 		}
 		else {
 			m_Self.GetComponent<TransformComponent>().UpdateParentTransform(Mat4x4(1.f));
@@ -43,6 +45,32 @@ namespace Spike {
 		for (auto& c : m_Children) {
 			c.Destroy();
 		}
+	}
+
+	void HierarchyComponent::Serialize(BinaryWriteStream& stream) {
+		if (m_Parent) {
+			auto& parentComp = m_Parent.GetComponent<HierarchyComponent>();
+			stream << parentComp.GetID();
+		}
+		else {
+			stream << UUID();
+		}
+
+		stream << m_Name;
+		stream << m_LayerMask;
+	}
+
+	void HierarchyComponent::Deserialize(BinaryReadStream& stream) {
+		UUID parentID;
+		stream >> parentID;
+
+		if (parentID != UUID()) {
+			Entity parent = m_Owner->GetEntityByID(parentID);
+			SetParent(parent, true);
+		}
+
+		stream >> m_Name;
+		stream >> m_LayerMask;
 	}
 
 	TransformComponent::TransformComponent(Entity self) : 
@@ -101,6 +129,20 @@ namespace Spike {
 
 	void TransformComponent::UpdateParentTransform(const Mat4x4& mat) {
 		UpdateTransformMatrix(&mat);
+	}
+
+	void TransformComponent::Serialize(BinaryWriteStream& stream) {
+		stream << m_Position;
+		stream << m_Rotation;
+		stream << m_Scale;
+		stream << m_WorldTransform;
+	}
+
+	void TransformComponent::Deserialize(BinaryReadStream& stream) {
+		stream >> m_Position;
+		stream >> m_Rotation;
+		stream >> m_Scale;
+		stream >> m_WorldTransform;
 	}
 
 
@@ -296,6 +338,42 @@ namespace Spike {
 		m_Materials.pop_back();
 	}
 
+	void StaticMeshComponent::Serialize(BinaryWriteStream& stream) {
+		if (m_Mesh.Valid()) {
+			stream << m_Mesh->GetUUID();
+		}
+		else {
+			stream << UUID();
+		}
+
+		stream << (uint32_t)m_Materials.size();
+		for (auto& m : m_Materials) {
+			stream << m->GetUUID();
+		}
+	}
+
+	void StaticMeshComponent::Deserialize(BinaryReadStream& stream) {
+		UUID meshID;
+		stream >> meshID;
+
+		if (meshID != UUID()) {
+			Ref <Mesh> mesh = GRegistry->LoadAsset(meshID).As<Mesh>();
+			SetMesh(mesh);
+		}
+
+		uint32_t numMaterials;
+		stream >> numMaterials;
+
+		m_Materials.reserve(numMaterials);
+		for (uint32_t i = 0; i < numMaterials; i++) {
+			UUID matID;
+			stream >> matID;
+
+			Ref<Material> mat = GRegistry->LoadAsset(matID).As<Material>();
+			PushMaterial(mat);
+		}
+	}
+
 
 	LightProxy::LightProxy(RHIWorldProxy* wProxy) 
 		: m_WorldProxy(wProxy), m_DataIndex(~0u) {}
@@ -353,7 +431,18 @@ namespace Spike {
 		m_WorldProxy->LightsVB[m_DataIndex].Position = Vec4(pos, 1.0f);
 	}
 
-	LightComponent::LightComponent(Entity entity) : BaseEntityComponent(entity) {
+	LightComponent::LightComponent(Entity entity) 
+		: BaseEntityComponent(entity),
+	    m_Color(0.f, 0.f, 0.f, 0.f),
+		m_Intensity(0.f),
+		m_Range(0.f),
+		m_LightLinear(0.f),
+		m_LightConstant(1.f),
+		m_LightQuadratic(0.f),
+		m_InnerConeCos(0.f),
+		m_OuterConeCos(0.f),
+		m_Type(ELightType::ENone)
+	{
 		m_Proxy = new LightProxy(entity.GetWorld()->GetProxy());
 
 		Vec3 pos = m_Self.GetComponent<TransformComponent>().GetPosition();
@@ -378,54 +467,72 @@ namespace Spike {
 	}
 
 	void LightComponent::SetIntensity(float value) {
+		m_Intensity = value;
+
 		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
 			proxy->SetIntensity(value);
 			});
 	}
 
 	void LightComponent::SetRange(float value) {
+		m_Range = value;
+
 		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
 			proxy->SetRange(value);
 			});
 	}
 
 	void LightComponent::SetColor(const Vec4& value) {
+		m_Color = value;
+
 		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
 			proxy->SetColor(value);
 			});
 	}
 
 	void LightComponent::SetLightLinear(float value) {
+		m_LightLinear = value;
+
 		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
 			proxy->SetLightLinear(value);
 			});
 	}
 
 	void LightComponent::SetLightConstant(float value) {
+		m_LightConstant = value;
+
 		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
 			proxy->SetLightConstant(value);
 			});
 	}
 
 	void LightComponent::SetLightQuadratic(float value) {
+		m_LightQuadratic = value;
+
 		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
 			proxy->SetLightQuadratic(value);
 			});
 	}
 
 	void LightComponent::SetType(ELightType type) {
+		m_Type = type;
+
 		GFrameRenderer->SubmitToFrameQueue([type, proxy = m_Proxy]() {
 			proxy->SetType((uint8_t)type);
 			});
 	}
 
 	void LightComponent::SetInnerConeCos(float value) {
+		m_InnerConeCos = value;
+
 		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
 			proxy->SetInnerConeCos(value);
 			});
 	}
 
 	void LightComponent::SetOuterConeCos(float value) {
+		m_OuterConeCos = value;
+
 		GFrameRenderer->SubmitToFrameQueue([value, proxy = m_Proxy]() {
 			proxy->SetOuterConeCos(value);
 			});

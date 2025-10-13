@@ -4,8 +4,6 @@
 #include <Engine/World/Entity.h>
 #include <Engine/World/Components.h>
 
-Spike::World* Spike::World::s_Current = nullptr;
-
 namespace Spike {
 
 	RHIWorldProxy::RHIWorldProxy() {
@@ -95,7 +93,23 @@ namespace Spike {
 			});
 	}
 
-	Ref<World> World::Create() {
+	void World::SaveAs(const std::filesystem::path& path) {
+		BinaryWriteStream stream(path);
+		if (!stream.IsOpen()) {
+			ENGINE_ERROR("Failed to create world file at: {}", path.string());
+			return;
+		}
+
+		stream << m_Entities.size();
+		for (auto& e : m_Entities) {
+			e.GetComponent<TransformComponent>().Serialize(stream);
+			e.GetComponent<HierarchyComponent>().Serialize(stream);
+
+
+		}
+	}
+
+	Ref<World> World::Create(BinaryReadStream& stream) {
 		Ref<World> w = CreateRef<World>();
 		s_Current = w.Get();
 		return w;

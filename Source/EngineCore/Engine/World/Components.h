@@ -12,6 +12,8 @@ namespace Spike {
 		virtual ~BaseEntityComponent() = default;
 
 		virtual void OnEntityMove(const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& world) {}
+		virtual void Serialize(BinaryWriteStream& stream) = 0;
+		virtual void Deserialize(BinaryReadStream& stream) = 0;
 
 	protected:
 		Entity m_Self;
@@ -19,8 +21,8 @@ namespace Spike {
 
 	class HierarchyComponent : public BaseEntityComponent {
 	public:
-		HierarchyComponent(Entity self, World* owner)
-			: BaseEntityComponent(self), m_Owner(owner), m_LayerMask(0) {}
+		HierarchyComponent(Entity self, UUID id, World* owner)
+			: BaseEntityComponent(self), m_Owner(owner), m_LayerMask(0), m_ID(id) {}
 		virtual ~HierarchyComponent() override;
 
 		void SetName(const std::string& value) { m_Name = value; }
@@ -30,14 +32,19 @@ namespace Spike {
 		void AddLayer(uint32_t layer) { m_LayerMask |= layer; }
 		void RemoveLayer(uint32_t layer) { m_LayerMask &= ~layer; }
 
+		UUID GetID() const { return m_ID; }
 		Entity GetParent() const { return m_Parent; }
-		void SetParent(Entity parent);
+		void SetParent(Entity parent, bool inLocalSpace = false);
 
 		const std::vector<Entity>& GetChildren() const { return m_Children; }
 		World* GetOwnerWorld() { return m_Owner; }
 
+		virtual void Serialize(BinaryWriteStream& stream) override;
+		virtual void Deserialize(BinaryReadStream& stream) override;
+
 	private:
 		std::string m_Name;
+		UUID m_ID;
 		uint32_t m_LayerMask;
 
 		Entity m_Parent;
@@ -61,6 +68,9 @@ namespace Spike {
 		void SetScale(const Vec3& value);
 
 		void UpdateParentTransform(const Mat4x4& mat);
+
+		virtual void Serialize(BinaryWriteStream& stream) override;
+		virtual void Deserialize(BinaryReadStream& stream) override;
 
 	private:
 		void UpdateTransformMatrix(const Mat4x4* parentMat = nullptr);
@@ -105,6 +115,8 @@ namespace Spike {
 		void PopMaterial();
 
 		virtual void OnEntityMove(const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& world) override;
+		virtual void Serialize(BinaryWriteStream& stream) override;
+		virtual void Deserialize(BinaryReadStream& stream) override;
 
 	private:
 
@@ -159,10 +171,33 @@ namespace Spike {
 		void SetInnerConeCos(float value);
 		void SetOuterConeCos(float value);
 
+		float GetIntensity() const { return m_Intensity; }
+		float GetRange() const { return m_Range; }
+		float GetLightLinear() const { return m_LightLinear; }
+		float GetLightConstant() const { return m_LightConstant; }
+		float GetLightQuadratic() const { return m_LightQuadratic; }
+		float GetInnerConeCos() const { return m_InnerConeCos; }
+		float GetOuterConeCos() const { return m_OuterConeCos; }
+		const Vec4& GetColor() const { return m_Color; }
+		ELightType GetType() const { return m_Type; }
+
 		virtual void OnEntityMove(const Vec3& pos, const Vec3& rot, const Vec3& scale, const Mat4x4& world) override;
+		virtual void Serialize(BinaryWriteStream& stream) override;
+		virtual void Deserialize(BinaryReadStream& stream) override;
 
 	private:
 		LightProxy* m_Proxy;
+
+		float m_Intensity;
+		float m_Range;
+		Vec4 m_Color;
+		float m_LightLinear;
+		float m_LightQuadratic;
+		float m_LightConstant;
+		float m_InnerConeCos;
+		float m_OuterConeCos;
+
+		ELightType m_Type;
 	};
 
 	class CameraComponent : public BaseEntityComponent {

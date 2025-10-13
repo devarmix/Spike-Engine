@@ -35,7 +35,7 @@ namespace Spike {
 		// cube -  10020809986100263309
 
 		Ref<Mesh> meshes[1] = {
-			GRegistry->LoadAsset(UUID(4277593723248069016)).As<Mesh>(),
+			GRegistry->LoadAsset(UUID(10020809986100263309)).As<Mesh>(),
 			//GRegistry->LoadAsset(UUID(17952529003848048510)).As<Mesh>(),
 			//GRegistry->LoadAsset(UUID(11465955512769156728)).As<Mesh>(),
 			//GRegistry->LoadAsset(UUID(2728495303558564767)).As<Mesh>()
@@ -56,13 +56,22 @@ namespace Spike {
 			mat->SetTextureSRV(DeferredPBRMaterialResources.AlbedoMap, tex);
 		} 
 
-		auto entity = m_World->CreateEntity();
-		auto& mc = entity.AddComponent<StaticMeshComponent>();
-		mc.PushMaterial(mat);
-		mc.SetMesh(meshes[0]);
+		for (int x = 0; x < 5; x++) {
+			for (int y = 0; y < 5; y++) {
+				for (int z = 0; z < 5; z++) {
 
-		auto& tc = entity.GetComponent<TransformComponent>();
-		tc.SetScale({ 0.05f, 0.05f, 0.05f });
+					auto entity = m_World->CreateEntity();
+					auto& mc = entity.AddComponent<StaticMeshComponent>();
+					mc.PushMaterial(mat);
+					mc.SetMesh(meshes[0]);
+
+					auto& tc = entity.GetComponent<TransformComponent>();
+					//tc.SetScale({ 0.05f, 0.05f, 0.05f });
+					tc.SetPosition({ x * 4 + rand() % 5, y * 4 + rand() % 5, z * 4 + rand() % 5 });
+					tc.SetRotation({ rand() % 360, rand() % 360, rand() % 360 });
+				}
+			}
+		}
 	}
 
 	WorldViewportWidget::~WorldViewportWidget() {
@@ -70,9 +79,7 @@ namespace Spike {
 	}
 
 	void WorldViewportWidget::Tick(float deltaTime) {
-		static bool open = true;
-
-		ImGui::Begin("World", &open, ImGuiWindowFlags_NoMove);
+		ImGui::Begin("World");
 		ImVec2 size = ImGui::GetContentRegionAvail();
 
 		if (size.x >= 1 && size.y >= 1) {
